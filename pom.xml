@@ -15,7 +15,7 @@
         <kotlin.code.style>official</kotlin.code.style>
         <kotlin.compiler.jvmTarget>21</kotlin.compiler.jvmTarget>
         <maven.compiler.release>21</maven.compiler.release>
-        <kotlin.version>2.4.20</kotlin.version>
+        <kotlin.version>2.2.0</kotlin.version>
         <javafx.version>21.0.8</javafx.version>
     </properties>
 

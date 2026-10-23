@@ -85,7 +85,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         element: SvgElement, ancestors: List<SvgElement>, parentStyle: Map<String, String>,
         viewport: SvgViewport, isRoot: Boolean, referenced: Boolean
     ): Node? {
-        if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop")) return null
+        if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop", "filter")) return null
         if (element.name == "symbol" && !referenced) return null
         if (element.name == "clipPath" && !referenced) return null
         val style = styles.compute(element, ancestors, parentStyle)
@@ -95,7 +95,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 report("Unsupported child ${it.name} inside ${element.name}", it)
             }
         }
-        for (attribute in listOf("filter", "mask", "marker-start", "marker-mid", "marker-end", "vector-effect", "paint-order")) {
+        for (attribute in listOf("mask", "marker-start", "marker-mid", "marker-end", "vector-effect", "paint-order")) {
             if (element[attribute] != null) report("Unsupported SVG attribute: $attribute", element)
         }
         fun length(name: String, axis: Double, default: String = "0") = SvgNumbers.length(element[name] ?: default, axis)
@@ -273,8 +273,35 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 applyShapeStyle(styleNode, style, viewport, element, node)
             }
         }
-        if (style.getValue("clip-path") != "none") applyClip(node, style.getValue("clip-path"), viewport, element)
-        return node
+        val result = if (!clipping && style.getValue("filter") != "none") applyFilter(node, style.getValue("filter"), viewport, element) else node
+        if (style.getValue("clip-path") != "none") applyClip(result, style.getValue("clip-path"), viewport, element)
+        return result
+    }
+
+    private fun applyFilter(node: Node, value: String, viewport: SvgViewport, owner: SvgElement): Node {
+        return try {
+            val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)").matchEntire(value)?.groupValues?.get(1)
+                ?: throw SvgException("Only local filter references are supported")
+            val filter = document.elementsById[id] ?: throw SvgException("Missing filter: #$id")
+            require(filter.name == "filter") { "Filter reference is not a filter: #$id" }
+            require(filter["href"] == null && filter["xlink:href"] == null && filter["filterRes"] == null) {
+                "Filter templates and filterRes are unsupported"
+            }
+            val primitives = filter.children.filter { it.name !in setOf("title", "desc", "metadata") }
+            require(primitives.size == 1 && primitives.single().name == "feGaussianBlur") {
+                "Only a single feGaussianBlur primitive is supported"
+            }
+            val primitive = primitives.single()
+            require(primitive.children.all { it.name in setOf("title", "desc", "metadata") }) {
+                "Animated Gaussian filters are unsupported"
+            }
+            SvgGaussianFilter(node, filter, primitive, viewport, paints.styleOf(primitive).getValue("color-interpolation-filters")) {
+                report(it, owner)
+            }.also { filtered -> update(owner) { filtered.refresh() } }
+        } catch (e: IllegalArgumentException) {
+            report(e.message ?: "Invalid filter", owner)
+            node
+        }
     }
 
     private fun applyClip(node: Node, value: String, viewport: SvgViewport, owner: SvgElement) {

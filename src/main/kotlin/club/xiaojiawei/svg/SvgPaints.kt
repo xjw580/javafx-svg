@@ -28,6 +28,7 @@ internal class SvgPaints(private val document: SvgDocument, private val styles: 
     }
 
     fun ancestorsOf(element: SvgElement): List<SvgElement> = ancestors[element].orEmpty()
+    fun styleOf(element: SvgElement): Map<String, String> = computed(element)
     fun parentStyleOf(element: SvgElement): Map<String, String> = ancestors[element]?.lastOrNull()?.let(::computed) ?: emptyMap()
 
     fun gradient(id: String, opacity: Double, viewport: SvgViewport, bounds: Bounds): Paint {

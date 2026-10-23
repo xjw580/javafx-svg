@@ -184,6 +184,7 @@ SVG 内部样式和应用 JavaFX CSS 是两套语法：SVG 使用 `fill/stroke/s
 | 引用 | 本文档内 defs/use/symbol、href/xlink:href；独立实例、循环和展开数量限制 |
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
+| 滤镜 | 单个 feGaussianBlur；独立 X/Y 标准差、SourceGraphic/SourceAlpha、filterUnits/primitiveUnits、输入区域及输出子区域裁剪 |
 | 文本 | 单段 text、x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space、textLength/lengthAdjust；字号支持 em 和相对父字号的百分比 |
 | 图片 | image 中的 base64 PNG/JPEG，preserveAspectRatio，视口裁剪 |
 
@@ -191,10 +192,16 @@ SVG 内部样式和应用 JavaFX CSS 是两套语法：SVG 使用 `fill/stroke/s
 
 spacing 模式当前支持单行水平的拉丁、汉字等非上下文文字；双向文字、复杂连写和强制换行会报告诊断，宽松模式回退到自然排版。spacingAndGlyphs 保留整段文字的 JavaFX 原生字形处理。文字展开节点计入 `maxElements` 限制。
 
+基础高斯模糊通过 JavaFX 原生效果实现，支持 SVG 属性、内联 style 和样式表中的 `filter: url(#id)`。`stdDeviation` 可为一个或两个数值；0 关闭对应方向的模糊，负值使该原语退回输入图像。滤镜坐标先于元素变换计算，滤镜输入按 filter 区域裁剪，输出再按原语子区域和 clipPath 裁剪。应用 CSS 修改填充或字体后会更新效果。
+
+支持 `edgeMode="none"` 和单个 `feGaussianBlur`，暂不支持其他滤镜原语、滤镜链、模板引用、filterRes 和 duplicate/wrap 边缘扩展。sRGB/auto 支持多色输入；默认 linearRGB 仅支持单色或 SourceAlpha 输入，多色线性 RGB 合成会报告诊断并在宽松模式下保留未滤镜处理的原图。较大的标准差通过分解方差执行多轮模糊，最多 16 轮，超限会报告诊断而不会静默截断。
+
+Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，可在严格模式下渲染；测试使用固定资源，不依赖网络或 GitHub 版本变化。
+
 当前不支持完整 SVG 规范。限制包括：
 
 - 不执行脚本、事件处理器、SMIL/CSS 动画，不渲染 foreignObject。
-- 不支持 filter、mask、pattern、marker、non-scaling-stroke、radialGradient 的 gradientTransform 和非零 fr。
+- 不支持完整 filter 管线、mask、pattern、marker、non-scaling-stroke、radialGradient 的 gradientTransform 和非零 fr。
 - SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量、at-rule、外部样式表；应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
 - 不支持 tspan、textPath、逐字位置列表、复杂排版或嵌入字体；文本外观依赖系统字体。
 - 不自动加载 image/use/gradient/clipPath 中的外部文件或网络引用；load(URL) 仅打开调用方明确提供的顶层地址。

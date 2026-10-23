@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+    <defs>
+        <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#409eff"/>
+            <stop offset="1" stop-color="#5965df"/>
+        </linearGradient>
+        <symbol id="spark" viewBox="0 0 10 10">
+            <path d="M5 0L6.5 3.5L10 5L6.5 6.5L5 10L3.5 6.5L0 5L3.5 3.5Z" fill="white"/>
+        </symbol>
+    </defs>
+    <rect class="tile" x="4" y="4" width="88" height="88" rx="22" fill="url(#background)"/>
+    <path id="outline" d="M25 29H61L72 40V69H25Z M61 29V40H72"
+          fill="none" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+    <path id="check" d="M36 52L44 60L60 44"
+          fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#spark" x="70" y="13" width="12" height="12"/>
+</svg>

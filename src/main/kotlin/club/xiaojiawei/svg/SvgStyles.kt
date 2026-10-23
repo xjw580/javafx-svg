@@ -101,6 +101,10 @@ internal class SvgStyles(
             }
         }.toMutableMap()
         if (result["color"] == "currentColor") result["color"] = parent["color"] ?: "black"
+        val fontSize = result.getValue("font-size")
+        val parentFontSize = parent["font-size"]?.toDoubleOrNull() ?: 16.0
+        result["font-size"] = (if (fontSize.endsWith("em")) SvgNumbers.scalar(fontSize.dropLast(2)) * parentFontSize
+            else SvgNumbers.length(fontSize, parentFontSize)).also { require(it >= 0) { "Negative font size" } }.toString()
         return result
     }
 

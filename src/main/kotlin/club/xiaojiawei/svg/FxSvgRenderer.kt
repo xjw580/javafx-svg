@@ -8,6 +8,14 @@ import javafx.scene.shape.*
 import javafx.beans.property.Property
 import javafx.css.StyleableProperty
 import javafx.css.StyleOrigin
+import javafx.scene.text.Text
+import javafx.scene.text.Font
+import javafx.scene.text.FontWeight
+import javafx.scene.text.FontPosture
+import javafx.scene.image.Image
+import javafx.scene.image.ImageView
+import java.io.ByteArrayInputStream
+import java.util.Base64
 import java.util.Collections
 import kotlin.math.hypot
 import kotlin.math.min
@@ -86,6 +94,56 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         fun length(name: String, axis: Double, default: String = "0") = SvgNumbers.length(element[name] ?: default, axis)
         fun positive(value: Double): Double = value.also { require(it >= 0) { "Negative SVG size" } }
         val node: Node = when (element.name) {
+            "text" -> Text().also { text ->
+                element.children.forEach { report("Unsupported text child: ${it.name}", it) }
+                listOf("rotate", "textLength", "lengthAdjust", "dominant-baseline", "writing-mode").forEach {
+                    if (element[it] != null) report("Unsupported text attribute: $it", element)
+                }
+                val preserve = (element["xml:space"] ?: ancestors.asReversed().firstNotNullOfOrNull { it["xml:space"] }) == "preserve"
+                text.text = if (preserve) element.text else element.text.replace(Regex("\\s+"), " ").trim()
+                val weight = when (val value = style.getValue("font-weight")) {
+                    "normal" -> FontWeight.NORMAL
+                    "bold" -> FontWeight.BOLD
+                    else -> FontWeight.findByWeight(value.toIntOrNull() ?: throw SvgException("Unsupported font-weight: $value"))
+                }
+                val posture = when (style.getValue("font-style")) {
+                    "normal" -> FontPosture.REGULAR
+                    "italic", "oblique" -> FontPosture.ITALIC
+                    else -> throw SvgException("Unsupported font-style")
+                }
+                val family = style.getValue("font-family").substringBefore(',').trim().trim('\'', '"')
+                text.font = Font.font(family, weight, posture, SvgNumbers.scalar(style.getValue("font-size")))
+                val anchor = when (style.getValue("text-anchor")) {
+                    "start" -> 0.0; "middle" -> .5; "end" -> 1.0
+                    else -> throw SvgException("Invalid text-anchor")
+                }
+                update(element) {
+                    text.x = length("x", viewport.width) + length("dx", viewport.width) - anchor * text.layoutBounds.width
+                    text.y = length("y", viewport.height) + length("dy", viewport.height)
+                }
+            }
+            "image" -> {
+                require(!clipping) { "Images are not supported inside clipPath" }
+                val href = element["href"] ?: element["xlink:href"] ?: throw SvgException("Missing image href")
+                val data = Regex("data:image/(png|jpeg);base64,([\\s\\S]*)").matchEntire(href)
+                    ?: throw SvgException("Only embedded base64 PNG/JPEG images are supported")
+                val bytes = Base64.getDecoder().decode(data.groupValues[2].filterNot { it.isWhitespace() })
+                val image = Image(ByteArrayInputStream(bytes))
+                require(!image.isError && image.width > 0 && image.height > 0) { "Cannot decode SVG image" }
+                val imageView = ImageView(image)
+                val group = Group(imageView)
+                val clip = Rectangle()
+                group.clip = clip
+                update(element) {
+                    val x = length("x", viewport.width); val y = length("y", viewport.height)
+                    val width = positive(length("width", viewport.width)); val height = positive(length("height", viewport.height))
+                    imageView.transforms.setAll(javafx.scene.transform.Translate(x, y),
+                        SvgBox(0.0, 0.0, image.width, image.height).transform(width, height, element["preserveAspectRatio"]))
+                    clip.x = x; clip.y = y; clip.width = width; clip.height = height
+                    imageView.isVisible = width > 0 && height > 0
+                }
+                group
+            }
             "use" -> {
                 val href = element["href"] ?: element["xlink:href"] ?: throw SvgException("Missing use href")
                 require(href.startsWith('#') && href.length > 1) { "Only local use references are supported: $href" }
@@ -179,7 +237,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
         node.transforms += SvgTransforms.parse(element["transform"])
         node.opacity = if (clipping) 1.0 else SvgNumbers.fraction(style.getValue("opacity"))
-        if (node !is Group) node.isVisible = style.getValue("visibility") == "visible"
+        if (node !is Group || element.name == "image") node.isVisible = style.getValue("visibility") == "visible"
         if (node is Shape) {
             if (clipping) {
                 node.fill = Color.BLACK

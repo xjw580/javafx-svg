@@ -68,7 +68,7 @@ container.getChildren().add(icon);
 
 支持 `SvgLoader.parse(String)`、`load(Path)`、`load(URL)`、`load(InputStream)`；`SvgView` 也提供对应的静态便利方法。调用方传入的流不会被关闭，路径及 URL 方法自行关闭其创建的流。
 
-`SvgLoader` 不创建 JavaFX 节点，可在后台执行。缓存并复用 `SvgDocument` 即可避免重复解析；每个 `SvgView(document)` 会创建独立节点，分别接受 CSS，不应跨视图复用节点。库没有全局缓存，也不会启动后台线程。
+`SvgLoader` 不创建 JavaFX 节点，可在后台执行。缓存并复用 `SvgDocument` 即可避免重复解析；每个 `SvgView(document)` 会创建独立节点，分别接受 CSS，不应跨视图复用节点。库没有全局缓存；通过 `source` 加载网络地址时会使用后台虚拟线程。
 
 `SvgView` 是可布局的 `Region`。fitWidth/fitHeight 决定首选尺寸，0 表示采用自然尺寸，父布局仍可调整实际尺寸。需要固定图标尺寸时，同时设置 min/maxSize。默认遵循 SVG 的 preserveAspectRatio；`preserveRatio = false` 将 viewBox 拉伸到视口。没有 viewBox 时，调整的是视口，绝对坐标不会自动缩放。
 
@@ -111,7 +111,29 @@ val loader = FXMLLoader(javaClass.getResource("/club/xiaojiawei/TipNode.fxml"))
 
 应用需要自行引入 `javafx-fxml`，上例 Button 还需要 `javafx-controls`，版本应与应用 JavaFX 一致。使用命名模块时，Controller 所在包需要 `opens ... to javafx.fxml`。
 
-`source` 接收完整 URL 字符串，FXML 的 `@` 会自动转换；Kotlin/Java 中使用 `getResource(...).toExternalForm()`。加载使用默认 `SvgOptions`，在 FX 线程同步执行；大文件、后台解析和严格模式请继续使用 `SvgLoader` 加载后设置 `document`。加载失败保留旧内容；设为 null/空白字符串清空视图；直接设置 `document` 会清空 `source`。`sourceProperty()` 提供只读观察，不支持绑定写入。
+`source` 接收完整 URL 字符串，FXML 的 `@` 会自动转换；Kotlin/Java 中使用 `getResource(...).toExternalForm()`。加载使用默认 `SvgOptions`：本地 `file:` / `jar:file:` 资源同步加载，HTTP(S) 等其他地址在后台下载和解析，仅节点创建及属性更新在 FX 线程执行。本地大文件和严格模式可自行在后台用 `SvgLoader` 加载，再在 FX 线程设置 `document`。`sourceProperty()` 提供只读观察，不支持绑定写入。
+
+网络地址直接写入 FXML，无需 `@`：
+
+```xml
+<SvgView source="https://img.shields.io/github/release/xjw580/Hearthstone-Script.svg"/>
+```
+
+网络加载期间保留旧图标，`source` 表示本次请求地址。通过只读 `loadingProperty()` / `isLoading` 和 `loadExceptionProperty()` / `loadException` 观察状态；异步失败保留旧文档和节点，通过异常属性报告，不会从 FXML 加载方法抛出。新请求会清空旧异常，重复设置同一 URL 可重试。本地加载失败仍同步抛出异常并保留原内容和地址。
+
+```kotlin
+icon.loadExceptionProperty().addListener { _, _, error ->
+    if (error != null) println("SVG 加载失败：${error.message}")
+}
+icon.loadingProperty().addListener { _, _, loading ->
+    println("SVG 加载中：$loading")
+}
+icon.source = "https://img.shields.io/github/release/xjw580/Hearthstone-Script.svg"
+```
+
+切换地址、将 `source` 设为 null/空白字符串或直接设置 `document` 时会取消旧任务；过期结果不会覆盖新内容。清空 `source` 同时清空视图，直接设置 `document` 会清空 `source`。连接超时 5 秒，单次读取等待超时 10 秒；这不是整个请求的总时限。后台任务使用 Java 21 虚拟线程，不阻止应用退出。
+
+`SvgLoader.load(URL)` 和静态 `SvgView.load(URL)` 仍为同步方法，也使用上述连接/读取超时；自动异步加载由 `source` 属性提供。
 
 可直接加载的 FXML 示例位于 `src/test/resources/demo/icon.fxml`，测试 `SvgFxmlTest` 验证资源加载、CSS 覆盖和失败回退。
 
@@ -187,7 +209,7 @@ val view = SvgView(document)
 
 ## 验证
 
-测试覆盖解析限制、坐标矩阵、样式优先级、实例隔离、JavaFX CSS 覆盖与伪类、百分比布局、引用循环、渐变、文本和图片。使用 JavaFX 离屏快照验证透明度叠加及裁剪区域的像素。
+测试覆盖解析限制、坐标矩阵、样式优先级、实例隔离、JavaFX CSS 覆盖与伪类、百分比布局、引用循环、渐变、文本和图片。使用 JavaFX 离屏快照验证透明度叠加及裁剪区域的像素；网络加载测试使用本地 HTTP 服务验证 UI 响应、超时、失败回退及请求切换，不依赖外网。
 
 ```shell
 mvn clean verify

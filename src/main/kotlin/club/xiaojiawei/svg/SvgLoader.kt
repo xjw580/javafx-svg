@@ -27,8 +27,13 @@ object SvgLoader {
     /** Opening this URL is explicit; references inside the document never trigger network access. */
     @JvmStatic
     @JvmOverloads
-    fun load(url: URL, options: SvgOptions = SvgOptions()): SvgDocument =
-        url.openStream().use { load(it, options) }
+    fun load(url: URL, options: SvgOptions = SvgOptions()): SvgDocument {
+        val connection = url.openConnection().apply {
+            connectTimeout = 5_000
+            readTimeout = 10_000
+        }
+        return connection.getInputStream().use { load(it, options) }
+    }
 
     @JvmStatic
     @JvmOverloads

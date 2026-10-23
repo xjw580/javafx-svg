@@ -1,0 +1,37 @@
+package club.xiaojiawei.svg
+
+/** Parsing limits also apply to caller-provided streams. Streams are never closed by load(InputStream). */
+data class SvgOptions @JvmOverloads constructor(
+    val strict: Boolean = false,
+    val maxBytes: Int = 8 * 1024 * 1024,
+    val maxDepth: Int = 128,
+    val maxElements: Int = 100_000
+) {
+    init {
+        require(maxBytes in 1 until Int.MAX_VALUE)
+        require(maxDepth in 1..512)
+        require(maxElements > 0)
+    }
+}
+
+class SvgException(message: String, cause: Throwable? = null) : IllegalArgumentException(message, cause)
+
+data class SvgDiagnostic(val message: String, val elementId: String? = null)
+
+class SvgElement internal constructor(
+    val name: String,
+    val attributes: Map<String, String>,
+    val children: List<SvgElement>,
+    val text: String
+) {
+    val id: String? get() = attributes["id"]
+    operator fun get(name: String): String? = attributes[name]
+}
+
+/** Immutable and safe to share between views. Contains no JavaFX nodes. */
+class SvgDocument internal constructor(
+    val root: SvgElement,
+    val elementsById: Map<String, SvgElement>,
+    val diagnostics: List<SvgDiagnostic>,
+    val options: SvgOptions
+)

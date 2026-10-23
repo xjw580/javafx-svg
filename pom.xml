@@ -53,13 +53,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.4.2</version>
-                <configuration>
-                    <archive>
-                        <manifestEntries>
-                            <Automatic-Module-Name>club.xiaojiawei.svg</Automatic-Module-Name>
-                        </manifestEntries>
-                    </archive>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
@@ -83,6 +76,12 @@
     </build>
 
     <dependencies>
+        <dependency>
+            <groupId>club.xiaojiawei</groupId>
+            <artifactId>javafx-plus-annotations</artifactId>
+            <version>0.1.0</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-graphics</artifactId>
@@ -117,7 +116,7 @@
                         <artifactId>exec-maven-plugin</artifactId>
                         <version>3.5.0</version>
                         <configuration>
-                            <mainClass>club.xiaojiawei.svg.demo.SvgDemoLauncher</mainClass>
+                            <mainClass>club.xiaojiawei.svg.demo.SvgDemoKt</mainClass>
                             <classpathScope>test</classpathScope>
                         </configuration>
                     </plugin>

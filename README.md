@@ -14,6 +14,10 @@ mvn -Pdemo test-compile exec:java
 
 示例展示同一个 SVG 文档的原始样式和应用 CSS 后的样式，悬停可改变描边颜色。示例代码和资源位于 `src/test`，不进入库 JAR。
 
+IDEA 中重新加载 Maven 项目后，打开 `src/test/kotlin/club/xiaojiawei/svg/demo/SvgDemo.kt`，运行文件末尾的顶层 `main`，入口类为 `club.xiaojiawei.svg.demo.SvgDemoKt`。旧的 `SvgDemoLauncher` 运行配置已不适用。
+
+Demo 使用 classpath 启动，项目没有 `module-info.java`。不要为它配置 `--module club.xiaojiawei.svg` 或 `--add-modules club.xiaojiawei.svg`；这会导致 `Module club.xiaojiawei.svg not found`。POM 不声明 `Automatic-Module-Name`，避免 IDEA 将编译输出目录误识别成可直接启动的命名模块。
+
 不显示窗口的示例检查：
 
 ```shell

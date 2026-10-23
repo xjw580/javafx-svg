@@ -72,8 +72,6 @@ class SvgDemo : Application() {
     }
 }
 
-object SvgDemoLauncher {
-    @JvmStatic fun main(args: Array<String>) {
-        Application.launch(SvgDemo::class.java, *args)
-    }
+fun main(args: Array<String>) {
+    Application.launch(SvgDemo::class.java, *args)
 }

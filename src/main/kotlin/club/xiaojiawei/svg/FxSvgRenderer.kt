@@ -27,6 +27,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private val paints = SvgPaints(document, styles)
     private val updates = mutableListOf<() -> Unit>()
     private val activeReferences = linkedSetOf<String>()
+    private var clipping = false
     private var renderedElements = 0
     private val box = document.root["viewBox"]?.let(SvgBox::parse)
     val intrinsicWidth = document.root["width"]?.let { SvgNumbers.length(it, box?.width ?: 300.0) } ?: box?.width ?: 300.0
@@ -76,6 +77,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     ): Node? {
         if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop")) return null
         if (element.name == "symbol" && !referenced) return null
+        if (element.name == "clipPath" && !referenced) return null
         val style = styles.compute(element, ancestors, parentStyle)
         if (style.getValue("display") == "none") return null
         for (attribute in listOf("filter", "mask", "marker-start", "marker-mid", "marker-end", "vector-effect", "paint-order")) {
@@ -104,7 +106,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     group
                 } finally { activeReferences.remove(href) }
             }
-            "svg", "g", "a", "symbol" -> {
+            "svg", "g", "a", "symbol", "clipPath" -> {
                 val group = Group()
                 if (element.name in setOf("svg", "symbol") && !isRoot) {
                     val inner = Group()
@@ -133,7 +135,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             "path" -> SVGPath().apply {
                 content = element["d"] ?: ""
                 SvgPathData.validate(content)
-                fillRule = fillRule(style.getValue("fill-rule"))
+                fillRule = fillRule(style.getValue(if (clipping) "clip-rule" else "fill-rule"))
             }
             "rect" -> Rectangle().also { shape ->
                 update(element) {
@@ -163,25 +165,62 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 content = points.chunked(2).mapIndexed { index, pair ->
                     (if (index == 0) "M" else "L") + pair.joinToString(" ")
                 }.joinToString(" ") + if (element.name == "polygon" && points.isNotEmpty()) " Z" else ""
-                fillRule = fillRule(style.getValue("fill-rule"))
+                fillRule = fillRule(style.getValue(if (clipping) "clip-rule" else "fill-rule"))
             }
             else -> {
                 report("Unsupported SVG element: ${element.name}", element)
                 return null
             }
         }
-        node.id = element.id
-        node.styleClass += "svg-${element.name}"
-        element["class"]?.split(Regex("\\s+"))?.filter { it.isNotBlank() }?.let { node.styleClass.addAll(it) }
+        if (!clipping) {
+            node.id = element.id
+            node.styleClass += "svg-${element.name}"
+            element["class"]?.split(Regex("\\s+"))?.filter { it.isNotBlank() }?.let { node.styleClass.addAll(it) }
+        }
         node.transforms += SvgTransforms.parse(element["transform"])
-        node.opacity = SvgNumbers.fraction(style.getValue("opacity"))
+        node.opacity = if (clipping) 1.0 else SvgNumbers.fraction(style.getValue("opacity"))
         if (node !is Group) node.isVisible = style.getValue("visibility") == "visible"
         if (node is Shape) {
-            node.styleClass += "svg-shape"
-            applyShapeStyle(node, style, viewport, element)
+            if (clipping) {
+                node.fill = Color.BLACK
+                node.stroke = null
+            } else {
+                node.styleClass += "svg-shape"
+                applyShapeStyle(node, style, viewport, element)
+            }
         }
-        if (style.getValue("clip-path") != "none") report("clip-path is not supported yet", element)
+        if (style.getValue("clip-path") != "none") applyClip(node, style.getValue("clip-path"), viewport, element)
         return node
+    }
+
+    private fun applyClip(node: Node, value: String, viewport: SvgViewport, owner: SvgElement) {
+        val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)").matchEntire(value)?.groupValues?.get(1)
+            ?: throw SvgException("Only local clip-path references are supported")
+        val target = document.elementsById[id] ?: throw SvgException("Missing clipPath: #$id")
+        require(target.name == "clipPath") { "clip-path target is not a clipPath" }
+        require(activeReferences.add("clip:$id")) { "Circular clipPath reference: #$id" }
+        val previousClipping = clipping
+        try {
+            clipping = true
+            val proportional = when (target["clipPathUnits"] ?: "userSpaceOnUse") {
+                "userSpaceOnUse" -> false
+                "objectBoundingBox" -> true
+                else -> throw SvgException("Invalid clipPathUnits")
+            }
+            val clipViewport = if (proportional) SvgViewport(1.0, 1.0) else viewport
+            val parents = paints.ancestorsOf(target)
+            val clipNode = render(target, parents, paints.parentStyleOf(target), clipViewport, referenced = true) ?: Group()
+            val wrapper = Group(clipNode)
+            if (proportional) update(owner) {
+                val bounds = svgGeometryBounds(node)
+                wrapper.transforms.setAll(javafx.scene.transform.Affine(bounds.width, 0.0, bounds.minX, 0.0, bounds.height, bounds.minY))
+            }
+            wrapper.clip = node.clip
+            node.clip = wrapper
+        } finally {
+            clipping = previousClipping
+            activeReferences.remove("clip:$id")
+        }
     }
 
     private fun update(element: SvgElement, action: () -> Unit) {

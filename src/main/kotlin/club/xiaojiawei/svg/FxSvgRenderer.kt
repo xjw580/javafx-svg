@@ -5,6 +5,9 @@ import javafx.scene.Node
 import javafx.scene.paint.Color
 import javafx.scene.paint.Paint
 import javafx.scene.shape.*
+import javafx.beans.property.Property
+import javafx.css.StyleableProperty
+import javafx.css.StyleOrigin
 import java.util.Collections
 import kotlin.math.hypot
 import kotlin.math.min
@@ -21,6 +24,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         issues += SvgDiagnostic(message, element?.id)
     }
     private val styles = SvgStyles(document, ::report)
+    private val paints = SvgPaints(document, styles)
     private val updates = mutableListOf<() -> Unit>()
     private val activeReferences = linkedSetOf<String>()
     private var renderedElements = 0
@@ -70,7 +74,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         element: SvgElement, ancestors: List<SvgElement>, parentStyle: Map<String, String>,
         viewport: SvgViewport, isRoot: Boolean, referenced: Boolean
     ): Node? {
-        if (element.name in setOf("defs", "style", "title", "desc", "metadata")) return null
+        if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop")) return null
         if (element.name == "symbol" && !referenced) return null
         val style = styles.compute(element, ancestors, parentStyle)
         if (style.getValue("display") == "none") return null
@@ -188,9 +192,17 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
 
     private fun applyShapeStyle(shape: Shape, style: Map<String, String>, viewport: SvgViewport, element: SvgElement) {
-        shape.fill = paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element)
-        shape.stroke = paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element)
-        shape.strokeWidth = SvgNumbers.length(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) }
+        var previousWidth = Double.NaN
+        var previousHeight = Double.NaN
+        update(element) {
+            if (previousWidth != viewport.width || previousHeight != viewport.height) {
+                setBase(shape.fillProperty(), paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, shape, viewport))
+                setBase(shape.strokeProperty(), paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, shape, viewport))
+                setBase(shape.strokeWidthProperty(), SvgNumbers.length(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) })
+                setBase(shape.strokeDashOffsetProperty(), SvgNumbers.length(style.getValue("stroke-dashoffset"), viewport.diagonal))
+                previousWidth = viewport.width; previousHeight = viewport.height
+            }
+        }
         shape.strokeType = StrokeType.CENTERED
         shape.strokeLineCap = when (style.getValue("stroke-linecap")) {
             "butt" -> StrokeLineCap.BUTT; "round" -> StrokeLineCap.ROUND; "square" -> StrokeLineCap.SQUARE
@@ -208,14 +220,26 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             }
             if (values.any { it > 0 }) shape.strokeDashArray.setAll(if (values.size % 2 == 0) values else values + values)
         }
-        shape.strokeDashOffset = SvgNumbers.length(style.getValue("stroke-dashoffset"), viewport.diagonal)
     }
 
-    private fun paint(value: String, style: Map<String, String>, opacity: Double, element: SvgElement): Paint? {
+    private fun <T> setBase(property: Property<T>, value: T) {
+        val origin = (property as? StyleableProperty<*>)?.styleOrigin
+        if (!property.isBound && origin != StyleOrigin.AUTHOR && origin != StyleOrigin.INLINE) property.value = value
+    }
+
+    private fun paint(value: String, style: Map<String, String>, opacity: Double, element: SvgElement, shape: Shape, viewport: SvgViewport): Paint? {
         if (value == "none") return null
         if (value.startsWith("url(")) {
-            report("Paint server is not supported yet: $value", element)
-            return null
+            val match = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)\\s*(.*)").matchEntire(value)
+                ?: throw SvgException("Only local paint references are supported: $value")
+            return try {
+                paints.gradient(match.groupValues[1], opacity, viewport, svgGeometryBounds(shape))
+            } catch (e: IllegalArgumentException) {
+                report(e.message ?: "Invalid paint server", element)
+                val fallback = match.groupValues[2].ifBlank { "none" }
+                require(!fallback.startsWith("url(")) { "Invalid paint fallback" }
+                paint(fallback, style, opacity, element, shape, viewport)
+            }
         }
         val color = Color.web(if (value == "currentColor") style.getValue("color") else value)
         return Color(color.red, color.green, color.blue, color.opacity * opacity)

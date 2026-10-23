@@ -75,6 +75,18 @@ class SvgViewTest {
         assertEquals(32.0, first.prefHeight(-1.0))
     }
 
+    @Test fun cssOverridesSurvivePercentageViewportResize() = FxTest.run {
+        val view = SvgView.parse("""<svg><rect id="p" width="50%" height="100%" fill="red" stroke="black" stroke-width="10%"/></svg>""")
+        Scene(Group(view))
+        val p = view.lookup("#p") as Rectangle
+        p.style = "-fx-fill: blue; -fx-stroke-width: 3;"
+        view.resize(200.0, 100.0); view.applyCss(); view.layout()
+        view.resize(400.0, 200.0); view.layout()
+        assertEquals(Color.BLUE, p.fill)
+        assertEquals(3.0, p.strokeWidth)
+        assertEquals(200.0, p.width)
+    }
+
     @Test fun invalidAndUnsupportedContentIsDiagnosed() = FxTest.run {
         val view = SvgView.parse("""<svg><path d="M0"/><foreignObject/></svg>""")
         assertEquals(2, view.diagnostics.size)

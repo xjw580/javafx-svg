@@ -24,7 +24,8 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
         get() = documentValue.get()
         set(value) {
             checkFxThread()
-            val replacement = value?.let(::FxSvgRenderer)
+            val replacement = try { value?.let(::FxSvgRenderer) }
+                catch (e: IllegalArgumentException) { throw SvgException("Cannot render SVG: ${e.message}", e) }
             renderer = replacement
             children.setAll(listOfNotNull(replacement?.root))
             documentValue.set(value)

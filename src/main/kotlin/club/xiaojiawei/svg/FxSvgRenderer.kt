@@ -48,7 +48,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     init {
         require(intrinsicWidth >= 0 && intrinsicHeight >= 0) { "Negative SVG dimensions" }
         content = render(document.root, emptyList(), emptyMap(), viewport, true) ?: Group()
-        root = Group(content).apply { clip = viewportClip }
+        root = Group(content).apply { clip = viewportClip; isManaged = false }
     }
 
     fun layout(width: Double, height: Double, preserveRatio: Boolean) {
@@ -60,7 +60,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         root.transforms.clear()
         content.transforms.removeIf { it === viewportTransform }
         viewportTransform = box?.transform(width, height, if (preserveRatio) document.root["preserveAspectRatio"] else "none")
-        viewportTransform?.let { content.transforms.add(0, it) }
+        viewportTransform?.let { content.transforms.add(it) }
         updates.forEach { it() }
     }
     private var viewportTransform: javafx.scene.transform.Affine? = null
@@ -69,11 +69,13 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         element: SvgElement, ancestors: List<SvgElement>, parentStyle: Map<String, String>,
         viewport: SvgViewport, isRoot: Boolean = false, referenced: Boolean = false
     ): Node? {
+        val updateCheckpoint = updates.size
         return try {
             require(ancestors.size < document.options.maxDepth) { "SVG reference depth limit exceeded" }
             require(++renderedElements <= document.options.maxElements) { "SVG expanded element limit exceeded" }
             renderElement(element, ancestors, parentStyle, viewport, isRoot, referenced)
         } catch (e: IllegalArgumentException) {
+            while (updates.size > updateCheckpoint) updates.removeAt(updates.lastIndex)
             report(e.message ?: "Invalid SVG element", element)
             null
         }
@@ -88,6 +90,11 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         if (element.name == "clipPath" && !referenced) return null
         val style = styles.compute(element, ancestors, parentStyle)
         if (style.getValue("display") == "none") return null
+        if (element.name in setOf("path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "image", "use")) {
+            element.children.filter { it.name !in setOf("title", "desc", "metadata") }.forEach {
+                report("Unsupported child ${it.name} inside ${element.name}", it)
+            }
+        }
         for (attribute in listOf("filter", "mask", "marker-start", "marker-mid", "marker-end", "vector-effect", "paint-order")) {
             if (element[attribute] != null) report("Unsupported SVG attribute: $attribute", element)
         }

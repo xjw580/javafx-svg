@@ -109,4 +109,21 @@ class SvgViewTest {
         assertEquals(single.opacity, overlap.opacity, .03)
         assertEquals(1.0, overlap.red, .03)
     }
+
+    @Test fun invalidReplacementLeavesExistingDocumentAndNodesUsable() = FxTest.run {
+        val good = SvgLoader.parse("""<svg viewBox="0 0 10 10"><path id="p" d="M0 0L10 10"/></svg>""")
+        val view = SvgView(good)
+        val path = view.lookup("#p")
+        assertFailsWith<SvgException> { view.document = SvgLoader.parse("""<svg viewBox="0 0 -10 10"/>""") }
+        assertSame(good, view.document)
+        assertSame(path, view.lookup("#p"))
+    }
+
+    @Test fun rootTransformIsAppliedOutsideViewBoxAndAnimationsAreReported() = FxTest.run {
+        val view = SvgView.parse("""<svg viewBox="0 0 10 10" transform="translate(5 0)"><path id="p" d="M0 0L10 10">
+            <animate attributeName="fill" values="red;blue"/></path></svg>""")
+        view.resize(20.0, 20.0); view.layout()
+        assertEquals(5.0, view.lookup("#p").localToScene(0.0, 0.0).x)
+        assertTrue(view.diagnostics.any { it.message.contains("animate") })
+    }
 }

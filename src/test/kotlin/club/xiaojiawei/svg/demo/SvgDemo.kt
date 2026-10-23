@@ -14,33 +14,14 @@ import javafx.scene.paint.Color
 import javafx.scene.text.Font
 import javafx.scene.text.Text
 import javafx.stage.Stage
+import java.awt.image.BufferedImage
+import java.nio.file.Files
 import java.nio.file.Path
+import javax.imageio.ImageIO
 
 /** Example-only Java2D usage writes the smoke-test PNG; the library has no Java2D/Swing dependency. */
 class SvgDemo : Application() {
     override fun start(stage: Stage) {
-        val directoryIndex = parameters.raw.indexOf("--svg-dir")
-        if ("--javafx-ui" in parameters.raw || directoryIndex >= 0) {
-            val directory = if (directoryIndex >= 0) {
-                val value = parameters.raw.getOrNull(directoryIndex + 1)
-                require(value != null && !value.startsWith("--")) { "--svg-dir requires a directory path" }
-                Path.of(value).toAbsolutePath().normalize()
-            } else SvgGallery.defaultDirectory()
-            val gallery = SvgGallery(directory)
-            stage.title = "JavaFX SVG — ${directory.fileName}"
-            stage.scene = Scene(gallery.root, SvgGallery.WIDTH, SvgGallery.HEIGHT).apply {
-                stylesheets += checkNotNull(javaClass.getResource("/demo/gallery.css")).toExternalForm()
-            }
-            if ("--smoke" in parameters.raw) {
-                try { gallery.export(Path.of("target", "svg-gallery")) }
-                finally { Platform.exit() }
-            } else {
-                stage.minWidth = SvgGallery.WIDTH
-                stage.minHeight = SvgGallery.HEIGHT
-                stage.show()
-            }
-            return
-        }
         val source = checkNotNull(javaClass.getResource("/demo/sample.svg"))
         val document = SvgLoader.load(source, SvgOptions(strict = true))
         fun caption(value: String, size: Double, color: String) =
@@ -76,8 +57,13 @@ class SvgDemo : Application() {
             root.applyCss()
             root.layout()
             val snapshot = root.snapshot(null, null)
+            val image = BufferedImage(snapshot.width.toInt(), snapshot.height.toInt(), BufferedImage.TYPE_INT_ARGB)
+            for (y in 0 until image.height) for (x in 0 until image.width) {
+                image.setRGB(x, y, snapshot.pixelReader.getArgb(x, y))
+            }
             val output = Path.of("target", "demo-preview.png")
-            writeDemoSnapshot(snapshot, output)
+            Files.createDirectories(output.parent)
+            check(ImageIO.write(image, "png", output.toFile()))
             println("SVG demo snapshot: ${output.toAbsolutePath()}")
             Platform.exit()
         } else {

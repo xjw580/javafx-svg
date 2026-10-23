@@ -106,6 +106,7 @@ internal class SvgPaints(private val document: SvgDocument, private val styles: 
 
 /** Geometric bounds exclude stroke and effects, as required by SVG objectBoundingBox. */
 internal fun svgGeometryBounds(node: Node): Bounds = when (node) {
+    is SvgAdjustedText -> node.geometryBounds()
     is Rectangle -> BoundingBox(node.x, node.y, node.width, node.height)
     is Circle -> BoundingBox(node.centerX - node.radius, node.centerY - node.radius, node.radius * 2, node.radius * 2)
     is Ellipse -> BoundingBox(node.centerX - node.radiusX, node.centerY - node.radiusY, node.radiusX * 2, node.radiusY * 2)

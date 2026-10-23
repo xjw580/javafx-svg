@@ -101,9 +101,10 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         fun length(name: String, axis: Double, default: String = "0") = SvgNumbers.length(element[name] ?: default, axis)
         fun positive(value: Double): Double = value.also { require(it >= 0) { "Negative SVG size" } }
         val node: Node = when (element.name) {
-            "text" -> Text().also { text ->
+            "text" -> {
+                val text = Text()
                 element.children.forEach { report("Unsupported text child: ${it.name}", it) }
-                listOf("rotate", "textLength", "lengthAdjust", "dominant-baseline", "writing-mode").forEach {
+                listOf("rotate", "dominant-baseline", "writing-mode").forEach {
                     if (element[it] != null) report("Unsupported text attribute: $it", element)
                 }
                 val preserve = (element["xml:space"] ?: ancestors.asReversed().firstNotNullOfOrNull { it["xml:space"] }) == "preserve"
@@ -124,10 +125,27 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     "start" -> 0.0; "middle" -> .5; "end" -> 1.0
                     else -> throw SvgException("Invalid text-anchor")
                 }
+                val lengthAdjust = element["lengthAdjust"] ?: "spacing"
+                require(lengthAdjust in setOf("spacing", "spacingAndGlyphs")) { "Invalid lengthAdjust" }
+                val adjusted = if (element["textLength"] != null) {
+                    try {
+                        SvgAdjustedText(text, lengthAdjust == "spacingAndGlyphs", anchor,
+                            document.options.maxElements - renderedElements).also { renderedElements += it.glyphCount }
+                    } catch (e: IllegalArgumentException) {
+                        report(e.message ?: "Unsupported textLength layout", element)
+                        null
+                    }
+                } else null
                 update(element) {
-                    text.x = length("x", viewport.width) + length("dx", viewport.width) - anchor * text.layoutBounds.width
-                    text.y = length("y", viewport.height) + length("dy", viewport.height)
+                    val x = length("x", viewport.width) + length("dx", viewport.width)
+                    val y = length("y", viewport.height) + length("dy", viewport.height)
+                    if (adjusted != null) adjusted.position(x, y, length("textLength", viewport.width))
+                    else {
+                        text.x = x - anchor * text.layoutBounds.width
+                        text.y = y
+                    }
                 }
+                adjusted ?: text
             }
             "image" -> {
                 require(!clipping) { "Images are not supported inside clipPath" }
@@ -237,21 +255,22 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 return null
             }
         }
+        val styleNode = (node as? SvgAdjustedText)?.styleText ?: node
         if (!clipping) {
-            node.id = element.id
-            node.styleClass += "svg-${element.name}"
-            element["class"]?.split(Regex("\\s+"))?.filter { it.isNotBlank() }?.let { node.styleClass.addAll(it) }
+            styleNode.id = element.id
+            styleNode.styleClass += "svg-${element.name}"
+            element["class"]?.split(Regex("\\s+"))?.filter { it.isNotBlank() }?.let { styleNode.styleClass.addAll(it) }
         }
         node.transforms += SvgTransforms.parse(element["transform"])
-        node.opacity = if (clipping) 1.0 else SvgNumbers.fraction(style.getValue("opacity"))
-        if (node !is Group || element.name == "image") node.isVisible = style.getValue("visibility") == "visible"
-        if (node is Shape) {
+        styleNode.opacity = if (clipping) 1.0 else SvgNumbers.fraction(style.getValue("opacity"))
+        if (node !is Group || element.name in setOf("image", "text")) node.isVisible = style.getValue("visibility") == "visible"
+        if (styleNode is Shape) {
             if (clipping) {
-                node.fill = Color.BLACK
-                node.stroke = null
+                styleNode.fill = Color.BLACK
+                styleNode.stroke = null
             } else {
-                node.styleClass += "svg-shape"
-                applyShapeStyle(node, style, viewport, element)
+                styleNode.styleClass += "svg-shape"
+                applyShapeStyle(styleNode, style, viewport, element, node)
             }
         }
         if (style.getValue("clip-path") != "none") applyClip(node, style.getValue("clip-path"), viewport, element)
@@ -295,13 +314,13 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
     }
 
-    private fun applyShapeStyle(shape: Shape, style: Map<String, String>, viewport: SvgViewport, element: SvgElement) {
+    private fun applyShapeStyle(shape: Shape, style: Map<String, String>, viewport: SvgViewport, element: SvgElement, geometry: Node = shape) {
         var previousWidth = Double.NaN
         var previousHeight = Double.NaN
         update(element) {
             if (previousWidth != viewport.width || previousHeight != viewport.height) {
-                setBase(shape.fillProperty(), paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, shape, viewport))
-                setBase(shape.strokeProperty(), paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, shape, viewport))
+                setBase(shape.fillProperty(), paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport))
+                setBase(shape.strokeProperty(), paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport))
                 setBase(shape.strokeWidthProperty(), SvgNumbers.length(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) })
                 setBase(shape.strokeDashOffsetProperty(), SvgNumbers.length(style.getValue("stroke-dashoffset"), viewport.diagonal))
                 previousWidth = viewport.width; previousHeight = viewport.height
@@ -331,7 +350,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         if (!property.isBound && origin != StyleOrigin.AUTHOR && origin != StyleOrigin.INLINE) property.value = value
     }
 
-    private fun paint(value: String, style: Map<String, String>, opacity: Double, element: SvgElement, shape: Shape, viewport: SvgViewport): Paint? {
+    private fun paint(value: String, style: Map<String, String>, opacity: Double, element: SvgElement, shape: Node, viewport: SvgViewport): Paint? {
         if (value == "none") return null
         if (value.startsWith("url(")) {
             val match = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)\\s*(.*)").matchEntire(value)

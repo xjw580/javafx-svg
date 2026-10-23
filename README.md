@@ -184,8 +184,12 @@ SVG 内部样式和应用 JavaFX CSS 是两套语法：SVG 使用 `fill/stroke/s
 | 引用 | 本文档内 defs/use/symbol、href/xlink:href；独立实例、循环和展开数量限制 |
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
-| 文本 | 单段 text、x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space；字号支持 em 和相对父字号的百分比 |
+| 文本 | 单段 text、x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space、textLength/lengthAdjust；字号支持 em 和相对父字号的百分比 |
 | 图片 | image 中的 base64 PNG/JPEG，preserveAspectRatio，视口裁剪 |
+
+`textLength` 支持数值、长度单位和百分比，默认 `lengthAdjust="spacing"` 只调整字素簇间距，`spacingAndGlyphs` 同时缩放字形的横向尺寸。支持文本锚点、视口尺寸更新及应用 CSS 修改字体、填充和描边。单个字素簇在 spacing 模式下保持自然宽度。带 textLength 的文字由多个关联 Text 节点绘制，源 id/class 和 `.svg-text` 仍用于样式控制。
+
+spacing 模式当前支持单行水平的拉丁、汉字等非上下文文字；双向文字、复杂连写和强制换行会报告诊断，宽松模式回退到自然排版。spacingAndGlyphs 保留整段文字的 JavaFX 原生字形处理。文字展开节点计入 `maxElements` 限制。
 
 当前不支持完整 SVG 规范。限制包括：
 

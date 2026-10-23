@@ -26,6 +26,32 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--smoke"
 
 生成 `target/demo-preview.png`。渲染测试及示例仍需要 JavaFX 图形环境；Linux 无显示器环境可使用 `xvfb-run -a mvn verify`。测试不会打开窗口。
 
+### 加载 javafx-ui 的实际图标
+
+当 `javafx-ui` 与本项目位于同一父目录时，运行：
+
+```shell
+mvn -Pdemo test-compile exec:java "-Dexec.args=--javafx-ui"
+```
+
+IDEA 也可以直接选择项目自带的 `SVG Gallery - javafx-ui` 运行配置，或给 `SvgDemoKt` 添加程序参数 `--javafx-ui`。
+
+预览程序直接读取 `../javafx-ui/src/main/resources/club/xiaojiawei/controls/images`，不修改源 SVG。每页 24 个图标，并排显示原始效果与 CSS 换色效果；白色及透明填充保留，以免遮掉内部细节。支持悬停换色、按钮或左右方向键翻页、单击图标查看诊断。
+
+也可加载任意 SVG 目录，递归扫描其中的 SVG 文件：
+
+```shell
+mvn -Pdemo test-compile exec:java "-Dexec.args=--svg-dir ../javafx-ui/src/main/resources/club/xiaojiawei/controls/images"
+```
+
+批量检查并导出每页截图和逐文件诊断：
+
+```shell
+mvn -Pdemo test-compile exec:java "-Dexec.args=--javafx-ui --smoke"
+```
+
+输出位于 `target/svg-gallery/page-N.png` 和 `target/svg-gallery/report.tsv`。检查包含加载失败数、图形数、非透明像素数及不支持内容的诊断；有加载失败或空白图标时返回失败。非空绘制不代表完整 SVG 规范兼容，诊断仍须检查。
+
 ## 使用
 
 依赖（先执行本地 `mvn install`；当前为本地 SNAPSHOT，尚未发布到 Maven Central）：

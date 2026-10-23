@@ -5,10 +5,13 @@ import javafx.beans.property.BooleanProperty
 import javafx.beans.property.DoubleProperty
 import javafx.beans.property.ReadOnlyObjectProperty
 import javafx.beans.property.ReadOnlyObjectWrapper
+import javafx.beans.property.ReadOnlyStringProperty
+import javafx.beans.property.ReadOnlyStringWrapper
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleDoubleProperty
 import javafx.scene.layout.Region
 import java.io.InputStream
+import java.net.URI
 import java.net.URL
 import java.nio.file.Path
 
@@ -16,22 +19,45 @@ import java.nio.file.Path
 class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region() {
     private var renderer: FxSvgRenderer? = null
     private val documentValue = ReadOnlyObjectWrapper<SvgDocument?>(this, "document")
+    private val sourceValue = ReadOnlyStringWrapper(this, "source")
     private val fitWidthValue = SimpleDoubleProperty(this, "fitWidth", 0.0)
     private val fitHeightValue = SimpleDoubleProperty(this, "fitHeight", 0.0)
     private val preserveRatioValue = SimpleBooleanProperty(this, "preserveRatio", true)
 
     var document: SvgDocument?
         get() = documentValue.get()
+        set(value) { replaceDocument(value, null) }
+    fun documentProperty(): ReadOnlyObjectProperty<SvgDocument?> = documentValue.readOnlyProperty
+
+    /**
+     * Absolute URL loaded synchronously on the FX thread, using default [SvgOptions].
+     * In FXML, use `source="@icon.svg"` to resolve relative to the FXML location.
+     * Null/blank clears the view. Failure preserves the previous source, document and nodes.
+     * Assigning [document] directly clears source; [sourceProperty] is for observation only.
+     */
+    var source: String?
+        get() = sourceValue.get()
         set(value) {
             checkFxThread()
-            val replacement = try { value?.let(::FxSvgRenderer) }
-                catch (e: IllegalArgumentException) { throw SvgException("Cannot render SVG: ${e.message}", e) }
-            renderer = replacement
-            children.setAll(listOfNotNull(replacement?.root))
-            documentValue.set(value)
-            requestLayout()
+            val location = value?.takeUnless { it.isBlank() }
+            val loaded = location?.let {
+                try { SvgLoader.load(URI(it).toURL()) }
+                catch (e: Exception) { throw SvgException("Cannot load SVG source '$it': ${e.message}", e) }
+            }
+            replaceDocument(loaded, location)
         }
-    fun documentProperty(): ReadOnlyObjectProperty<SvgDocument?> = documentValue.readOnlyProperty
+    fun sourceProperty(): ReadOnlyStringProperty = sourceValue.readOnlyProperty
+
+    private fun replaceDocument(value: SvgDocument?, source: String?) {
+        checkFxThread()
+        val replacement = try { value?.let(::FxSvgRenderer) }
+            catch (e: IllegalArgumentException) { throw SvgException("Cannot render SVG: ${e.message}", e) }
+        renderer = replacement
+        children.setAll(listOfNotNull(replacement?.root))
+        documentValue.set(value)
+        sourceValue.set(source)
+        requestLayout()
+    }
 
     /** Zero uses the document's natural size. Parent layout may still resize this Region. */
     var fitWidth: Double

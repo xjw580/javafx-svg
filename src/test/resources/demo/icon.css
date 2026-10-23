@@ -1,0 +1,5 @@
+.toolbar-icon #outline {
+    -fx-fill: #e6f0ff;
+    -fx-stroke: #409eff;
+    -fx-stroke-width: 6;
+}

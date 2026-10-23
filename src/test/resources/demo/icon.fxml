@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import club.xiaojiawei.svg.SvgView?>
+<SvgView xmlns:fx="http://javafx.com/fxml/1" fx:id="icon"
+         source="@sample.svg" stylesheets="@icon.css" styleClass="toolbar-icon"
+         fitWidth="32" fitHeight="32" preserveRatio="true"
+         minWidth="32" minHeight="32" maxWidth="32" maxHeight="32"/>

@@ -74,6 +74,47 @@ container.getChildren().add(icon);
 
 可通过 `view.document = nextDocument` / `setDocument` 替换内容；失败时保留原文档和节点。`documentProperty()` 是只读观察属性。fitWidth、fitHeight、preserveRatio 提供标准 JavaFX 属性方法。
 
+## FXML 使用
+
+`SvgView` 提供无参构造和 `source` 属性，可以直接声明 SVG 地址，无需在 Controller 中手动加载：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<?import club.xiaojiawei.svg.SvgView?>
+<?import javafx.scene.control.Button?>
+
+<Button xmlns:fx="http://javafx.com/fxml/1" text="打开" stylesheets="@icons.css">
+    <graphic>
+        <SvgView fx:id="icon" source="@icons/open.svg" styleClass="toolbar-icon"
+                 fitWidth="24" fitHeight="24"
+                 minWidth="24" minHeight="24" maxWidth="24" maxHeight="24"/>
+    </graphic>
+</Button>
+```
+
+例如 FXML 位于 `src/main/resources/club/xiaojiawei/TipNode.fxml`，上面的 SVG 应放在 `src/main/resources/club/xiaojiawei/icons/open.svg`，CSS 放在 FXML 同目录的 `icons.css`。保留原有 `fx:root` 结构时，将 `graphic` 部分放入对应 Button 即可，并在 FXML 顶部导入 `SvgView`。
+
+```css
+.toolbar-icon .svg-path {
+    -fx-fill: #409eff;
+    -fx-stroke: #333333;
+    -fx-stroke-width: 2;
+}
+```
+
+`@icons/open.svg` 相对于当前 FXML；`@/icons/open.svg` 相对于 classpath 根目录（`src/main/resources/icons/open.svg`）。这是 [FXML 的地址解析语法](https://openjfx.io/javadoc/21/javafx.fxml/javafx/fxml/doc-files/introduction_to_fxml.html#location_resolution)。加载相对资源时必须向 `FXMLLoader` 提供 FXML 的 URL：
+
+```kotlin
+val loader = FXMLLoader(javaClass.getResource("/club/xiaojiawei/TipNode.fxml"))
+// fx:root 自定义组件还需保留 loader.setRoot(this) 和 loader.setController(this)。
+```
+
+应用需要自行引入 `javafx-fxml`，上例 Button 还需要 `javafx-controls`，版本应与应用 JavaFX 一致。使用命名模块时，Controller 所在包需要 `opens ... to javafx.fxml`。
+
+`source` 接收完整 URL 字符串，FXML 的 `@` 会自动转换；Kotlin/Java 中使用 `getResource(...).toExternalForm()`。加载使用默认 `SvgOptions`，在 FX 线程同步执行；大文件、后台解析和严格模式请继续使用 `SvgLoader` 加载后设置 `document`。加载失败保留旧内容；设为 null/空白字符串清空视图；直接设置 `document` 会清空 `source`。`sourceProperty()` 提供只读观察，不支持绑定写入。
+
+可直接加载的 FXML 示例位于 `src/test/resources/demo/icon.fxml`，测试 `SvgFxmlTest` 验证资源加载、CSS 覆盖和失败回退。
+
 ## JavaFX CSS
 
 外层视图带有 `svg-view` 样式类，每个图形有 `svg-shape`，每种元素带有 `svg-元素名`，例如 `svg-path`、`svg-rect`。源 SVG 的 id 和 class 会映射到对应节点。
@@ -153,4 +194,4 @@ mvn clean verify
 mvn dependency:tree "-Dincludes=org.openjfx"
 ```
 
-核心运行依赖仅为 Kotlin 标准库和 javafx-graphics（传递引入 javafx-base）；构建会禁止引入 javafx-web。测试及示例 PNG 导出使用的 JUnit/Java2D 不属于库运行接口。
+核心运行依赖仅为 Kotlin 标准库和 javafx-graphics（传递引入 javafx-base）；构建会禁止引入 javafx-web。FXML 集成测试使用的 javafx-fxml，以及测试及示例 PNG 导出使用的 JUnit/Java2D 不属于库运行接口。

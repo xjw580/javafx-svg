@@ -77,6 +77,12 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>club.xiaojiawei</groupId>
             <artifactId>javafx-plus-annotations</artifactId>
             <version>0.1.0</version>

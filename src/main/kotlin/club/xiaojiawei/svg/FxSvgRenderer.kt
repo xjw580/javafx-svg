@@ -22,6 +22,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
     private val styles = SvgStyles(document, ::report)
     private val updates = mutableListOf<() -> Unit>()
+    private val activeReferences = linkedSetOf<String>()
+    private var renderedElements = 0
     private val box = document.root["viewBox"]?.let(SvgBox::parse)
     val intrinsicWidth = document.root["width"]?.let { SvgNumbers.length(it, box?.width ?: 300.0) } ?: box?.width ?: 300.0
     val intrinsicHeight = document.root["height"]?.let { SvgNumbers.length(it, box?.height ?: 150.0) } ?: box?.height ?: 150.0
@@ -52,10 +54,12 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
 
     private fun render(
         element: SvgElement, ancestors: List<SvgElement>, parentStyle: Map<String, String>,
-        viewport: SvgViewport, isRoot: Boolean = false
+        viewport: SvgViewport, isRoot: Boolean = false, referenced: Boolean = false
     ): Node? {
         return try {
-            renderElement(element, ancestors, parentStyle, viewport, isRoot)
+            require(ancestors.size < document.options.maxDepth) { "SVG reference depth limit exceeded" }
+            require(++renderedElements <= document.options.maxElements) { "SVG expanded element limit exceeded" }
+            renderElement(element, ancestors, parentStyle, viewport, isRoot, referenced)
         } catch (e: IllegalArgumentException) {
             report(e.message ?: "Invalid SVG element", element)
             null
@@ -64,9 +68,10 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
 
     private fun renderElement(
         element: SvgElement, ancestors: List<SvgElement>, parentStyle: Map<String, String>,
-        viewport: SvgViewport, isRoot: Boolean
+        viewport: SvgViewport, isRoot: Boolean, referenced: Boolean
     ): Node? {
         if (element.name in setOf("defs", "style", "title", "desc", "metadata")) return null
+        if (element.name == "symbol" && !referenced) return null
         val style = styles.compute(element, ancestors, parentStyle)
         if (style.getValue("display") == "none") return null
         for (attribute in listOf("filter", "mask", "marker-start", "marker-mid", "marker-end", "vector-effect", "paint-order")) {
@@ -75,9 +80,29 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         fun length(name: String, axis: Double, default: String = "0") = SvgNumbers.length(element[name] ?: default, axis)
         fun positive(value: Double): Double = value.also { require(it >= 0) { "Negative SVG size" } }
         val node: Node = when (element.name) {
-            "svg", "g", "a" -> {
+            "use" -> {
+                val href = element["href"] ?: element["xlink:href"] ?: throw SvgException("Missing use href")
+                require(href.startsWith('#') && href.length > 1) { "Only local use references are supported: $href" }
+                val target = document.elementsById[href.drop(1)] ?: throw SvgException("Missing use target: $href")
+                require(activeReferences.add(href)) { "Circular use reference: $href" }
+                try {
+                    val instance = if (target.name in setOf("svg", "symbol")) {
+                        val attributes = target.attributes.toMutableMap()
+                        listOf("width", "height").forEach { key -> element[key]?.let { attributes[key] = it } }
+                        SvgElement(target.name, attributes, target.children, target.text)
+                    } else target
+                    val group = Group()
+                    update(element) {
+                        group.layoutX = length("x", viewport.width)
+                        group.layoutY = length("y", viewport.height)
+                    }
+                    render(instance, ancestors + element, style, viewport, referenced = true)?.let { group.children += it }
+                    group
+                } finally { activeReferences.remove(href) }
+            }
+            "svg", "g", "a", "symbol" -> {
                 val group = Group()
-                if (element.name == "svg" && !isRoot) {
+                if (element.name in setOf("svg", "symbol") && !isRoot) {
                     val inner = Group()
                     val nestedBox = element["viewBox"]?.let(SvgBox::parse)
                     val nested = SvgViewport(nestedBox?.width ?: viewport.width, nestedBox?.height ?: viewport.height)

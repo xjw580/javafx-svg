@@ -104,7 +104,7 @@ class SvgAnimationBenchmark : Application() {
             "jvmArgs=" + ManagementFactory.getRuntimeMXBean().inputArguments,
             "pulse=" + System.getProperty("javafx.animation.pulse", "default"),
             "counts=$counts; kinds=$kinds; warmup=$warmup; measure=$measure",
-            "scene=740x650; columns=25; tile=28; icon=24; all icons visible; cache=off; one shared document per case",
+            "scene=740x650; columns=25; tile=28; icon=24; all icons visible; application cache=off; internal render cache=default; one shared document per case",
             "screens=" + Screen.getScreens().map { it.bounds.toString() + ", dpi=" + it.dpi + ", scale=" + it.outputScaleX },
             "Pulse intervals are AnimationTimer intervals, not GPU completion or presented FPS.",
             "CPU percent is equivalent utilization of ONE core; process CPU can exceed 100%. -1 means unavailable.",
@@ -140,7 +140,7 @@ class SvgAnimationBenchmark : Application() {
             return
         }
         val (kind, count) = cases[index]
-        val document = SvgLoader.parse(animationBenchmarkSvg(kind), SvgOptions(strict = true))
+        val document = SvgLoader.parse(animationBenchmarkSvg(kind), SvgOptions::class.java.getConstructor(java.lang.Boolean.TYPE).newInstance(true))
         views = List(count) { n -> SvgView().apply {
             animationAutoPlay = kind != "paused"
             this.document = document

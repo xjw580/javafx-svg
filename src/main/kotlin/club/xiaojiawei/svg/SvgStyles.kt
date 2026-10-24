@@ -104,12 +104,12 @@ internal class SvgStyles(
             "display" to "inline", "visibility" to "visible", "overflow" to "visible",
             "marker" to "none", "marker-start" to "none", "marker-mid" to "none", "marker-end" to "none",
             "clip-path" to "none", "mask" to "none", "mask-type" to "luminance", "filter" to "none", "color-interpolation-filters" to "linearRGB",
-            "stop-color" to "black", "stop-opacity" to "1",
+            "stop-color" to "black", "stop-opacity" to "1", "flood-color" to "black", "flood-opacity" to "1",
             "font-family" to "sans-serif", "font-size" to "16", "font-weight" to "normal",
             "font-style" to "normal", "text-anchor" to "start",
             "transform" to "none", "transform-origin" to "0 0", "transform-box" to "view-box", "animation" to "none"
         ) + SvgCssTiming.defaults
-        private val inherited = defaults.keys - setOf("opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity", "vector-effect", "overflow", "transform", "transform-origin", "transform-box", "animation") - SvgCssTiming.defaults.keys
+        private val inherited = defaults.keys - setOf("opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity", "flood-color", "flood-opacity", "vector-effect", "overflow", "transform", "transform-origin", "transform-box", "animation") - SvgCssTiming.defaults.keys
     }
 }
 

@@ -412,7 +412,7 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
 | 遮罩 | alpha/luminance（默认）；区域、两种坐标单位、嵌套遮罩、CSS 与引用 |
-| 滤镜 | 单个 feGaussianBlur；独立 X/Y 标准差、SourceGraphic/SourceAlpha、filterUnits/primitiveUnits、输入区域及输出子区域裁剪 |
+| 滤镜 | 单个 feGaussianBlur / feDropShadow；独立 X/Y 标准差、SourceGraphic/SourceAlpha、filterUnits/primitiveUnits、输入区域及输出子区域裁剪 |
 | 文本 | text/嵌套 tspan、单值 x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space；单段文字支持 textLength/lengthAdjust；字号支持 em 和相对父字号的百分比 |
 | 图片 | image 中的 base64 PNG/JPEG，preserveAspectRatio，视口裁剪 |
 
@@ -505,7 +505,7 @@ spacing 模式当前支持单行水平的拉丁、汉字等非上下文文字；
 
 基础高斯模糊通过 JavaFX 原生效果实现，支持 SVG 属性、内联 style 和样式表中的 `filter: url(#id)`。`stdDeviation` 可为一个或两个数值；0 关闭对应方向的模糊，负值使该原语退回输入图像。滤镜坐标先于元素变换计算，滤镜输入按 filter 区域裁剪，输出再按原语子区域和 clipPath 裁剪。应用 CSS 修改填充或字体后会更新效果。
 
-支持 `edgeMode="none"` 和单个 `feGaussianBlur`，暂不支持其他滤镜原语、滤镜链、模板引用、filterRes 和 duplicate/wrap 边缘扩展。sRGB/auto 支持多色输入；默认 linearRGB 仅支持单色或 SourceAlpha 输入，多色线性 RGB 合成会报告诊断并在宽松模式下保留未滤镜处理的原图。较大的标准差通过分解方差执行多轮模糊，最多 16 轮，超限会报告诊断而不会静默截断。
+支持 `edgeMode="none"` 和单个 `feGaussianBlur` 或 `feDropShadow`，暂不支持其他滤镜原语、滤镜链、模板引用、filterRes 和 duplicate/wrap 边缘扩展。sRGB/auto 支持多色输入；默认 linearRGB 仅支持单色或 SourceAlpha 输入，多色线性 RGB 合成会报告诊断并在宽松模式下保留未滤镜处理的原图。较大的标准差通过分解方差执行多轮模糊，最多 16 轮，超限会报告诊断而不会静默截断。
 
 Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，可在严格模式下渲染；测试使用固定资源，不依赖网络或 GitHub 版本变化。
 
@@ -539,3 +539,6 @@ mvn dependency:tree "-Dincludes=org.openjfx"
 ```
 
 核心运行依赖仅为 Kotlin 标准库和 javafx-graphics（传递引入 javafx-base）；构建会禁止引入 javafx-web。FXML 集成测试使用的 javafx-fxml，以及测试及示例 PNG 导出使用的 JUnit/Java2D 不属于库运行接口。
+
+
+feDropShadow 支持 dx/dy、一个或两个 stdDeviation、flood-color/currentColor/flood-opacity，以及两种区域坐标单位。使用原生 Gaussian DropShadow；每轴标准差最多 127/3，超限报告诊断。sRGB/auto 支持多色源；默认 linearRGB 目前要求源与阴影颜色相同（SourceAlpha 要求黑色阴影），避免把 sRGB 合成冒充线性 RGB。暂不支持滤镜链及阴影原语属性动画。

@@ -6,6 +6,8 @@ import javafx.scene.Group
 import javafx.scene.Node
 import javafx.scene.effect.ColorAdjust
 import javafx.scene.effect.Effect
+import javafx.scene.effect.DropShadow
+import javafx.scene.effect.BlurType
 import javafx.scene.effect.GaussianBlur
 import javafx.scene.effect.MotionBlur
 import javafx.scene.paint.Color
@@ -25,11 +27,13 @@ internal class SvgGaussianFilter(
     private val viewport: SvgViewport,
     private val lengths: SvgLengthCache,
     private val interpolation: String,
+    private val shadowColor: Color = Color.BLACK,
     private val report: (String) -> Unit
 ) : Group() {
     private val filterProportional = units(filter["filterUnits"] ?: "objectBoundingBox")
     private val primitiveProportional = units(filter["primitiveUnits"] ?: "userSpaceOnUse")
-    private val deviations = SvgNumbers.list(primitive["stdDeviation"] ?: "0").also {
+    private val shadow = primitive.name == "feDropShadow"
+    private val deviations = SvgNumbers.list(primitive["stdDeviation"] ?: if (shadow) "2" else "0").also {
         require(it.size in 1..2) { "feGaussianBlur needs one or two stdDeviation values" }
     }
     private val alphaOnly = primitive["in"] == "SourceAlpha"
@@ -39,6 +43,7 @@ internal class SvgGaussianFilter(
     private val blurred = Group(input)
     private val output = Group(blurred)
     private var lastSigma: Pair<Double, Double>? = null
+    private var shadowKey: List<Double>? = null
 
     init {
         require(primitive["in"] in listOf(null, "SourceGraphic", "SourceAlpha")) { "Unsupported Gaussian filter input" }
@@ -68,11 +73,28 @@ internal class SvgGaussianFilter(
             val sigmaX = if (rawX < 0 || rawY < 0) 0.0 else rawX * if (primitiveProportional) bounds.width else 1.0
             val sigmaY = if (rawX < 0 || rawY < 0) 0.0 else rawY * if (primitiveProportional) bounds.height else 1.0
             require(sigmaX.isFinite() && sigmaY.isFinite()) { "Non-finite Gaussian deviation" }
-            require(interpolation != "linearRGB" || alphaOnly || (sigmaX == 0.0 && sigmaY == 0.0) || isMonochrome(source)) {
+            require(interpolation != "linearRGB" || if (shadow) {
+                if (alphaOnly) shadowColor.red == 0.0 && shadowColor.green == 0.0 && shadowColor.blue == 0.0
+                else isMonochrome(source, shadowColor)
+            } else alphaOnly || (sigmaX == 0.0 && sigmaY == 0.0) || isMonochrome(source)) {
                 "Multicolor linearRGB Gaussian filtering is unsupported; use color-interpolation-filters=sRGB"
             }
             val sigma = sigmaX to sigmaY
-            if (lastSigma != sigma) {
+            if (shadow) {
+                val dx = lengths.resolve(primitive["dx"] ?: "2", if (primitiveProportional) 1.0 else viewport.width) * if (primitiveProportional) bounds.width else 1.0
+                val dy = lengths.resolve(primitive["dy"] ?: "2", if (primitiveProportional) 1.0 else viewport.height) * if (primitiveProportional) bounds.height else 1.0
+                val key = listOf(sigmaX, sigmaY, dx, dy)
+                if (shadowKey != key) {
+                    require(sigmaX <= 127.0 / 3 && sigmaY <= 127.0 / 3) { "Drop shadow deviation exceeds the native kernel limit" }
+                    blurred.effect = if (rawX < 0 || rawY < 0) null else DropShadow().apply {
+                        blurType = BlurType.GAUSSIAN; color = shadowColor
+                        width = 6 * sigmaX + 1; height = 6 * sigmaY + 1
+                        offsetX = dx; offsetY = dy
+                        if (alphaOnly) input = ColorAdjust().apply { brightness = -1.0 }
+                    }
+                    shadowKey = key
+                }
+            } else if (lastSigma != sigma) {
                 blurred.effect = gaussian(sigmaX, sigmaY)
                 lastSigma = sigma
             }
@@ -86,6 +108,7 @@ internal class SvgGaussianFilter(
         } catch (e: IllegalArgumentException) {
             blurred.effect = null
             lastSigma = null
+            shadowKey = null
             input.clip = null
             output.clip = null
             report(e.message ?: "Invalid Gaussian filter")
@@ -141,8 +164,8 @@ internal class SvgGaussianFilter(
         if (node is Group) node.children.forEach(::observe)
     }
 
-    private fun isMonochrome(node: Node): Boolean {
-        var rgb: List<Double>? = null
+    private fun isMonochrome(node: Node, required: Color? = null): Boolean {
+        var rgb: List<Double>? = required?.let { listOf(it.red, it.green, it.blue) }
         fun paint(value: Paint?): Boolean {
             if (value == null) return true
             if (value !is Color) return false

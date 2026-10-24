@@ -678,14 +678,17 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 "Filter templates and filterRes are unsupported"
             }
             val primitives = filter.children.filter { it.name !in setOf("title", "desc", "metadata") }
-            require(primitives.size == 1 && primitives.single().name == "feGaussianBlur") {
-                "Only a single feGaussianBlur primitive is supported"
+            require(primitives.size == 1 && primitives.single().name in setOf("feGaussianBlur", "feDropShadow")) {
+                "Only a single feGaussianBlur or feDropShadow primitive is supported"
             }
             val primitive = primitives.single()
             require(primitive.children.all { it.name in setOf("title", "desc", "metadata") }) {
                 "Animated Gaussian filters are unsupported"
             }
-            SvgGaussianFilter(node, filter, primitive, viewport, document.lengths, paints.styleOf(primitive).getValue("color-interpolation-filters")) {
+            val primitiveStyle = paints.styleOf(primitive)
+            val flood = Color.web(primitiveStyle.getValue("flood-color").let { if (it == "currentColor") primitiveStyle.getValue("color") else it })
+            val floodColor = flood.deriveColor(0.0, 1.0, 1.0, SvgNumbers.fraction(primitiveStyle.getValue("flood-opacity")))
+            SvgGaussianFilter(node, filter, primitive, viewport, document.lengths, primitiveStyle.getValue("color-interpolation-filters"), floodColor) {
                 report(it, owner)
             }.also { filtered -> update(owner) { filtered.refresh() } }
         } catch (e: IllegalArgumentException) {

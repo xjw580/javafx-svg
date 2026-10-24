@@ -4,7 +4,7 @@
 
 - [x] 直接样式属性查找，消除 AbstractMap 默认 get 的遍历。
 - [x] XML 解析器线程隔离复用，限制 64 次/累计 1 MiB；大输入不保留，错误后丢弃。
-- [ ] feDropShadow。
+- [x] feDropShadow（单原语、有界原生内核；linearRGB 限制见 README）。
 - [ ] animateMotion / mpath。
 - [ ] textPath。
 - [ ] pattern。
@@ -29,3 +29,7 @@
 同一 Windows/JDK/JavaFX/512 MiB/JFR 配置，100/500 图标，每场景预热 2 秒、测量 5 秒；正式采样均聚焦且未最小化。单轮记录不是置信区间。创建计时不含 CSS/layout/首绘，分配不是最终保留内存。
 
 数据：[创建基线](remediation-2026-10-24-create-before.csv)、[第一阶段](remediation-2026-10-24-create-stage1.csv)、[渲染基线](remediation-2026-10-24-before.csv)、[第一阶段](remediation-2026-10-24-stage1.csv)。完整过程记录暂存 verification-svg-remediation，最终归档至 target/svg-verification/remediation。
+
+## 阴影
+
+318 项 Maven verify 回归通过。新增阴影覆盖源图合成、偏移、滤镜区域及子区域裁剪、SVG CSS/currentColor/flood-opacity、应用 CSS，以及错误输入和内核上限。该项解决原报告 sRGB 阴影样本缺口，不表示完整滤镜管线兼容。

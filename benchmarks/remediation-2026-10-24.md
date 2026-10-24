@@ -7,7 +7,7 @@
 - [x] feDropShadow（单原语、有界原生内核；linearRGB 限制见 README）。
 - [x] animateMotion / mpath（常用路径与时序，限制见 README）。
 - [x] textPath（单段原生字形沿路径排版，限制见 README）。
-- [ ] pattern。
+- [x] pattern（有界原生快照图案；两种坐标单位、变换与模板）。
 - [ ] 外部旋转与渐变渲染优化、质量及内存边界验证。
 - [ ] 固定描边动画分配优化。
 - [ ] 最终特性与性能对照、Demo 与完整回归。
@@ -41,3 +41,7 @@
 ## 沿路径文字
 
 330 项 Maven verify 回归通过。新增水平/竖直/曲线文字、CSS 字体和填充、百分比偏移、锚点、pathLength、引用路径变换、路径外字形隐藏、共享文档隔离及不支持内容诊断验证。
+
+## 图案绘制
+
+335 项 Maven verify 回归通过。新增重复填充、描边/透明度、CSS 失效与稳态复用、坐标单位、viewBox、旋转、模板、实例隔离、循环和像素预算。新增 maxPatternPixels 选项，在所有图案实例间限制稳态像素量。

@@ -69,6 +69,9 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private var paintContext: SvgMarkerContext? = null
     private val maskBudget = SvgMaskBudget(document.options.maxMaskPixels)
     private val masks = mutableListOf<SvgMask>()
+    private val patternBudget = SvgPatternBudget(document.options.maxPatternPixels)
+    private val patterns = mutableListOf<SvgPattern>()
+    private val definitions = Group().apply { isManaged=false; opacity=0.0; clip=Rectangle() }
     private var renderedElements = 0
     private val box = document.root["viewBox"]?.let(SvgBox::parse)
     val intrinsicWidth = document.root["width"]?.let { document.lengths.resolve(it, box?.width ?: 300.0) } ?: box?.width ?: 300.0
@@ -82,7 +85,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     init {
         require(intrinsicWidth >= 0 && intrinsicHeight >= 0) { "Negative SVG dimensions" }
         content = render(document.root, emptyList(), emptyMap(), viewport, true) ?: Group()
-        root = Group(content).apply { clip = viewportClip; isManaged = false }
+        root = Group(content, definitions).apply { clip = viewportClip; isManaged = false }
         // Effect callbacks and text flow must observe the normal geometry/paint/transform order.
         transformFramesOnly = animations.transformsOnly && updates.isEmpty() && !hasTextLayout
         themeReady = true
@@ -134,6 +137,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val paintCheckpoint = paintUpdates.size
         val styleCheckpoint = shapeStyles.size
         val maskCheckpoint = masks.size
+        val patternCheckpoint = patterns.size
         val animationCheckpoint = animations.size
         return try {
             require(ancestors.size < document.options.maxDepth) { "SVG reference depth limit exceeded" }
@@ -146,6 +150,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             animations.discardFrom(animationCheckpoint)
             shapeStyles.discardFrom(styleCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
+            while (patterns.size > patternCheckpoint) patterns.removeAt(patterns.lastIndex).also { definitions.children.remove(it.hidden); it.dispose() }
             report(e.message ?: "Invalid SVG element", element)
             null
         }
@@ -158,7 +163,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         if (element.name in SvgAnimation.NAMES) return null
         if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop", "filter")) return null
         if (element.name == "symbol" && !referenced) return null
-        if (element.name in setOf("clipPath", "mask", "marker") && !referenced) return null
+        if (element.name in setOf("clipPath", "mask", "marker", "pattern") && !referenced) return null
         if (element.name in setOf("text", "textPath")) hasTextLayout = true
         val computed = computedStyle(element, ancestors, parentStyle, viewport)
         val style = when (element.name) {
@@ -292,7 +297,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     group
                 } finally { activeReferences.remove(href) }
             }
-            "svg", "g", "a", "symbol", "clipPath", "mask", "marker" -> {
+            "svg", "g", "a", "symbol", "clipPath", "mask", "marker", "pattern" -> {
                 val group = Group()
                 if (element.name in setOf("svg", "symbol") && !isRoot) {
                     val inner = Group()
@@ -431,6 +436,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val paintCheckpoint = paintUpdates.size
         val styleCheckpoint = shapeStyles.size
         val maskCheckpoint = masks.size
+        val patternCheckpoint = patterns.size
         val animationCheckpoint = animations.size
         val layer: SvgMarkers
         try {
@@ -479,6 +485,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             animations.discardFrom(animationCheckpoint)
             shapeStyles.discardFrom(styleCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
+            while (patterns.size > patternCheckpoint) patterns.removeAt(patterns.lastIndex).also { definitions.children.remove(it.hidden); it.dispose() }
             report(failure.message ?: "Invalid SVG marker", owner)
             return source
         }
@@ -658,6 +665,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val geometryCheckpoint = geometryUpdates.size
         val paintCheckpoint = paintUpdates.size
         val maskCheckpoint = masks.size
+        val patternCheckpoint = patterns.size
         val animationCheckpoint = animations.size
         try {
             val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)").matchEntire(value)?.groupValues?.get(1)
@@ -692,6 +700,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             while (paintUpdates.size > paintCheckpoint) paintUpdates.removeAt(paintUpdates.lastIndex)
             animations.discardFrom(animationCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
+            while (patterns.size > patternCheckpoint) patterns.removeAt(patterns.lastIndex).also { definitions.children.remove(it.hidden); it.dispose() }
             report(failure.message ?: "Invalid mask", owner)
             // Invalid or unavailable masks must not expose the unmasked source.
             node.clip = Rectangle()
@@ -777,15 +786,58 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
     }
 
+    private fun pattern(value: String, owner: SvgElement, target: Node, viewport: SvgViewport): SvgPattern? {
+        if (!value.startsWith("url(")) return null
+        val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)\\s*.*").matchEntire(value)?.groupValues?.get(1) ?: return null
+        if (document.elementsById[id]?.name != "pattern") return null
+        require(activeReferences.add("pattern:$id")) { "Circular pattern reference: #$id" }
+        val oldMasking = masking
+        val oldContext = paintContext
+        try {
+            val chain = mutableListOf<SvgElement>()
+            var next: String? = id
+            val seen = mutableSetOf<String>()
+            while (next != null) {
+                require(seen.add(next) && seen.size <= document.options.maxDepth) { "Circular or too deep pattern template" }
+                val item = document.elementsById[next] ?: throw SvgException("Missing pattern: #$next")
+                require(item.name == "pattern") { "Pattern template must reference a pattern" }
+                chain += item
+                val href = item["href"] ?: item["xlink:href"]
+                require(href == null || href.startsWith('#') && href.length > 1) { "Only local pattern templates are supported" }
+                next = href?.drop(1)
+            }
+            val attrs = chain.asReversed().flatMap { it.attributes.entries }.associate { it.key to it.value }
+            val content = chain.firstOrNull { item -> item.children.any { it.name !in setOf("title","desc","metadata") } } ?: chain.first()
+            val merged = SvgElement("pattern",attrs,content.children,"",content.content)
+            require(document.options.maxElements-renderedElements >= 3) { "SVG expanded pattern node limit exceeded" }
+            renderedElements += 3
+            val instance = SvgPattern(target,merged,viewport,document.lengths,patternBudget) { if (themeReady) root.parent?.requestLayout() }
+            patterns += instance
+            definitions.children += instance.hidden
+            update(owner,phase=geometryUpdates) { instance.prepare() }
+            masking = true
+            paintContext = null
+            render(merged,paints.ancestorsOf(chain.first()),paints.parentStyleOf(chain.first()),instance.contentViewport,referenced=true)
+                ?.let { instance.content.children += it }
+            instance.observe()
+            return instance
+        } finally {
+            masking=oldMasking; paintContext=oldContext
+            activeReferences.remove("pattern:$id")
+        }
+    }
+
     private fun applyShapeStyle(
         shape: Shape, style: Map<String, String>, viewport: SvgViewport, element: SvgElement,
         geometry: Node = shape, dynamicGeometry: Boolean = false
     ) {
         val context = paintContext
+        val fillPattern = pattern(style.getValue("fill"),element,geometry,viewport)
+        val strokePattern = pattern(style.getValue("stroke"),element,geometry,viewport)
         val entry = if (masking || context != null) null else shapeStyles.register(shape)
         val action = {
-            val fill = paint(style.getValue("fill"), style, svgStyleNumber(style, "fill-opacity", 1.0, document.lengths).coerceIn(0.0, 1.0), element, geometry, viewport, context, svgStyleColour(style, "fill"))
-            val stroke = paint(style.getValue("stroke"), style, svgStyleNumber(style, "stroke-opacity", 1.0, document.lengths).coerceIn(0.0, 1.0), element, geometry, viewport, context, svgStyleColour(style, "stroke"))
+            val fill = paint(style.getValue("fill"), style, svgStyleNumber(style, "fill-opacity", 1.0, document.lengths).coerceIn(0.0, 1.0), element, geometry, viewport, context, svgStyleColour(style, "fill"), fillPattern)
+            val stroke = paint(style.getValue("stroke"), style, svgStyleNumber(style, "stroke-opacity", 1.0, document.lengths).coerceIn(0.0, 1.0), element, geometry, viewport, context, svgStyleColour(style, "stroke"), strokePattern)
             val width = svgStyleNumber(style, "stroke-width", viewport.diagonal, document.lengths).also { require(it >= 0) }
             if (entry != null) entry.setBase(fill, stroke, width) else {
                 setSvgBaseStyle(shape.fillProperty(), fill)
@@ -797,7 +849,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         if (context != null && (style.getValue("fill").startsWith("context-") || style.getValue("stroke").startsWith("context-"))) {
             action()
             context.updates += { try { action() } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid marker paint", element) } }
-        } else update(element, if (dynamicGeometry || style is SvgAnimatedStyle && style.affected.isNotEmpty()) null else viewport, phase = paintUpdates) { action() }
+        } else if (fillPattern != null || strokePattern != null) update(element) { action() }
+        else update(element, if (dynamicGeometry || style is SvgAnimatedStyle && style.affected.isNotEmpty()) null else viewport, phase = paintUpdates) { action() }
         shape.strokeType = StrokeType.CENTERED
         shape.strokeLineCap = when (style.getValue("stroke-linecap")) {
             "butt" -> StrokeLineCap.BUTT; "round" -> StrokeLineCap.ROUND; "square" -> StrokeLineCap.SQUARE
@@ -819,7 +872,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
 
     private fun paint(
         value: String, style: Map<String, String>, opacity: Double, element: SvgElement, shape: Node,
-        viewport: SvgViewport, context: SvgMarkerContext? = null, animatedColour: Color? = null
+        viewport: SvgViewport, context: SvgMarkerContext? = null, animatedColour: Color? = null, pattern: SvgPattern? = null
     ): Paint? {
         if (animatedColour != null) return Color(animatedColour.red, animatedColour.green, animatedColour.blue, animatedColour.opacity * opacity)
         if (value == "none") return null
@@ -828,7 +881,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             val match = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)\\s*(.*)").matchEntire(value)
                 ?: throw SvgException("Only local paint references are supported: $value")
             return try {
-                paints.gradient(match.groupValues[1], opacity, viewport, svgGeometryBounds(shape))
+                if (pattern != null) { if (themeReady) pattern.paint(opacity) else Color.TRANSPARENT }
+                else paints.gradient(match.groupValues[1], opacity, viewport, svgGeometryBounds(shape))
             } catch (e: IllegalArgumentException) {
                 report(e.message ?: "Invalid paint server", element)
                 val fallback = match.groupValues[2].ifBlank { "none" }

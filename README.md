@@ -512,7 +512,7 @@ Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，
 当前不支持完整 SVG 规范。限制包括：
 
 - 不执行脚本和事件处理器，不渲染 foreignObject；声明式动画的支持范围见上文。
-- 不支持完整 filter 管线、pattern、radialGradient 的 gradientTransform 和非零 fr；vector-effect 目前只支持 none/non-scaling-stroke。
+- 不支持完整 filter 管线、radialGradient 的 gradientTransform 和非零 fr；vector-effect 目前只支持 none/non-scaling-stroke。
 - SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量、除 @keyframes 外的 at-rule、外部样式表；应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
 - 不支持逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
 - 不自动加载 image/use/gradient/clipPath 中的外部文件或网络引用；load(URL) 仅打开调用方明确提供的顶层地址。
@@ -548,3 +548,6 @@ animateMotion 支持 path、优先的本地 mpath、values/from-to 坐标、默�
 
 
 textPath 支持本地 href/xlink:href 路径引用、startOffset 长度/百分比、pathLength 校准、text-anchor、引用路径自身 transform、父 text 的 x/dx/dy，以及字体/绘制属性继承和 JavaFX CSS。沿路径放置原生 Text 字素簇并按切线旋转，曲线测量复用文档缓存；可组合整段变换、裁剪、遮罩、滤镜及固定描边。当前要求 text 内只有一个 textPath 文字段；不支持混合 tspan、method=stretch、textLength、复杂连写和双向排版。spacing=auto/exact 使用原生字形度量，不额外执行排版优化。规则参考 [SVG textPath](https://www.w3.org/TR/SVG11/text.html#TextPathElement)。
+
+
+pattern 支持填充/描边、本地 href 模板、patternUnits/patternContentUnits、viewBox/preserveAspectRatio、x/y/width/height 与二维 patternTransform。定义内容使用原生场景节点，通过 JavaFX 快照和 Canvas 生成重复图案；无需 WebView/Java2D。CSS 和内容动画变化会刷新，稳定布局复用图像，纯外部旋转复用同尺寸采样；定义内容不受根 -svg-* 主题改色。每视图所有图案的 tile 与目标图像共用 maxPatternPixels 像素预算（默认 4,194,304），单轴最多 4096，超限报告诊断。当前按 tile 边界裁剪，不支持 overflow=visible 跨 tile 绘制；快照后极端离屏放大仍可能重采样。模板循环、引用深度和展开节点有界。规则参考 [SVG Patterns](https://www.w3.org/TR/SVG11/pservers.html#Patterns)。

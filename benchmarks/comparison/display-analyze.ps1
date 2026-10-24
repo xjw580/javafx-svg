@@ -1,9 +1,10 @@
-param([Parameter(Mandatory=$true)][string]$InputDirectory,[int]$ExpectedRepeats=3,[switch]$AllowSmoke)
+param([Parameter(Mandatory=$true)][string]$InputDirectory,[int]$ExpectedRepeats=3,[switch]$AllowSmoke,[switch]$AllowJfr)
 $ErrorActionPreference='Stop'
 $root=(Resolve-Path -LiteralPath $InputDirectory).Path
 if(!(Test-Path (Join-Path $root 'completed.txt'))){throw 'Incomplete run'}
 $protocol=Get-Content (Join-Path $root 'protocol.txt') -Raw
 if($protocol -match 'smoke=True' -and !$AllowSmoke){throw 'Smoke cannot support performance conclusions'}
+if($protocol -match 'JFR=True' -and !$AllowJfr){throw 'JFR diagnostics cannot be mixed with unrecorded performance comparisons; use AllowJfr explicitly for diagnostic summaries'}
 function Median($items){
     $numbers=@($items|ForEach-Object {[double]$_}|Sort-Object)
     if(!$numbers.Count){return $null}

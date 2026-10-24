@@ -10,6 +10,7 @@ param(
     [double]$RasterWarmupSeconds=10,
     [double]$IdleWarmupSeconds=3,
     [double]$IdleMeasureSeconds=5,
+    [switch]$RecordJfr,
     [switch]$Smoke
 )
 $ErrorActionPreference='Stop'
@@ -41,7 +42,7 @@ Copy-Item (Join-Path $PSScriptRoot 'dependencies.json') $Output
 @(
     "smoke=$Smoke; count=$Count; independent JVM repeats=$Repeats"
     "Raster warmup at least $WarmupBatches batches AND $RasterWarmupSeconds s; measurement=$MeasureBatches batches; idle warmup=$IdleWarmupSeconds s; idle measurement=$IdleMeasureSeconds s."
-    'Sequential fresh JVMs, fixed 512 MiB heap, same full classpath, no JFR or forced GC.'
+    "Sequential fresh JVMs, fixed 512 MiB heap, same full classpath, JFR=$RecordJfr; no forced GC."
     'Provider order rotates, kinds reverse on even rounds. Every warmup/measurement row is retained.'
     'Raster readiness includes asynchronous offscreen snapshot and readback, not screen presentation.'
     'Idle has no AnimationTimer; worker samples CPU/allocation once at interval end.'
@@ -60,7 +61,7 @@ $culture=[Globalization.CultureInfo]::InvariantCulture
 foreach($run in $plan){
     $destination=Join-Path $Output $run.run
     Write-Host $run.run
-    & (Join-Path $JavaHome 'bin/java.exe') -Xms512m -Xmx512m --enable-native-access=ALL-UNNAMED -cp ($classes+';'+$cp) svgbench.DisplayMain ("--provider="+$run.provider) ("--output="+$destination) ("--kinds="+$run.kinds) ("--count="+$Count) ("--warmups="+$WarmupBatches) ("--measurements="+$MeasureBatches) ("--raster-warmup="+$RasterWarmupSeconds.ToString($culture)) ("--idle-warmup="+$IdleWarmupSeconds.ToString($culture)) ("--idle-measure="+$IdleMeasureSeconds.ToString($culture)) *> (Join-Path $Output ($run.run+'.log'))
+    & (Join-Path $JavaHome 'bin/java.exe') -Xms512m -Xmx512m --enable-native-access=ALL-UNNAMED -cp ($classes+';'+$cp) svgbench.DisplayMain ("--jfr="+$RecordJfr.ToString().ToLowerInvariant()) ("--provider="+$run.provider) ("--output="+$destination) ("--kinds="+$run.kinds) ("--count="+$Count) ("--warmups="+$WarmupBatches) ("--measurements="+$MeasureBatches) ("--raster-warmup="+$RasterWarmupSeconds.ToString($culture)) ("--idle-warmup="+$IdleWarmupSeconds.ToString($culture)) ("--idle-measure="+$IdleMeasureSeconds.ToString($culture)) *> (Join-Path $Output ($run.run+'.log'))
     if($LASTEXITCODE -ne 0 -or !(Test-Path (Join-Path $destination 'completed.txt')) -or (Test-Path (Join-Path $destination 'failure.txt'))){
         Get-Content (Join-Path $Output ($run.run+'.log')) -Tail 25
         throw ('Incomplete run: '+$run.run)

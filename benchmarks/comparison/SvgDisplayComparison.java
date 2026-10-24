@@ -21,11 +21,20 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
+import jdk.jfr.*;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 
 /** Complete offscreen raster readiness and timer-free idle measurement. Not presentation latency. */
 public final class SvgDisplayComparison extends Application {
+    @Name("club.xiaojiawei.svg.RasterBenchmarkPhase")
+    public static final class RasterPhase extends Event {
+        public String provider, kind;
+        public int batch, icons;
+        public boolean warmup, complete;
+    }
+    private Recording recording;
+    private RasterPhase rasterPhase;
     private final com.sun.management.ThreadMXBean threads =
         (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
     private final com.sun.management.OperatingSystemMXBean os =
@@ -83,6 +92,11 @@ public final class SvgDisplayComparison extends Application {
         if(Files.exists(output.resolve("raster.csv")))throw new IllegalArgumentException("Choose a fresh output");
         threads.setThreadCpuTimeEnabled(true);threads.setThreadAllocatedMemoryEnabled(true);
         stage.setTitle("SVG static display - "+provider);stage.setResizable(false);
+        if(Boolean.parseBoolean(arg("jfr","false"))){
+            recording=new Recording(Configuration.getConfiguration("profile"));
+            recording.enable("jdk.ObjectAllocationSample").withStackTrace().with("throttle","300/s");
+            recording.start();
+        }
         stage.focusedProperty().addListener((o,a,b) -> {if(measuringIdle&&!b)focusLosses++;});
         Files.writeString(output.resolve("environment.txt"),String.join("\n",
             "provider="+provider,"java="+System.getProperty("java.version"),
@@ -93,7 +107,7 @@ public final class SvgDisplayComparison extends Application {
             "Raster: new Scene + parse/build/CSS/layout + asynchronous 740x650 logical-pixel snapshot/readback, no visible Stage.",
             "Raster is NOT screen presentation or pure GPU time. Validation and PNG writing are outside the timed interval.",
             "Idle: same last scene shown, screen output scale="+javafx.stage.Screen.getPrimary().getOutputScaleX(),
-            "No AnimationTimer/JFR/FX polling during idle. Worker reads FX CPU/allocation counters once at the end.",
+            "JFR="+(recording!=null)+"; no AnimationTimer or FX polling during idle; worker samples counters at the end.",
             "Focus transitions are counted; counters cannot detect occlusion. No forced GC; allocated bytes are not retained memory."));
         worker.schedule(() -> {if(!completed){System.err.println("Display comparison timeout");System.exit(2);}},180,TimeUnit.SECONDS);
         nextBatch();
@@ -141,6 +155,10 @@ public final class SvgDisplayComparison extends Application {
             Files.writeString(output.resolve(kind+".svg"),xml);
             if(rasterWarmupStarted==0)rasterWarmupStarted=System.nanoTime();
             warmupBatch=batch<warmups || (System.nanoTime()-rasterWarmupStarted)/1e9<rasterWarmupSeconds;
+            if(recording!=null){
+                rasterPhase=new RasterPhase();rasterPhase.provider=provider;rasterPhase.kind=kind;
+                rasterPhase.batch=batch;rasterPhase.icons=count;rasterPhase.warmup=warmupBatch;rasterPhase.begin();
+            }
             start=counters();
             root=new Pane();root.resize(740,650);
             scene=new Scene(root,740,650,Color.TRANSPARENT);
@@ -155,6 +173,7 @@ public final class SvgDisplayComparison extends Application {
             root.snapshot(result -> {
                 try {
                     Counters end=counters();
+                    if(rasterPhase!=null){rasterPhase.end();rasterPhase.complete=true;rasterPhase.commit();rasterPhase=null;}
                     validate(result.getImage());
                     ready.add(String.join(",",provider,kind,""+batch,""+warmupBatch,""+count,
                         n((end.wall-start.wall)/1e6),n((end.fxCpu-start.fxCpu)/1e6),n((end.cpu-start.cpu)/1e6),
@@ -219,7 +238,8 @@ public final class SvgDisplayComparison extends Application {
         String body=kind.equals("gradient")?"<defs><linearGradient id=\"g\"><stop stop-color=\"red\"/><stop offset=\"1\" stop-color=\"blue\"/></linearGradient></defs><g fill=\"url(#g)\">"+paths+"</g>":"<g fill=\"#2563eb\">"+paths+"</g>";
         return "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\" viewBox=\"0 0 64 64\">"+body+"</svg>";
     }
-    @Override public void stop() {
+    @Override public void stop() throws Exception {
         measuringIdle=false;worker.shutdownNow();release();stage.setScene(null);
+        if(recording!=null){recording.stop();recording.dump(output.resolve("display.jfr"));recording.close();}
     }
 }

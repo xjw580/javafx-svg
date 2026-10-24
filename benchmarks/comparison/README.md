@@ -59,3 +59,6 @@ NativeRenderCache 可选 default/on/off。default 保留目标 JAR 的内部缓�
 参数 Count、Repeats、WarmupBatches、RasterWarmupSeconds、MeasureBatches、IdleWarmupSeconds、IdleMeasureSeconds 可调整；正式比较必须相同。Smoke 使用 10 实例、一个预热/测量批次和 1 秒空闲区间，仅检查 API、像素、生命周期与输出完整性，不能用于性能结论。
 
 每进程保留 raster.csv（全部批次）、idle.csv、PNG、输入 SVG、环境和日志，根目录保留源码、运行计划、协议与 JAR 哈希。仅全部进程完成才写 completed.txt。汇总应先在各独立进程内统计，再比较进程中位数与完整范围；批次不能充当独立 JVM 重复。短测与固定预热都不保证稳态，需审查迭代漂移和 GC，不能只挑最快值。
+
+可单独使用 `-RecordJfr` 诊断完整光栅分配与调用栈。每批记录 RasterBenchmarkPhase，字段区分库、场景、预热和完成状态；分析时只选择 complete=true、warmup=false 的事件区间，截图验证与写盘在区间外。默认仍关闭 JFR；采样结果不能与关闭录制的数据直接合并排名。display-analyze.ps1 默认拒绝录制数据，诊断汇总需显式传 -AllowJfr。此开关不影响原有动画基准的录制策略。
+

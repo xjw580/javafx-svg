@@ -68,3 +68,6 @@ NativeRenderCache 可选 default/on/off。default 保留目标 JAR 的内部缓�
 
 需要控制改前/改后的运行顺序时，可指定 `-NativeJar 改后.jar -BaselineNativeJar 改前.jar -Providers native-before,native,fxsvgimage,jsvg-fx`。native-before 使用相同的本库 API 与测量代码，仅替换类路径中的本库 JAR；每模式每轮新建 JVM，四个模式一起轮换顺序，偶数轮反转场景。plan.csv 逐进程记录实际本库 JAR 路径及哈希，避免把顺序完成的两轮当成逐进程交错对照；默认三库运行方式保持原有行为。
 
+
+RecordJfr 模式额外输出 steps.csv：build（新 Scene、解析/创建及挂载）、css-layout（显式 CSS/layout）、snapshot-ready（快照准备、隐含同步、渲染/读回及回调等待）的 FX CPU、FX 分配和 wall。仅诊断模式增加两次边界计数，并将执行/原生方法采样周期设为 2 ms；正式默认模式不采这些边界。snapshot-ready 包含等待及多个线程的工作，不能解释为纯 GPU 时间；诊断分段不与无录制正式 wall 混合排名。
+

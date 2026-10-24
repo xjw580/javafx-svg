@@ -47,6 +47,8 @@ public final class SvgDisplayComparison extends Application {
         "provider,kind,batch,warmup,icons,wall_ms,fx_cpu_ms,process_cpu_ms,fx_alloc_mib,total_alloc_mib,gc_count,gc_ms"));
     private final List<String> idle = new ArrayList<>(List.of(
         "provider,kind,icons,seconds,fx_cpu_ms_s,process_cpu_core_pct,fx_alloc_kib_s,total_alloc_kib_s,gc_count,gc_ms,focus_start,focus_end,focus_losses,iconified_start,iconified_end"));
+    private final List<String> steps = new ArrayList<>(List.of(
+        "provider,kind,batch,warmup,build_ms,css_layout_ms,snapshot_ready_ms,build_fx_cpu_ms,css_fx_cpu_ms,snapshot_fx_cpu_ms,build_fx_mib,css_fx_mib,snapshot_fx_mib"));
     private String provider;
     private List<String> kinds;
     private Path output;
@@ -95,6 +97,8 @@ public final class SvgDisplayComparison extends Application {
         if(Boolean.parseBoolean(arg("jfr","false"))){
             recording=new Recording(Configuration.getConfiguration("profile"));
             recording.enable("jdk.ObjectAllocationSample").withStackTrace().with("throttle","300/s");
+            recording.enable("jdk.ExecutionSample").withPeriod(java.time.Duration.ofMillis(2));
+            recording.enable("jdk.NativeMethodSample").withPeriod(java.time.Duration.ofMillis(2));
             recording.start();
         }
         stage.focusedProperty().addListener((o,a,b) -> {if(measuringIdle&&!b)focusLosses++;});
@@ -167,7 +171,9 @@ public final class SvgDisplayComparison extends Application {
                 var host=new Pane(node);host.setManaged(false);host.resize(24,24);
                 host.relocate(20+(i%25)*28,72+(i/25)*28);root.getChildren().add(host);
             }
+            Counters built=recording==null?null:counters();
             root.applyCss();root.layout();
+            Counters laidOut=recording==null?null:counters();
             var parameters=new SnapshotParameters();parameters.setFill(Color.TRANSPARENT);
             parameters.setViewport(new Rectangle2D(0,0,740,650));
             root.snapshot(result -> {
@@ -175,6 +181,13 @@ public final class SvgDisplayComparison extends Application {
                     Counters end=counters();
                     if(rasterPhase!=null){rasterPhase.end();rasterPhase.complete=true;rasterPhase.commit();rasterPhase=null;}
                     validate(result.getImage());
+                    if(recording!=null){
+                        steps.add(String.join(",",provider,kind,""+batch,""+warmupBatch,
+                            n((built.wall-start.wall)/1e6),n((laidOut.wall-built.wall)/1e6),n((end.wall-laidOut.wall)/1e6),
+                            n((built.fxCpu-start.fxCpu)/1e6),n((laidOut.fxCpu-built.fxCpu)/1e6),n((end.fxCpu-laidOut.fxCpu)/1e6),
+                            n((built.fxAllocated-start.fxAllocated)/1048576.0),n((laidOut.fxAllocated-built.fxAllocated)/1048576.0),n((end.fxAllocated-laidOut.fxAllocated)/1048576.0)));
+                        Files.write(output.resolve("steps.csv"),steps);
+                    }
                     ready.add(String.join(",",provider,kind,""+batch,""+warmupBatch,""+count,
                         n((end.wall-start.wall)/1e6),n((end.fxCpu-start.fxCpu)/1e6),n((end.cpu-start.cpu)/1e6),
                         n((end.fxAllocated-start.fxAllocated)/1048576.0),n((end.allocated-start.allocated)/1048576.0),

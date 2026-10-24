@@ -105,6 +105,10 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
         set(value) { replaceDocument(value, null) }
     fun documentProperty(): ReadOnlyObjectProperty<SvgDocument?> = documentValue.readOnlyProperty
 
+    /** Cache captured by each source assignment. Null disables sharing; changing it does not reload. */
+    var resourceCache: SvgResourceCache? = SvgResourceCache.shared
+        set(value) { checkFxThread(); field = value }
+
     /**
      * Absolute URL loaded using default [SvgOptions]. Network I/O and parsing run in background;
      * file and jar:file resources load synchronously. Nodes are always created on the FX thread.
@@ -125,7 +129,7 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
             val url = try { URI(location).toURL() }
                 catch (e: Exception) { throw sourceException(location, e) }
             if (url.protocol == "file" || (url.protocol == "jar" && url.path.startsWith("file:"))) {
-                val loaded = try { SvgLoader.load(url) }
+                val loaded = try { resourceCache?.load(url) ?: SvgLoader.load(url) }
                     catch (e: Exception) { throw sourceException(location, e) }
                 replaceDocument(loaded, location)
             } else {
@@ -152,8 +156,9 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
 
     private fun loadInBackground(location: String, url: URL) {
         val generation = cancelPendingLoad()
+        val cache = resourceCache
         val task = object : Task<SvgDocument>() {
-            override fun call(): SvgDocument = SvgLoader.load(url)
+            override fun call(): SvgDocument = cache?.load(url) ?: SvgLoader.load(url)
         }
         pendingLoad = task
         task.setOnSucceeded {

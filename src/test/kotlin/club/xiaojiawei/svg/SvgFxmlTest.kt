@@ -61,6 +61,41 @@ class SvgFxmlTest {
         }
     }
 
+    @Test fun fxmlViewsShareCachedDocumentsButKeepIndependentNodesAndMutableSources() = FxTest.run {
+        val location = javaClass.getResource("/demo/icon.fxml")
+        val first = FXMLLoader(location).load<SvgView>()
+        val second = FXMLLoader(location).load<SvgView>()
+        assertSame(SvgResourceCache.shared, first.resourceCache)
+        val shared = first.document
+        assertSame(shared, second.document)
+        assertNotSame(first.lookup("#outline"), second.lookup("#outline"))
+        val other = Files.writeString(directory.resolve("other.svg"), """<svg><circle id="other" r="4"/></svg>""")
+        first.source = other.toUri().toString()
+        assertNotNull(first.lookup("#other"))
+        assertSame(shared, second.document)
+        assertNotNull(second.lookup("#outline"))
+        first.resourceCache = null
+        assertNotNull(first.lookup("#other"))
+        first.source = second.source
+        assertNotSame(shared, first.document)
+    }
+
+    @Test fun sameLocalAddressReloadsAfterFileChangesAndKeepsTheme() = FxTest.run {
+        val file = Files.writeString(directory.resolve("changing.svg"), """<svg><rect id="before" width="10" height="10"/></svg>""")
+        val view = SvgView().apply {
+            resourceCache = SvgResourceCache()
+            svgFill = Color.BLUE
+            source = file.toUri().toString()
+        }
+        val before = view.document
+        Files.writeString(file, """<svg><path id="after" d="M0 0L10 10"/></svg>""")
+        Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 2000))
+        view.source = file.toUri().toString()
+        assertNotSame(before, view.document)
+        assertNull(view.lookup("#before"))
+        assertEquals(Color.BLUE, (view.lookup("#after") as SVGPath).fill)
+    }
+
     @Test fun sourceCanReloadClearAndYieldToDirectDocumentAssignment() = FxTest.run {
         val view = SvgView()
         val observed = mutableListOf<String?>()

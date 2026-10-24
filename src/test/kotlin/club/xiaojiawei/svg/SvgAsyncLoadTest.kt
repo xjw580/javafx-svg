@@ -194,6 +194,51 @@ class SvgAsyncLoadTest {
         } finally { response.release.countDown() }
     }
 
+    @Test fun cancellingOrChangingSourceLeavesAnotherCacheReaderRunning() = TestServer().use { server ->
+        server.respond("/latest", svg("latest"))
+        for (replacement in listOf("clear", "new")) {
+            val response = server.respond("/shared-$replacement", svg("shared"), delayed = true)
+            val cache = SvgResourceCache()
+            val owner = java.util.concurrent.FutureTask { cache.load(java.net.URL(server.url("/shared-$replacement"))) }
+            val ownerThread = Thread.ofVirtual().start(owner)
+            lateinit var view: SvgView
+            try {
+                await(response.entered)
+                FxTest.run {
+                    view = SvgView().apply { resourceCache = cache; source = server.url("/shared-$replacement") }
+                }
+                FxTest.run { view.source = if (replacement == "clear") null else server.url("/latest") }
+                awaitLoad(view)
+                response.release.countDown()
+                assertTrue("shared" in owner.get(5, TimeUnit.SECONDS).elementsById)
+                FxTest.run {
+                    assertFalse(view.isLoading)
+                    assertNull(view.loadException)
+                    if (replacement == "clear") assertNull(view.document)
+                    else assertNotNull(view.lookup("#latest"))
+                    assertNull(view.lookup("#shared"))
+                }
+                assertEquals(1, response.requests.get())
+            } finally { response.release.countDown(); ownerThread.interrupt() }
+        }
+    }
+
+    @Test fun completedRemoteSourceCanBeReloadedAndDoesNotKeepStaleCacheResults() = TestServer().use { server ->
+        val response = server.respond("/fresh", svg("fresh"))
+        lateinit var view: SvgView
+        lateinit var first: SvgDocument
+        FxTest.run { view = SvgView().apply { resourceCache = SvgResourceCache(); source = server.url("/fresh") } }
+        awaitLoad(view)
+        FxTest.run { first = view.document!!; view.source = server.url("/fresh") }
+        awaitLoad(view)
+        FxTest.run {
+            assertNotSame(first, view.document)
+            assertNotNull(view.lookup("#fresh"))
+            assertNull(view.loadException)
+        }
+        assertEquals(2, response.requests.get())
+    }
+
     private fun svg(id: String) = """<svg viewBox="0 0 24 24"><path id="$id" d="M0 0L12 12"/></svg>"""
 
     private fun await(latch: CountDownLatch, seconds: Long = 5) {
@@ -212,6 +257,7 @@ class SvgAsyncLoadTest {
     }
 
     private class Response(val delayed: Boolean) {
+        val requests = java.util.concurrent.atomic.AtomicInteger()
         val entered = CountDownLatch(1)
         val release = CountDownLatch(if (delayed) 1 else 0)
         val finished = CountDownLatch(1)
@@ -228,6 +274,7 @@ class SvgAsyncLoadTest {
             val response = Response(delayed)
             server.createContext(path) { exchange ->
                 try {
+                    response.requests.incrementAndGet()
                     response.entered.countDown()
                     check(response.release.await(25, TimeUnit.SECONDS))
                     val bytes = body.toByteArray()

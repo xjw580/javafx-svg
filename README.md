@@ -130,6 +130,10 @@ val secondView = SvgView(second) // 独立节点，CSS 互不影响
 
 可使用 `cache.size` / `cache.sourceBytes` 查看当前保留量，或显式使用 `SvgResourceCache.shared` 共享默认实例。缓存仅持有文档，不持有 JavaFX 节点或视图。
 
+`SvgView.source` 默认使用 `SvgResourceCache.shared`，FXML 无需额外配置即可共享本地文档及合并正在进行的请求。地址仍可修改，新地址取消当前视图的旧等待；其他视图或调用方的共享请求继续执行。已完成网络资源不保留，重新赋相同 URL 仍会请求服务器；本地命中时复用文档，但每次赋值仍创建新节点。
+
+可在指定 source 前设置 `view.resourceCache = customCache`，或设为 `null` 禁用该视图后续请求的缓存与合并。缓存实例在每次 source 赋值时捕获；更换 resourceCache 不影响现有内容和已经开始的请求。需要强制重读元数据相同的本地文件时，先 `view.resourceCache?.invalidate(url)`，再重新赋 source。清空视图不清理共享缓存，清理缓存也不会清空现有视图。
+
 ## FXML 使用
 
 `SvgView` 提供无参构造和 `source` 属性，可以直接声明 SVG 地址，无需在 Controller 中手动加载：

@@ -1,6 +1,6 @@
 # JavaFX SVG 库对照：2026-10-24
 
-本库适合需要 FXML、JavaFX CSS 改色和声明式动画的控件场景，但当前批量加载与纯旋转开销并不占优。fxsvgimage 的基本 SMIL 旋转更轻；JSVG 的 pattern、textPath 和滤镜能力更广，Canvas 静态画面的外部变换也较轻。不能据此给出所有 SVG 场景的统一速度排名。
+本文保留 eb0a6d2 的历史对照结果。后续已补齐本报告列出的 pattern、feDropShadow、textPath、animateMotion 四个缺口，当前 18 个样本全部通过，并完成批量构建、固定描边和原生旋转缓存优化。341 项回归及 27 项 Demo 检查通过；最新能力边界、性能数据与缓存代价见 [缺口修复报告](remediation-2026-10-24.md)。下表及旧 CSV 不改写为新版本成绩，不能据历史缺口判断当前支持范围。
 
 后续 [纯变换动画优化](transform-fastpath-2026-10-24.md) 已完成；下表保留优化前版本与原始数据，当前实现的收益及波动见新报告。
 

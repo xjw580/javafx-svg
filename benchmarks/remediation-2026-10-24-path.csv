@@ -1,0 +1,3 @@
+"provider","scenario","icons","samples","seconds","pulse_p50_ms","pulse_p95_ms","pulse_p99_ms","pulse_max_ms","over_33ms","process_cpu_core_pct","fx_cpu_ms_per_pulse","total_alloc_mib_s","fx_alloc_mib_s","fx_alloc_bytes_per_pulse","gc_count","gc_time_ms","unfocused_samples","iconified_samples"
+"native","path","1","825","5.003046","6.050800","11.121600","11.929100","12.639800","0","30.918664","0.170454","0.925064","0.284219","1807.311515","0","0","0","0"
+"native","path","500","768","5.002230","6.120800","8.549600","15.700200","58.135100","6","113.386941","3.153483","49.379578","44.105756","301229.552083","1","9","0","0"

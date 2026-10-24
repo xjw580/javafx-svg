@@ -407,13 +407,14 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 | 样式 | 属性、style 属性、style 元素；类型/class/id/复合/后代/逗号选择器；继承、优先级、!important、currentColor |
 | 描边 | 颜色、宽度、透明度、端点、连接、miterlimit、虚线、non-scaling-stroke |
 | 引用 | 本文档内 defs/use/symbol、href/xlink:href；独立实例、循环和展开数量限制 |
-| 动画 | animateTransform、样式与几何 animate、CSS @keyframes；关键帧/缓动、延迟/循环、播放/暂停/停止/时间定位 |
+| 动画 | animateMotion/mpath、animateTransform、样式与几何 animate、CSS @keyframes；关键帧/缓动、延迟/循环、播放/暂停/停止/时间定位 |
 | 标记 | marker-start/mid/end、marker 简写；自动定向、两类坐标单位、上下文颜色/线性渐变 |
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
 | 遮罩 | alpha/luminance（默认）；区域、两种坐标单位、嵌套遮罩、CSS 与引用 |
 | 滤镜 | 单个 feGaussianBlur / feDropShadow；独立 X/Y 标准差、SourceGraphic/SourceAlpha、filterUnits/primitiveUnits、输入区域及输出子区域裁剪 |
-| 文本 | text/嵌套 tspan、单值 x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space；单段文字支持 textLength/lengthAdjust；字号支持 em 和相对父字号的百分比 |
+| 图案 | pattern 填充/描边、模板、坐标单位、viewBox 与二维变换 |
+| 文本 | 单段 textPath；text/嵌套 tspan、单值 x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space；单段文字支持 textLength/lengthAdjust；字号支持 em 和相对父字号的百分比 |
 | 图片 | image 中的 base64 PNG/JPEG，preserveAspectRatio，视口裁剪 |
 
 ### 遮罩

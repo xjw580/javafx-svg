@@ -74,6 +74,11 @@ class SvgDemo : Application() {
 
 fun main(args: Array<String>) {
     val benchmark = "--benchmark" in args
-    Application.launch(if (benchmark) SvgRenderBenchmark::class.java else SvgDemo::class.java,
-        *args.filterNot { it == "--benchmark" }.toTypedArray())
+    val visualCheck = "--cache-visual-check" in args
+    require(!benchmark || !visualCheck) { "Choose benchmark or cache visual check" }
+    Application.launch(when {
+        benchmark -> SvgRenderBenchmark::class.java
+        visualCheck -> SvgCacheVisualCheck::class.java
+        else -> SvgDemo::class.java
+    }, *args.filterNot { it == "--benchmark" || it == "--cache-visual-check" }.toTypedArray())
 }

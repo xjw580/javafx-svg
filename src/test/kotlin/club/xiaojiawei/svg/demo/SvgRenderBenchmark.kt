@@ -8,11 +8,12 @@ import javafx.application.Application
 import javafx.application.Platform
 import javafx.css.PseudoClass
 import javafx.scene.Group
+import javafx.scene.CacheHint
 import javafx.scene.Scene
 import javafx.scene.layout.Pane
-import javafx.scene.paint.Color
 import javafx.scene.shape.Rectangle
 import javafx.scene.text.Text
+import javafx.scene.transform.Scale
 import javafx.stage.Screen
 import javafx.stage.Stage
 import jdk.jfr.Configuration
@@ -37,18 +38,18 @@ import kotlin.math.sin
 class RenderBenchmarkPhase : Event() {
     @JvmField var scenario: String = ""
     @JvmField var icons: Int = 0
+    @JvmField var cacheMode: String = "off"
 }
 
 /** Manual visible-window workload. Pulse intervals are not GPU timings or presented-frame measurements. */
 class SvgRenderBenchmark : Application() {
-    private val cases = listOf("path", "gradient", "text", "blur").flatMap { kind ->
-        listOf("scroll", "scale", "css").map { motion -> kind to motion }
-    }
+    private var cases = emptyList<Pair<String, String>>()
+    private var cacheMode = "off"
     private val alternate = PseudoClass.getPseudoClass("alternate")
     private val gcBeans = ManagementFactory.getGarbageCollectorMXBeans()
     private val intervals = DoubleArray(100_000)
     private val work = DoubleArray(100_000)
-    private val rows = mutableListOf("scenario,icons,samples,pulse_p50_ms,pulse_p95_ms,pulse_p99_ms,pulse_max_ms,over_33ms,over_50ms,work_p95_ms,gc_count,gc_time_ms,unfocused_samples,iconified_samples")
+    private val rows = mutableListOf("scenario,icons,samples,pulse_p50_ms,pulse_p95_ms,pulse_p99_ms,pulse_max_ms,over_33ms,over_50ms,work_p95_ms,gc_count,gc_time_ms,unfocused_samples,iconified_samples,cache_mode")
     private lateinit var output: Path
     private lateinit var stage: Stage
     private lateinit var recording: Recording
@@ -77,10 +78,23 @@ class SvgRenderBenchmark : Application() {
     private var gcTime = 0L
     private var phase: RenderBenchmarkPhase? = null
     private var views = emptyList<SvgView>()
+    private var scales = emptyList<Scale>()
 
     override fun start(stage: Stage) {
         this.stage = stage
         fun argument(name: String): String? = parameters.raw.firstOrNull { it.startsWith("--$name=") }?.substringAfter('=')
+        fun selection(name: String, allowed: List<String>): List<String> =
+            (argument(name)?.split(',') ?: allowed).also { values ->
+                require(values.isNotEmpty() && values.distinct().size == values.size && values.all { it in allowed }) {
+                    "$name must contain distinct values from $allowed"
+                }
+            }
+        val kinds = selection("kinds", listOf("path", "gradient", "text", "blur"))
+        val motions = if (argument("motions") == null) listOf("scroll", "scale", "css")
+            else selection("motions", listOf("scroll", "scale", "transform", "css"))
+        cases = kinds.flatMap { kind -> motions.map { kind to it } }
+        cacheMode = argument("cache") ?: "off"
+        require(cacheMode in listOf("off", "scale", "quality")) { "cache must be off, scale or quality" }
         icons = argument("count")?.toInt() ?: icons
         warmupSeconds = argument("warmup-seconds")?.toDouble() ?: warmupSeconds
         measureSeconds = argument("measure-seconds")?.toDouble() ?: measureSeconds
@@ -107,10 +121,12 @@ class SvgRenderBenchmark : Application() {
             maxHeap=${Runtime.getRuntime().maxMemory()}
             count=$icons; columns=10; tile=64; viewport=680x480; scene=720x570
             warmupSeconds=$warmupSeconds; measureSeconds=$measureSeconds
+            kinds=$kinds; motions=$motions; cacheMode=$cacheMode (on each SvgView)
             screens=${Screen.getScreens().map { "${it.bounds}, dpi=${it.dpi}, scale=${it.outputScaleX}x${it.outputScaleY}" }}
             Pulse interval measures AnimationTimer callbacks, not GPU completion or display presentation.
             Work duration measures only the preceding callback workload. GC time is MXBean collection time, not pause time.
-            Scroll translates a clipped grid (no ListView virtualization). Scale resizes every SvgView. CSS toggles the entire grid every pulse.
+            Scroll translates a clipped grid (no ListView virtualization). Scale resizes every SvgView. Transform scales fixed-size views about (0,0). CSS toggles the entire grid every pulse.
+            CacheHint.SCALE permits bitmap resampling. Resize mutates the cached subtree; transform changes only its external Scale.
             path/gradient/blur: 12 paths per icon; text: 4 native Text nodes per icon. All views share one document per case.
             Cases are not equal-complexity comparisons. Keep the window visible and unobscured; focus counts do not detect occlusion.
         """.trimIndent())
@@ -139,18 +155,22 @@ class SvgRenderBenchmark : Application() {
             return
         }
         val (kind, motion) = cases[caseIndex]
-        val document = SvgLoader.parse(svg(kind), SvgOptions(strict = true))
+        val document = SvgLoader.parse(renderBenchmarkSvg(kind), SvgOptions(strict = true))
         views = List(icons) { index -> SvgView(document).apply {
             isManaged = false
             styleClass += kind
+            cacheHint = if (cacheMode == "quality") CacheHint.QUALITY else CacheHint.SCALE
+            isCache = cacheMode != "off"
             resizeRelocate((index % 10) * 64.0, (index / 10) * 64.0, 48.0, 48.0)
             check(diagnostics.isEmpty()) { diagnostics.toString() }
         } }
+        scales = if (motion == "transform") views.map { view -> Scale(1.0, 1.0, 0.0, 0.0).also { view.transforms += it } }
+            else emptyList()
         content.translateY = 0.0
         cssAlternate = false
         content.pseudoClassStateChanged(alternate, false)
         content.children.setAll(views)
-        caption.text = "${caseIndex + 1}/${cases.size}  $kind / $motion  |  $icons SVG views"
+        caption.text = "${caseIndex + 1}/${cases.size}  $kind / $motion  |  $icons SVG views  |  cache=$cacheMode"
         detail.text = "Warmup ${warmupSeconds}s, measurement ${measureSeconds}s — keep window visible"
         stage.scene.root.applyCss()
         views.forEach { it.layout() }
@@ -167,7 +187,10 @@ class SvgRenderBenchmark : Application() {
             measureStart = now
             gcCount = gcBeans.sumOf { max(0, it.collectionCount) }
             gcTime = gcBeans.sumOf { max(0, it.collectionTime) }
-            phase = RenderBenchmarkPhase().also { it.scenario = cases[caseIndex].let { (k, m) -> "$k-$m" }; it.icons = icons; it.begin() }
+            phase = RenderBenchmarkPhase().also {
+                it.scenario = cases[caseIndex].let { (k, m) -> "$k-$m" }
+                it.icons = icons; it.cacheMode = cacheMode; it.begin()
+            }
         }
         if (measureStart != 0L && previous != 0L) {
             check(samples < intervals.size) { "Too many pulse samples" }
@@ -187,6 +210,10 @@ class SvgRenderBenchmark : Application() {
         when (cases[caseIndex].second) {
             "scroll" -> content.translateY = -max(0.0, (icons / 10) * 64.0 - 480.0) * (1 + sin(elapsed * PI)) / 2
             "scale" -> views.forEach { it.resize(48.0 + 12 * sin(elapsed * PI), 48.0 + 12 * sin(elapsed * PI)) }
+            "transform" -> {
+                val factor = 1.0 + .25 * sin(elapsed * PI)
+                scales.forEach { it.x = factor; it.y = factor }
+            }
             "css" -> {
                 cssAlternate = !cssAlternate
                 content.pseudoClassStateChanged(alternate, cssAlternate)
@@ -202,11 +229,11 @@ class SvgRenderBenchmark : Application() {
         val sorted = intervals.copyOf(samples).sortedArray()
         val sortedWork = work.copyOf(samples).sortedArray()
         fun percentile(values: DoubleArray, fraction: Double) = values[(kotlin.math.ceil(values.size * fraction).toInt() - 1).coerceIn(values.indices)]
-        val row = String.format(Locale.ROOT, "%s,%d,%d,%.3f,%.3f,%.3f,%.3f,%d,%d,%.3f,%d,%d,%d,%d",
+        val row = String.format(Locale.ROOT, "%s,%d,%d,%.3f,%.3f,%.3f,%.3f,%d,%d,%.3f,%d,%d,%d,%d,%s",
             name, icons, samples, percentile(sorted, .5), percentile(sorted, .95), percentile(sorted, .99), sorted.last(),
             sorted.count { it > 1000.0 / 30 }, sorted.count { it > 50 }, percentile(sortedWork, .95),
             gcBeans.sumOf { max(0, it.collectionCount) } - gcCount, gcBeans.sumOf { max(0, it.collectionTime) } - gcTime,
-            unfocused, iconified)
+            unfocused, iconified, cacheMode)
         rows += row
         Files.write(output.resolve("results.csv"), rows)
         Files.write(output.resolve("$name-pulses.csv"), listOf("interval_ms,preceding_callback_work_ms") +
@@ -229,21 +256,21 @@ class SvgRenderBenchmark : Application() {
             recording.close()
         }
     }
+}
 
-    private fun svg(kind: String): String {
-        val paths = (0 until 12).joinToString("") { index ->
-            val x = (index % 3) * 20 + 2
-            val y = (index / 3) * 15 + 2
-            """<path d="M$x $y h16 v10 h-16 z"/>"""
-        }
-        val gradient = """<defs><linearGradient id="g"><stop stop-color="#409eff"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs>"""
-        val blur = """<defs><filter id="f" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="1.5"/></filter></defs>"""
-        val body = when (kind) {
-            "gradient" -> "$gradient<g fill=\"url(#g)\">$paths</g>"
-            "blur" -> "$blur<g fill=\"#409eff\" filter=\"url(#f)\">$paths</g>"
-            "text" -> (0 until 4).joinToString("") { """<text x="2" y="${it * 15 + 12}" font-size="11" fill="#409eff">SVG 123</text>""" }
-            else -> "<g fill=\"#409eff\">$paths</g>"
-        }
-        return "<svg viewBox=\"0 0 64 64\">$body</svg>"
+internal fun renderBenchmarkSvg(kind: String): String {
+    val paths = (0 until 12).joinToString("") { index ->
+        val x = (index % 3) * 20 + 2
+        val y = (index / 3) * 15 + 2
+        """<path d="M$x $y h16 v10 h-16 z"/>"""
     }
+    val gradient = """<defs><linearGradient id="g"><stop stop-color="#409eff"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs>"""
+    val blur = """<defs><filter id="f" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="1.5"/></filter></defs>"""
+    val body = when (kind) {
+        "gradient" -> "$gradient<g fill=\"url(#g)\">$paths</g>"
+        "blur" -> "$blur<g fill=\"#409eff\" filter=\"url(#f)\">$paths</g>"
+        "text" -> (0 until 4).joinToString("") { """<text x="2" y="${it * 15 + 12}" font-size="11" fill="#409eff">SVG 123</text>""" }
+        else -> "<g fill=\"#409eff\">$paths</g>"
+    }
+    return "<svg viewBox=\"0 0 64 64\">$body</svg>"
 }

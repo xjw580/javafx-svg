@@ -28,6 +28,17 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--benchmark --count=200 --warmup-
 
 首次测量结果见 [2026-10-24 渲染基线](benchmarks/render-baseline-2026-10-24.md)。
 
+缓存对照可以限制类型、动作和缓存策略，例如：
+
+```shell
+mvn -Pdemo test-compile exec:java "-Dexec.args=--benchmark --kinds=gradient --motions=scale,transform,css --cache=scale"
+mvn -Pdemo test-compile exec:java "-Dexec.args=--cache-visual-check --output=target/cache-visual-check-1"
+```
+
+`--cache` 支持 `off`（默认）、`scale`、`quality`，作用于每个 SvgView；`--kinds` 可选 `path,gradient,text,blur`，`--motions` 可选 `scroll,scale,transform,css`，均支持逗号分隔的子集。`scale` 通过 resize 改变视口，`transform` 固定视口大小并改变以左上角为中心的 Scale 变换。两者可能有不同的缓存失效成本。视觉检查会先预热缓存，再比较原始大小、放大、缩小、非整数缩放及 CSS 换色后的画面，输出设备缩放比例下的截图和像素差异；请为它指定空目录。
+
+[节点缓存对照结果](benchmarks/cache-comparison-2026-10-24.md)：当前样本中，SCALE 缓存能改善固定视口的变换动画，但持续 resize 没有收益，放大还会出现位图模糊。SvgView 已继承 JavaFX 的 `isCache`、`cacheHint`，可在短时动画中按需启用，动画结束时关闭以恢复目标尺寸的矢量绘制。Scale 变换只改变显示效果，不改变 Region 的布局尺寸；库保持默认关闭缓存。
+
 IDEA 中重新加载 Maven 项目后，打开 `src/test/kotlin/club/xiaojiawei/svg/demo/SvgDemo.kt`，运行文件末尾的顶层 `main`，入口类为 `club.xiaojiawei.svg.demo.SvgDemoKt`。旧的 `SvgDemoLauncher` 运行配置已不适用。
 
 Demo 使用 classpath 启动，项目没有 `module-info.java`。不要为它配置 `--module club.xiaojiawei.svg` 或 `--add-modules club.xiaojiawei.svg`；这会导致 `Module club.xiaojiawei.svg not found`。POM 不声明 `Automatic-Module-Name`，避免 IDEA 将编译输出目录误识别成可直接启动的命名模块。

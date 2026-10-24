@@ -171,7 +171,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         element: SvgElement, ancestors: List<SvgElement>, parentStyle: Map<String, String>,
         viewport: SvgViewport, isRoot: Boolean, referenced: Boolean
     ): Node? {
-        if (element.name in SvgAnimation.NAMES) return null
+        if (element.name.startsWith('{') || element.name in SvgAnimation.NAMES) return null
         if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop", "filter")) return null
         if (element.name == "symbol" && !referenced) return null
         if (element.name in setOf("clipPath", "mask", "marker", "pattern") && !referenced) return null
@@ -184,7 +184,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
         if (style.getValue("display") == "none") return null
         if (element.name in setOf("path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "image", "use")) {
-            element.children.filter { it.name !in setOf("title", "desc", "metadata", "marker") + SvgAnimation.NAMES }.forEach {
+            element.children.filter { !it.name.startsWith('{') && it.name !in setOf("title", "desc", "metadata", "marker") + SvgAnimation.NAMES }.forEach {
                 report("Unsupported child ${it.name} inside ${element.name}", it)
             }
         }
@@ -201,7 +201,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val node: Node = when (element.name) {
             "text", "textPath" -> if (element.children.any { it.name == "textPath" }) {
                 val paths = element.children.filter { it.name == "textPath" }
-                require(paths.size == 1 && element.children.all { it.name in setOf("textPath", "title", "desc", "metadata") + SvgAnimation.NAMES }
+                require(paths.size == 1 && element.children.all { it.name.startsWith('{') || it.name in setOf("textPath", "title", "desc", "metadata") + SvgAnimation.NAMES }
                     && element.content.filterIsInstance<SvgContent.Characters>().all { it.value.isBlank() }) {
                     "textPath currently requires one path run without mixed text/tspan"
                 }
@@ -213,7 +213,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 renderTextSpans(element, ancestors, style, viewport, geometry)
             } else {
                 val text = Text()
-                element.children.filter { it.name !in SvgAnimation.NAMES }.forEach { report("Unsupported text child: ${it.name}", it) }
+                element.children.filter { !it.name.startsWith('{') && it.name !in SvgAnimation.NAMES }.forEach { report("Unsupported text child: ${it.name}", it) }
                 listOf("rotate", "dominant-baseline", "writing-mode").forEach {
                     if (element[it] != null) report("Unsupported text attribute: $it", element)
                 }
@@ -226,7 +226,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 val path = if (element.name == "textPath") {
                     require(element["method"] in setOf(null, "align")) { "textPath method=stretch is unsupported" }
                     require(element["spacing"] in setOf(null, "auto", "exact")) { "Invalid textPath spacing" }
-                    require(element.children.all { it.name in setOf("title", "desc", "metadata") }) { "Nested textPath runs are unsupported" }
+                    require(element.children.all { it.name.startsWith('{') || it.name in setOf("title", "desc", "metadata") }) { "Nested textPath runs are unsupported" }
                     val href = element["href"] ?: element["xlink:href"] ?: throw SvgException("Missing textPath href")
                     require(href.startsWith('#') && href.length > 1) { "Only local textPath references are supported" }
                     val target = document.elementsById[href.drop(1)] ?: throw SvgException("Missing textPath path")
@@ -590,7 +590,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                                 children += { childGroup }
                                 build(child, lineage + owner, childStyle, childGroup, scopes, preserve)
                             }
-                        } else if (child.name !in setOf("title", "desc", "metadata") + SvgAnimation.NAMES) {
+                        } else if (!child.name.startsWith('{') && child.name !in setOf("title", "desc", "metadata") + SvgAnimation.NAMES) {
                             report("Unsupported text child: ${child.name}", child)
                         }
                     }
@@ -728,12 +728,12 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             require(filter["href"] == null && filter["xlink:href"] == null && filter["filterRes"] == null) {
                 "Filter templates and filterRes are unsupported"
             }
-            val primitives = filter.children.filter { it.name !in setOf("title", "desc", "metadata") }
+            val primitives = filter.children.filter { !it.name.startsWith('{') && it.name !in setOf("title", "desc", "metadata") }
             require(primitives.size == 1 && primitives.single().name in setOf("feGaussianBlur", "feDropShadow", "feOffset")) {
                 "Only a single feGaussianBlur, feDropShadow or feOffset primitive is supported"
             }
             val primitive = primitives.single()
-            require(primitive.children.all { it.name in setOf("title", "desc", "metadata") }) {
+            require(primitive.children.all { it.name.startsWith('{') || it.name in setOf("title", "desc", "metadata") }) {
                 "Animated filter primitives are unsupported"
             }
             if (primitive.name == "feOffset") {
@@ -822,7 +822,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 next = href?.drop(1)
             }
             val attrs = chain.asReversed().flatMap { it.attributes.entries }.associate { it.key to it.value }
-            val content = chain.firstOrNull { item -> item.children.any { it.name !in setOf("title","desc","metadata") } } ?: chain.first()
+            val content = chain.firstOrNull { item -> item.children.any { !it.name.startsWith('{') && it.name !in setOf("title","desc","metadata") } } ?: chain.first()
             val merged = SvgElement("pattern",attrs,content.children,"",content.content)
             require(document.options.maxElements-renderedElements >= 3) { "SVG expanded pattern node limit exceeded" }
             renderedElements += 3

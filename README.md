@@ -2,6 +2,8 @@
 
 将 SVG 文档解析为 JavaFX 原生场景图的 Kotlin/JVM 库。使用 JavaFX 公共 API，不依赖 javafx-web、WebView、Swing 或 Batik。
 
+兼容 Inkscape/Sodipodi 等编辑器的外部命名空间元数据：保留解析限制，从渲染和样式编译中排除私有节点；严格模式仍诊断未知 SVG 绘图元素和 foreignObject。实际文件回归及边界见 [编辑器元数据兼容报告](benchmarks/editor-metadata-2026-10-24.md)。
+
 构建基线：JDK 21+、Maven 3.8.8+；Kotlin 2.4.20，JavaFX 21.0.8。生成的字节码目标为 Java 21。
 
 ## 构建与示例

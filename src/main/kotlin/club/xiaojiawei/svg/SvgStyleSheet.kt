@@ -59,6 +59,7 @@ internal class SvgStyleSheet private constructor(
 
         fun compile(root: SvgElement): SvgStyleSheet {
             fun visit(element: SvgElement) {
+                if (element.name.startsWith('{')) return
                 if (element.name == "style") {
                     if (element["type"] !in listOf(null, "", "text/css") || element["media"] !in listOf(null, "", "all")) {
                         report("Only unconditional text/css stylesheets are supported", element)

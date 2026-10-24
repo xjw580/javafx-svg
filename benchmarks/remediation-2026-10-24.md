@@ -5,7 +5,7 @@
 - [x] 直接样式属性查找，消除 AbstractMap 默认 get 的遍历。
 - [x] XML 解析器线程隔离复用，限制 64 次/累计 1 MiB；大输入不保留，错误后丢弃。
 - [x] feDropShadow（单原语、有界原生内核；linearRGB 限制见 README）。
-- [ ] animateMotion / mpath。
+- [x] animateMotion / mpath（常用路径与时序，限制见 README）。
 - [ ] textPath。
 - [ ] pattern。
 - [ ] 外部旋转与渐变渲染优化、质量及内存边界验证。
@@ -33,3 +33,7 @@
 ## 阴影
 
 318 项 Maven verify 回归通过。新增阴影覆盖源图合成、偏移、滤镜区域及子区域裁剪、SVG CSS/currentColor/flood-opacity、应用 CSS，以及错误输入和内核上限。该项解决原报告 sRGB 阴影样本缺口，不表示完整滤镜管线兼容。
+
+## 路径动画
+
+324 项 Maven verify 回归通过。新增匀速弧长、曲线/圆弧测量、断开子路径、路径预算、mpath 优先级、切线方向、反向关键点、延迟/冻结、叠加、基础及动画变换组合、共享文档独立时钟等验证。没有引入 WebView 或逐帧 XML/路径解析。

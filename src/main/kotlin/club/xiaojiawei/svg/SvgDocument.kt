@@ -46,6 +46,6 @@ class SvgDocument internal constructor(
     internal val sourceBytes: Int
 ) {
     internal val styleSheet: SvgStyleSheet by lazy { SvgStyleSheet.compile(root) }
-    internal val geometry: SvgGeometryCache by lazy { SvgGeometryCache() }
+    internal val geometry: SvgGeometryCache by lazy { SvgGeometryCache(options.maxElements) }
     internal val lengths: SvgLengthCache by lazy { SvgLengthCache() }
 }

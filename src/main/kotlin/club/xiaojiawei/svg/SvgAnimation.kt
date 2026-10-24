@@ -121,7 +121,7 @@ internal class SvgAnimation private constructor(
     }
 
     companion object {
-        val NAMES = setOf("animate", "animateTransform")
+        val NAMES = setOf("animate", "animateTransform", "animateMotion")
         private val NONNEGATIVE = setOf("stroke-width", "r", "rx", "ry", "width", "height")
         val STYLE_NUMBERS = setOf("opacity", "fill-opacity", "stroke-opacity", "stroke-width", "stroke-dashoffset")
         val GEOMETRY = SvgAnimatedGeometry.attributes.values.flatten().toSet()

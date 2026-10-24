@@ -3,11 +3,23 @@ package club.xiaojiawei.svg
 import java.util.concurrent.ConcurrentHashMap
 
 /** Document-owned, demand-driven geometry preparation. Stores no nodes, viewports, or exception instances. */
-internal class SvgGeometryCache {
+internal class SvgGeometryCache(private val maxMeasurePoints: Int = 100_000) {
     private enum class Kind { PATH, POLYLINE, POLYGON }
     private data class Key(val kind: Kind, val data: String)
     private data class Prepared(val content: String?, val problem: String? = null)
     private val entries = ConcurrentHashMap<Key, Prepared>()
+
+    private val measures = mutableMapOf<Pair<String, String?>, SvgPathMeasure>()
+    private var measuredPoints = 0
+
+    @Synchronized fun measure(data: String, transform: String? = null): SvgPathMeasure {
+        val key = data to transform
+        measures[key]?.let { return it }
+        val prepared = SvgPathMeasure(data, maxMeasurePoints - measuredPoints, transform)
+        measuredPoints += prepared.size
+        measures[key] = prepared
+        return prepared
+    }
 
     fun path(data: String): String = content(Key(Kind.PATH, data))
 

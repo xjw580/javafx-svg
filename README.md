@@ -355,7 +355,7 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 
 不支持几何 CSS 属性动画、根 svg 的位置/尺寸动画、use 的 width/height 动画、textLength 本身及文字位置列表动画。SvgView 的布局尺寸由 fitWidth/fitHeight 和父布局管理。形状几何语义参考 [SVG Basic Shapes](https://www.w3.org/TR/SVG11/shapes.html)。
 
-首版不支持事件/同步链 begin、begin 时间列表、end/repeatDur、累积动画、数值/颜色的 additive=sum、paced、animateMotion、set、animateColor、路径数据/points、渐变/滤镜属性动画，以及 CSS transition。tspan 支持上述样式动画，自身的变换动画仍受 tspan 变换限制。已检测到的不支持内容在严格模式拒绝，在宽松模式报告诊断并保留可用的静态内容。规则参考 [SVG 1.1 Animation](https://www.w3.org/TR/SVG11/animate.html)。
+首版不支持事件/同步链 begin、begin 时间列表、end/repeatDur、累积动画、数值/颜色的 additive=sum、paced、set、animateColor、路径数据/points、渐变/滤镜属性动画，以及 CSS transition。tspan 支持上述样式动画，自身的变换动画仍受 tspan 变换限制。已检测到的不支持内容在严格模式拒绝，在宽松模式报告诊断并保留可用的静态内容。规则参考 [SVG 1.1 Animation](https://www.w3.org/TR/SVG11/animate.html)。
 
 ### SVG 内嵌 CSS 动画
 
@@ -542,3 +542,6 @@ mvn dependency:tree "-Dincludes=org.openjfx"
 
 
 feDropShadow 支持 dx/dy、一个或两个 stdDeviation、flood-color/currentColor/flood-opacity，以及两种区域坐标单位。使用原生 Gaussian DropShadow；每轴标准差最多 127/3，超限报告诊断。sRGB/auto 支持多色源；默认 linearRGB 目前要求源与阴影颜色相同（SourceAlpha 要求黑色阴影），避免把 sRGB 合成冒充线性 RGB。暂不支持滤镜链及阴影原语属性动画。
+
+
+animateMotion 支持 path、优先的本地 mpath、values/from-to 坐标、默认 paced 弧长匀速，以及 linear/discrete/spline、keyPoints/keyTimes、rotate 数值/auto/auto-reverse、additive replace/sum。共用自动播放、延迟、重复、freeze 和 seek 控制；运动变换追加在基础及 animateTransform 之后。路径测量按文档复用，曲线有界细分；测量线段总数受 maxElements 限制，不共享节点或时钟。暂不支持百分比运动坐标、by、累积、变换后的 mpath；检测到时报告诊断。

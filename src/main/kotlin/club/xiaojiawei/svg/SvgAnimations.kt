@@ -14,6 +14,7 @@ internal class SvgAnimations(
 ) {
     private data class Binding(val end: Double?, val transform: Boolean = false, val requiresLayout: Boolean = !transform, val refresh: () -> Unit)
     private val index = IdentityHashMap<SvgElement, MutableList<SvgAnimation>>()
+    private val motions = IdentityHashMap<SvgElement, MutableList<SvgMotion>>()
     private val bindings = mutableListOf<Binding>()
     private var cssPointsRemaining = document.options.maxElements
     var time = 0.0
@@ -34,6 +35,11 @@ internal class SvgAnimations(
                         document.elementsById[href.drop(1)] ?: throw SvgException("Missing animation target: $href")
                     }
                     require(target != null && target.name in SvgAnimation.TARGETS) { "Unsupported animation target: " + target?.name }
+                    if (element.name == "animateMotion") {
+                        require(target.name != "tspan") { "tspan motion animation is unsupported" }
+                        motions.getOrPut(target) { mutableListOf() } += SvgMotion.create(element, document, order++)
+                        return
+                    }
                     val spec = SvgAnimation.parse(element, order++)
                     if (spec.attribute in SvgAnimation.GEOMETRY) {
                         require(spec.attribute in (SvgAnimatedGeometry.attributes[target.name] ?: emptySet())) {
@@ -118,13 +124,15 @@ internal class SvgAnimations(
             report(failure.message ?: "Invalid CSS transform", element)
             cssEnabled = false
         }
-        if (accepted.isEmpty() && !cssEnabled) return
+        val motion = (motions[element] ?: element.id?.let { document.elementsById[it]?.let(motions::get) } ?: emptyList()).sortedWith(compareBy({ it.timing.begin }, { it.timing.order }))
+        if (accepted.isEmpty() && !cssEnabled && motion.isEmpty()) return
         accepted.sortWith(compareBy({ it.first.begin }, { it.first.order }))
         val base = Affine(source)
         if (cssEnabled && !isRoot && style.getValue("transform-box") == "fill-box") {
             node.boundsInLocalProperty().addListener { _, _, _ -> requestLayout() }
         }
         val result = Affine()
+        val motionResult = Affine()
         val refresh = {
             if (cssEnabled) {
                 val box = if (!isRoot && style.getValue("transform-box") == "fill-box") svgGeometryBounds(node)
@@ -138,9 +146,16 @@ internal class SvgAnimations(
                     spec.append(result, curve.sample(progress, 1.0, null) as SvgAnimation.Value.Vector)
                 }
             }
+            motionResult.setToIdentity()
+            for (track in motion) {
+                if (track.timing.progress(time) == null) continue
+                if (!track.additive) motionResult.setToIdentity()
+                track.append(time, motionResult)
+            }
+            result.append(motionResult)
             source.setToTransform(result)
         }
-        bindings += Binding(accepted.maxOfOrNull { it.first.end }, transform = true,
+        bindings += Binding((accepted.map { it.first.end } + motion.map { it.timing.end }).maxOrNull(), transform = true,
             requiresLayout = cssEnabled && !isRoot && style.getValue("transform-box") == "fill-box") {
             try { refresh() } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid animated transform", element) }
         }

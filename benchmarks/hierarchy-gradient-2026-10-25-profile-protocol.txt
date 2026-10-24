@@ -1,0 +1,7 @@
+smoke=False; count=500; independent JVM repeats=1
+Raster warmup at least 5 batches AND 10 s; measurement=5 batches; idle warmup=3 s; idle measurement=5 s.
+Sequential fresh JVMs, fixed 512 MiB heap, same full classpath, JFR=True; no forced GC.
+Provider order rotates, kinds reverse on even rounds. Every warmup/measurement row is retained.
+native-before uses the native API with BaselineNativeJar substituted; dependencies and measurement code are identical; each native JAR hash is recorded in plan.csv.
+Raster readiness includes asynchronous offscreen snapshot and readback, not screen presentation.
+Idle has no AnimationTimer; worker samples CPU/allocation once at interval end.

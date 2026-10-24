@@ -71,3 +71,6 @@ NativeRenderCache 可选 default/on/off。default 保留目标 JAR 的内部缓�
 
 RecordJfr 模式额外输出 steps.csv：build（新 Scene、解析/创建及挂载）、css-layout（显式 CSS/layout）、snapshot-ready（快照准备、隐含同步、渲染/读回及回调等待）的 FX CPU、FX 分配和 wall。仅诊断模式增加两次边界计数，并将执行/原生方法采样周期设为 2 ms；正式默认模式不采这些边界。snapshot-ready 包含等待及多个线程的工作，不能解释为纯 GPU 时间；诊断分段不与无录制正式 wall 混合排名。
 
+
+缓存监听与渐变复用后的四轮交错复测、逐轮变化及独立分阶段诊断见 [最新报告](../hierarchy-gradient-2026-10-25.md)。结果区分正式无录制比较和单进程录制诊断，未将后者并入排名。
+

@@ -34,4 +34,6 @@ class SvgDocument internal constructor(
     val elementsById: Map<String, SvgElement>,
     val diagnostics: List<SvgDiagnostic>,
     val options: SvgOptions
-)
+) {
+    internal val styleSheet: SvgStyleSheet by lazy { SvgStyleSheet.compile(root) }
+}

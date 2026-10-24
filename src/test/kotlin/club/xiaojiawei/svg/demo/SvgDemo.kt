@@ -533,12 +533,19 @@ icon.loadingProperty().addListener { _, _, loading ->
 }
 
 fun main(args: Array<String>) {
+    args.firstOrNull { it.startsWith("--animation-report=") }?.let {
+        require(args.size == 1) { "Report mode accepts only --animation-report=<recording>" }
+        animationProfileReport(Path.of(it.substringAfter('=')))
+        return
+    }
     val benchmark = "--benchmark" in args
+    val animations = "--animation-benchmark" in args
     val visualCheck = "--cache-visual-check" in args
-    require(!benchmark || !visualCheck) { "Choose benchmark or cache visual check" }
+    require(listOf(benchmark, animations, visualCheck).count { it } <= 1) { "Choose one benchmark or visual check" }
     Application.launch(when {
         benchmark -> SvgRenderBenchmark::class.java
+        animations -> SvgAnimationBenchmark::class.java
         visualCheck -> SvgCacheVisualCheck::class.java
         else -> SvgDemo::class.java
-    }, *args.filterNot { it == "--benchmark" || it == "--cache-visual-check" }.toTypedArray())
+    }, *args.filterNot { it in listOf("--benchmark", "--animation-benchmark", "--cache-visual-check") }.toTypedArray())
 }

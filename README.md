@@ -318,7 +318,7 @@ println(icon.animationDuration) // 包括延迟/循环；无限循环为 Duratio
 println(icon.hasAnimations)
 ```
 
-FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需要视图连接到显示中的窗口；窗口隐藏、视图移出场景或任意父节点隐藏时自动暂停时钟，恢复显示后继续。显式 pause/stop 后保持停止推进；更换 document/source 会重置时钟并采用当前 animationAutoPlay，失败的替换保留原内容和播放状态。停止回到首帧，不保证回到未动画的源样式；seek 接受有限非负时间，并限制在有限动画总时长内。所有播放控制在 FX 线程执行。
+FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需要视图连接到显示中的窗口；窗口隐藏或最小化、视图自身/任意父节点隐藏、视图移出场景时自动暂停时钟，恢复显示后继续。显式 pause/stop 后保持停止推进；更换 document/source 会重置时钟并采用当前 animationAutoPlay，失败的替换保留原内容和播放状态。停止回到首帧，不保证回到未动画的源样式；seek 接受有限非负时间，并限制在有限动画总时长内。所有播放控制在 FX 线程执行。
 
 动画沿用源 SVG 样式层：应用侧 JavaFX CSS、属性绑定及统一主题保持已有优先级，移除覆盖后显示当前动画值。变换通过原生 Affine 更新；固定描边、marker、clipPath、mask 和普通/片段/定长文字复用已有节点。每帧由 JavaFX pulse 推进，仅更新属性与必要布局，不重新解析 XML，不把插值结果写入共享文档缓存。每个视图有独立时钟，未播放时不运行计时器。
 

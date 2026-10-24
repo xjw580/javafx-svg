@@ -46,3 +46,16 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--animation-report=target/animati
 每次保留 environment.txt、results.csv、逐 pulse CSV、各场景 PNG、animation.jfr 和 jfr-analysis.txt。只有 JFR 保存完成后才产生 completed.txt；提前关闭产生 aborted.txt，异常另有 failure.txt，不作为完整基线。分析器以两遍流式读取 JFR，排除未完成阶段。
 
 本地完整原始记录归档于 target/svg-verification/animation-perf/before/；JFR、逐 pulse 明细和 PNG 不纳入 Git。基准样本测试在严格模式渲染每种文档，并验证两个时间点的像素确实变化。
+
+
+## 生命周期验证与修复
+
+新增 7 项回归，完整验证后共 297 项测试通过：
+
+- 暂停、自身隐藏、祖先隐藏、窗口隐藏/关闭、移出场景后，连续多个 pulse 的文档时间保持不变；恢复显示/挂载后继续推进。
+- 缓存、共享 SvgDocument、窗口与场景继续存活时，移除的 40 个播放视图均通过 WeakReference 回收检查。
+- 保留当前播放视图与资源缓存，连续 40 次交替设置本地 source/document 后，旧图形节点均通过回收检查。
+- 修复前复现：最小化窗口仍计时；有限动画的时间监听器内重播被旧帧的结束处理覆盖；stop 回调内发出的新 play 同样被覆盖。
+- 修复后监听 Stage.iconifiedProperty，最小化暂停、还原继续；独立的播放命令版本号使回调内的新命令优先。文档版本号仍单独控制替换流程，保证 reset 回调中的暂停不会遗漏新时长。
+
+回收测试包含 GC 请求和有上限的等待，只证明本次场景下对象可回收，不是任意应用代码都不会泄漏的保证。最小化与回收测试保留宿主窗口，避免把关闭整个进程误认为资源释放。

@@ -7,6 +7,7 @@ import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.value.ChangeListener
 import javafx.scene.Scene
 import javafx.stage.Window
+import javafx.stage.Stage
 import javafx.util.Duration
 
 /** One pulse clock per playing view; detached and hidden windows do not retain a running timer. */
@@ -19,6 +20,7 @@ internal class SvgAnimationPlayer(private val view: SvgView) {
     private var requested = false
     private var stopped = true
     private var generation = 0L
+    private var commandRevision = 0L
     private val ancestors = mutableListOf<javafx.scene.Node>()
     private val ancestorChanged = javafx.beans.InvalidationListener { observeAncestors() }
     private var running = false
@@ -63,13 +65,16 @@ internal class SvgAnimationPlayer(private val view: SvgView) {
 
     private fun observeWindow() {
         window?.showingProperty()?.removeListener(showing)
+        (window as? Stage)?.iconifiedProperty()?.removeListener(showing)
         window = scene?.window
         window?.showingProperty()?.addListener(showing)
+        (window as? Stage)?.iconifiedProperty()?.addListener(showing)
         updateRunning()
     }
 
     fun install(next: FxSvgRenderer?) {
         val acceptedGeneration = ++generation
+        commandRevision++
         timer.stop()
         running = false
         lastPulse = 0L
@@ -84,21 +89,26 @@ internal class SvgAnimationPlayer(private val view: SvgView) {
     }
 
     fun play() {
+        val revision = ++commandRevision
         if (renderer?.hasAnimations != true) return
         if (!duration.get().isIndefinite && currentTime.get().greaterThanOrEqualTo(duration.get())) setTime(0.0)
+        if (revision != commandRevision) return
         requested = true
         stopped = false
         updateRunning()
     }
 
     fun pause() {
+        commandRevision++
         requested = false
         updateRunning()
     }
 
     fun stop() {
+        val revision = ++commandRevision
         requested = false
         setTime(0.0)
+        if (revision != commandRevision) return
         stopped = true
         updateRunning()
     }
@@ -107,16 +117,19 @@ internal class SvgAnimationPlayer(private val view: SvgView) {
         require(!time.isUnknown && !time.isIndefinite && time.toMillis().isFinite() && time.toMillis() >= 0) {
             "Animation time must be finite and nonnegative"
         }
+        commandRevision++
         setTime(time.toSeconds())
     }
 
     private fun setTime(seconds: Double) {
         val acceptedGeneration = generation
+        val revision = commandRevision
         val limit = duration.get().toSeconds()
         val value = seconds.coerceAtMost(limit)
         renderer?.seekAnimations(value)
         currentTime.set(Duration.seconds(value))
-        if (acceptedGeneration != generation) return
+        // Observers may replace the document or issue a newer playback command synchronously.
+        if (acceptedGeneration != generation || revision != commandRevision) return
         view.requestLayout()
         if (value >= limit) {
             requested = false
@@ -127,7 +140,7 @@ internal class SvgAnimationPlayer(private val view: SvgView) {
 
     private fun updateRunning() {
         val available = renderer?.hasAnimations == true && duration.get().toMillis() > 0
-        val next = available && requested && view.isVisible && ancestors.all { it.isVisible } && window?.isShowing == true
+        val next = available && requested && view.isVisible && ancestors.all { it.isVisible } && window?.isShowing == true && (window as? Stage)?.isIconified != true
         if (next != running) {
             running = next
             lastPulse = 0L

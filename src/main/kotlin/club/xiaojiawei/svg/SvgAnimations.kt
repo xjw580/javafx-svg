@@ -30,6 +30,13 @@ internal class SvgAnimations(
                     }
                     require(target != null && target.name in SvgAnimation.TARGETS) { "Unsupported animation target: " + target?.name }
                     val spec = SvgAnimation.parse(element, order++)
+                    if (spec.attribute in SvgAnimation.GEOMETRY) {
+                        require(spec.attribute in (SvgAnimatedGeometry.attributes[target.name] ?: emptySet())) {
+                            "Unsupported geometry animation on " + target.name + ": " + spec.attribute
+                        }
+                        require(target !== document.root) { "Root SVG geometry animation is unsupported; use SvgView sizing" }
+                        require(element["attributeType"] != "CSS") { "Geometry animation supports XML/auto attributes only" }
+                    }
                     require(target.name != "tspan" || spec.transformType == null) { "tspan transform animation is unsupported" }
                     index.getOrPut(target) { mutableListOf() } += spec
                 } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid SVG animation", element) }
@@ -46,7 +53,7 @@ internal class SvgAnimations(
         element: SvgElement, base: Map<String, String>, parent: Map<String, String>,
         inherited: Set<String>, viewport: SvgViewport
     ): Map<String, String> {
-        val local = specs(element).filter { it.transformType == null }
+        val local = specs(element).filter { it.transformType == null && it.attribute !in SvgAnimation.GEOMETRY }
         val inheritedAnimated = (parent as? SvgAnimatedStyle)?.affected?.intersect(inherited) ?: emptySet()
         if (local.isEmpty() && inheritedAnimated.isEmpty()) return base
         val accepted = mutableListOf<Pair<SvgAnimation, SvgAnimation.Curve>>()
@@ -61,6 +68,21 @@ internal class SvgAnimations(
         }
         if (accepted.isNotEmpty()) bindings += Binding(accepted.map { it.first }) {}
         return SvgAnimatedStyle(base, parent as? SvgAnimatedStyle, inherited, accepted, this, document.lengths)
+    }
+
+    fun geometry(element: SvgElement, viewport: SvgViewport): SvgAnimatedGeometry {
+        val accepted = mutableListOf<Pair<SvgAnimation, SvgAnimation.Curve>>()
+        specs(element).filter { it.attribute in SvgAnimation.GEOMETRY }.forEach { spec ->
+            try {
+                val curve = spec.Curve(null, false)
+                val reference = SvgAnimatedGeometry.reference(spec.attribute, viewport)
+                val base = if (spec.needsBase) SvgAnimation.Value.Number(SvgAnimatedGeometry.base(element, spec.attribute, viewport, document.lengths)) else null
+                curve.sample(.5, reference, base)
+                accepted += spec to curve
+            } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid geometry animation", spec.element) }
+        }
+        if (accepted.isNotEmpty()) bindings += Binding(accepted.map { it.first }) {}
+        return SvgAnimatedGeometry(element, accepted, this, viewport, document.lengths)
     }
 
     fun transform(element: SvgElement, source: Affine) {
@@ -128,7 +150,7 @@ internal class SvgAnimatedStyle(
     companion object {
         fun baseValue(base: Map<String, String>, name: String, reference: Double, lengths: SvgLengthCache): SvgAnimation.Value? =
             when (name) {
-                in SvgAnimation.NUMBERS -> SvgAnimation.Value.Number(lengths.resolve(base.getValue(name), reference))
+                in SvgAnimation.STYLE_NUMBERS -> SvgAnimation.Value.Number(lengths.resolve(base.getValue(name), reference))
                 in SvgAnimation.COLOURS -> {
                     val value = base.getValue(name).let { if (it == "currentColor") base.getValue("color") else it }
                     try { SvgAnimation.Value.Colour(Color.web(value)) } catch (_: IllegalArgumentException) { null }

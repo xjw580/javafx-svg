@@ -143,11 +143,16 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         for (attribute in listOf("paint-order")) {
             if (element[attribute] != null) report("Unsupported SVG attribute: $attribute", element)
         }
-        fun length(name: String, axis: Double, default: String = "0") = document.lengths.resolve(element[name] ?: default, axis)
+        val geometry = animations.geometry(element, viewport)
+        fun length(name: String, axis: Double, default: String = "0") = geometry.length(name, axis, default)
+        fun updateGeometry(action: () -> Unit) = update(element, if (geometry.isAnimated) null else viewport, action)
+        fun setGeometry(property: javafx.beans.property.Property<Number>, value: Double) {
+            if (geometry.isAnimated) setSvgBaseStyle(property, value) else property.value = value
+        }
         fun positive(value: Double): Double = value.also { require(it >= 0) { "Negative SVG size" } }
         val node: Node = when (element.name) {
             "text" -> if (element.children.any { it.name == "tspan" }) {
-                renderTextSpans(element, ancestors, style, viewport)
+                renderTextSpans(element, ancestors, style, viewport, geometry)
             } else {
                 val text = Text()
                 element.children.filter { it.name !in SvgAnimation.NAMES }.forEach { report("Unsupported text child: ${it.name}", it) }
@@ -174,8 +179,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     val y = length("y", viewport.height) + length("dy", viewport.height)
                     if (adjusted != null) adjusted.position(x, y, length("textLength", viewport.width))
                     else {
-                        text.x = x - anchor * text.layoutBounds.width
-                        text.y = y
+                        setGeometry(text.xProperty(), x - anchor * text.layoutBounds.width)
+                        setGeometry(text.yProperty(), y)
                     }
                 }
                 adjusted ?: text
@@ -192,7 +197,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 val group = Group(imageView)
                 val clip = Rectangle()
                 group.clip = clip
-                update(element, viewport) {
+                updateGeometry {
                     val x = length("x", viewport.width); val y = length("y", viewport.height)
                     val width = positive(length("width", viewport.width)); val height = positive(length("height", viewport.height))
                     imageView.transforms.setAll(javafx.scene.transform.Translate(x, y),
@@ -216,9 +221,9 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                         SvgElement(target.name, attributes, target.children, target.text, target.content)
                     } else target
                     val group = Group()
-                    update(element, viewport) {
-                        group.layoutX = length("x", viewport.width)
-                        group.layoutY = length("y", viewport.height)
+                    updateGeometry {
+                        setGeometry(group.layoutXProperty(), length("x", viewport.width))
+                        setGeometry(group.layoutYProperty(), length("y", viewport.height))
                     }
                     render(instance, ancestors + element, style, viewport, referenced = true)?.let { group.children += it }
                     group
@@ -233,7 +238,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     val clip = Rectangle()
                     group.children += inner
                     group.clip = clip
-                    update(element, viewport) {
+                    updateGeometry {
                         val x = length("x", viewport.width)
                         val y = length("y", viewport.height)
                         val width = positive(length("width", viewport.width, "100%"))
@@ -255,26 +260,28 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 fillRule = fillRule(style.getValue(if (clipping) "clip-rule" else "fill-rule"))
             }
             "rect" -> Rectangle().also { shape ->
-                update(element, viewport) {
-                    shape.x = length("x", viewport.width); shape.y = length("y", viewport.height)
-                    shape.width = positive(length("width", viewport.width)); shape.height = positive(length("height", viewport.height))
-                    val rx = positive(document.lengths.resolve(element["rx"] ?: element["ry"] ?: "0", viewport.width))
-                    val ry = positive(document.lengths.resolve(element["ry"] ?: element["rx"] ?: "0", viewport.height))
-                    shape.arcWidth = 2 * min(rx, shape.width / 2)
-                    shape.arcHeight = 2 * min(ry, shape.height / 2)
+                updateGeometry {
+                    setGeometry(shape.xProperty(), length("x", viewport.width)); setGeometry(shape.yProperty(), length("y", viewport.height))
+                    setGeometry(shape.widthProperty(), positive(length("width", viewport.width)))
+                    setGeometry(shape.heightProperty(), positive(length("height", viewport.height)))
+                    val rx = positive(if (geometry.specified("rx")) length("rx", viewport.width)
+                        else if (geometry.specified("ry")) length("ry", viewport.height) else 0.0)
+                    val ry = positive(if (geometry.specified("ry")) length("ry", viewport.height) else rx)
+                    setGeometry(shape.arcWidthProperty(), 2 * min(rx, shape.width / 2))
+                    setGeometry(shape.arcHeightProperty(), 2 * min(ry, shape.height / 2))
                 }
             }
-            "circle" -> Circle().also { shape -> update(element, viewport) {
-                shape.centerX = length("cx", viewport.width); shape.centerY = length("cy", viewport.height)
-                shape.radius = positive(length("r", viewport.diagonal))
+            "circle" -> Circle().also { shape -> updateGeometry {
+                setGeometry(shape.centerXProperty(), length("cx", viewport.width)); setGeometry(shape.centerYProperty(), length("cy", viewport.height))
+                setGeometry(shape.radiusProperty(), positive(length("r", viewport.diagonal)))
             } }
-            "ellipse" -> Ellipse().also { shape -> update(element, viewport) {
-                shape.centerX = length("cx", viewport.width); shape.centerY = length("cy", viewport.height)
-                shape.radiusX = positive(length("rx", viewport.width)); shape.radiusY = positive(length("ry", viewport.height))
+            "ellipse" -> Ellipse().also { shape -> updateGeometry {
+                setGeometry(shape.centerXProperty(), length("cx", viewport.width)); setGeometry(shape.centerYProperty(), length("cy", viewport.height))
+                setGeometry(shape.radiusXProperty(), positive(length("rx", viewport.width))); setGeometry(shape.radiusYProperty(), positive(length("ry", viewport.height)))
             } }
-            "line" -> Line().also { shape -> update(element, viewport) {
-                shape.startX = length("x1", viewport.width); shape.startY = length("y1", viewport.height)
-                shape.endX = length("x2", viewport.width); shape.endY = length("y2", viewport.height)
+            "line" -> Line().also { shape -> updateGeometry {
+                setGeometry(shape.startXProperty(), length("x1", viewport.width)); setGeometry(shape.startYProperty(), length("y1", viewport.height))
+                setGeometry(shape.endXProperty(), length("x2", viewport.width)); setGeometry(shape.endYProperty(), length("y2", viewport.height))
             } }
             "polyline", "polygon" -> SVGPath().apply {
                 content = document.geometry.points(element["points"] ?: "", element.name == "polygon")
@@ -305,7 +312,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 styleNode.stroke = null
             } else {
                 styleNode.styleClass += "svg-shape"
-                applyShapeStyle(styleNode, style, viewport, element, node)
+                applyShapeStyle(styleNode, style, viewport, element, node, dynamicGeometry = geometry.isAnimated)
             }
         }
         val painted = if (!clipping && style.getValue("vector-effect") == "non-scaling-stroke") when (node) {
@@ -316,13 +323,29 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             }
         } else node
         val marked = if (!clipping && styleNode is Shape && element.name in setOf("path", "line", "polyline", "polygon", "rect", "circle", "ellipse"))
-            applyMarkers(painted, styleNode, style, viewport, element) else painted
-        val result = if (!clipping && style.getValue("filter") != "none") applyFilter(marked, style.getValue("filter"), viewport, element) else marked
+            applyMarkers(painted, styleNode, style, viewport, element, geometry.isAnimated) else painted
+        val sized = if (geometry.isAnimated && node is Shape && element.name in setOf("rect", "circle", "ellipse")) {
+            require(++renderedElements <= document.options.maxElements) { "SVG expanded geometry node limit exceeded" }
+            Group(marked).also { layer ->
+                layer.styleClass += "svg-geometry-layer"
+                layer.transforms.setAll(marked.transforms)
+                marked.transforms.clear()
+                update(element) {
+                    layer.isVisible = when (node) {
+                        is Rectangle -> node.width > 0 && node.height > 0
+                        is Circle -> node.radius > 0
+                        is Ellipse -> node.radiusX > 0 && node.radiusY > 0
+                        else -> true
+                    }
+                }
+            }
+        } else marked
+        val result = if (!clipping && style.getValue("filter") != "none") applyFilter(sized, style.getValue("filter"), viewport, element) else sized
         if (style.getValue("clip-path") != "none") applyClip(result, style.getValue("clip-path"), viewport, element)
         return if (!clipping && style.getValue("mask") != "none") applyMask(result, style.getValue("mask"), viewport, element) else result
     }
 
-    private fun applyMarkers(source: Node, shape: Shape, style: Map<String, String>, viewport: SvgViewport, owner: SvgElement): Node {
+    private fun applyMarkers(source: Node, shape: Shape, style: Map<String, String>, viewport: SvgViewport, owner: SvgElement, animatedGeometry: Boolean = false): Node {
         val references = linkedMapOf<String, SvgMarkerSpec>()
         for (kind in listOf("start", "mid", "end")) {
             val value = style.getValue("marker-$kind")
@@ -350,7 +373,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             require(document.options.maxElements - renderedElements >= nodes) { "SVG expanded marker node limit exceeded" }
             renderedElements += nodes
             layer = SvgMarkers(shape, viewport, style.getValue("vector-effect") == "non-scaling-stroke", owner.name != "path",
-                document.options.maxElements, { if (themeReady) root else null },
+                document.options.maxElements, if (animatedGeometry) when (shape) { is Rectangle -> 9; is Circle, is Ellipse -> 5; is Line -> 2; else -> null } else null,
+                { if (themeReady) root else null },
                 { if (themeReady) root.parent?.requestLayout() }, { report(it, owner) })
             if (layer.vertexCount == 0) return source
             // Placement and marker viewports update before their content and context paints.
@@ -367,7 +391,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     val instance = SvgMarkerInstance(spec, viewport)
                     val context = SvgMarkerContext(shape, layer, ::report)
                     instance.context = context
-                    layer.add(index, kind == "start", instance)
+                    layer.add(index, kind == "start", instance, end = kind == "end")
                     val id = "marker:" + checkNotNull(spec.element.id)
                     require(activeReferences.add(id)) { "Circular marker reference: $id" }
                     val previous = paintContext
@@ -410,7 +434,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
 
     private fun renderTextSpans(
-        element: SvgElement, ancestors: List<SvgElement>, style: Map<String, String>, viewport: SvgViewport
+        element: SvgElement, ancestors: List<SvgElement>, style: Map<String, String>, viewport: SvgViewport, rootGeometry: SvgAnimatedGeometry
     ): SvgTextLayout {
         val layout = SvgTextLayout(document.lengths, viewport)
         // Register flow before paint/filter updates, so CSS and resize use the new text geometry.
@@ -456,7 +480,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     }
                 }
             }
-            val scopes = parents + SvgTextLayout.Scope(coordinates)
+            val geometry = if (owner === element) rootGeometry else animations.geometry(owner, viewport)
+            val scopes = parents + SvgTextLayout.Scope(coordinates, geometry)
             val preserve = when (owner["xml:space"]) {
                 "preserve" -> true
                 "default" -> false

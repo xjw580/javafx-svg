@@ -98,16 +98,17 @@ internal class SvgMarkers(
     private val nonScaling: Boolean,
     private val basicShape: Boolean,
     private val vertexLimit: Int,
+    private val animatedVertexCapacity: Int?,
     private val host: () -> Node?,
     private val invalidateRenderer: () -> Unit,
     private val report: (String) -> Unit
 ) : Group() {
-    private data class Mark(val vertex: Int, val start: Boolean, val instance: SvgMarkerInstance)
+    private data class Mark(val vertex: Int, val start: Boolean, val end: Boolean, val instance: SvgMarkerInstance)
     private val marks = mutableListOf<Mark>()
     private val placement = Affine()
     private var key = SvgMarkerGeometry.key(styleShape)
     private var vertices = SvgMarkerGeometry.vertices(styleShape, vertexLimit, basicShape)
-    val vertexCount: Int get() = vertices.size
+    val vertexCount: Int get() = animatedVertexCapacity ?: vertices.size
     private val expectedVertexCount = vertices.size
     private var refreshing = false
     private val changed = InvalidationListener { value ->
@@ -115,8 +116,8 @@ internal class SvgMarkers(
         if (!refreshing) { requestLayout(); invalidateRenderer() }
     }
 
-    fun add(vertex: Int, start: Boolean, instance: SvgMarkerInstance) {
-        marks += Mark(vertex, start, instance)
+    fun add(vertex: Int, start: Boolean, instance: SvgMarkerInstance, end: Boolean = false) {
+        marks += Mark(vertex, start, end, instance)
         children += instance
     }
 
@@ -167,16 +168,22 @@ internal class SvgMarkers(
                 vertices = SvgMarkerGeometry.vertices(styleShape, vertexLimit, basicShape)
                 key = nextKey
             }
-            if (vertices.size != expectedVertexCount) {
+            if (animatedVertexCapacity == null && vertices.size != expectedVertexCount || animatedVertexCapacity != null && vertices.size > animatedVertexCapacity) {
                 marks.forEach { it.instance.isVisible = false }
                 report("Changing marker vertex count requires replacing the SVG document")
                 return
             }
+            if (vertices.isEmpty()) { marks.forEach { it.instance.isVisible = false }; return }
             val sourceToOwner = svgTransformTo(styleShape, this) ?: return
             placement.setToTransform(styleShape.localToParentTransform)
             val fixedHost = if (nonScaling) host()?.let { svgTransformTo(this, it) } else null
             marks.forEach { mark ->
                 val instance = mark.instance
+                val vertexIndex = if (animatedVertexCapacity != null && mark.end) vertices.lastIndex else mark.vertex
+                if (vertexIndex > vertices.lastIndex || animatedVertexCapacity != null && !mark.start && !mark.end && vertexIndex >= vertices.lastIndex) {
+                    instance.isVisible = false
+                    return@forEach
+                }
                 val frame = instance.frame(sourceViewport)
                 val unit = if (instance.spec.strokeUnits) styleShape.strokeWidth else 1.0
                 val fixed = nonScaling && instance.spec.strokeUnits
@@ -186,7 +193,7 @@ internal class SvgMarkers(
                     return@forEach
                 }
                 instance.isVisible = true
-                val vertex = vertices[mark.vertex]
+                val vertex = vertices[vertexIndex]
                 val matrix = if (fixed) checkNotNull(fixedHost).createConcatenation(sourceToOwner) else sourceToOwner
                 val point = matrix.transform(vertex.point)
                 val angle = instance.spec.angle(vertex, mark.start, if (fixed) matrix else null)

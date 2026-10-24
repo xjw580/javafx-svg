@@ -299,6 +299,7 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
 
 - `animateTransform`：rotate、translate、scale、skewX/skewY；默认替换源 transform，`additive="sum"` 可叠加源变换及其他变换动画。要求 values 或显式 from/to。
 - `animate`：opacity、fill-opacity、stroke-opacity、fill、stroke、color、stroke-width、stroke-dashoffset。颜色值要求纯色；values 内的 currentColor 按目标初始 SVG color 解析。数值支持 from/to、to-only、from/by、by-only；颜色支持 values、from/to 和有纯色基础值的 to-only。线宽/虚线偏移支持现有长度单位与百分比，随当前视口求值。
+- 几何 animate：位置、半径和尺寸按下表支持；与样式动画共用延迟、关键帧、循环及播放控制。
 - 支持 values、keyTimes，calcMode=linear/discrete/spline；spline 使用 keySplines。颜色按源 color-interpolation 在 sRGB（默认）或 linearRGB 中插值。
 - begin 支持单个时间偏移（允许负数），dur 为有限正时长；支持秒、毫秒、分钟、小时和时钟格式。repeatCount 支持正数（包括小数）及 indefinite。fill=remove（默认）恢复源值，freeze 保留最后采样值。
 - 动画默认作用于父元素，也可通过 href/xlink:href 指向本文档内的目标。组上的颜色/描边动画按 SVG 样式继承，子元素显式样式可阻断继承；重叠的替换动画按开始时间及文档顺序决定优先级。
@@ -321,7 +322,34 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 
 动画沿用源 SVG 样式层：应用侧 JavaFX CSS、属性绑定及统一主题保持已有优先级，移除覆盖后显示当前动画值。变换通过原生 Affine 更新；固定描边、marker、clipPath、mask 和普通/片段/定长文字复用已有节点。每帧由 JavaFX pulse 推进，仅更新属性与必要布局，不重新解析 XML，不把插值结果写入共享文档缓存。每个视图有独立时钟，未播放时不运行计时器。
 
-首版不支持事件/同步链 begin、begin 时间列表、end/repeatDur、累积动画、数值/颜色的 additive=sum、paced、animateMotion、set、animateColor、路径/几何/渐变/滤镜属性动画，以及 CSS animation/transition/@keyframes。tspan 支持上述样式动画，自身的变换动画仍受 tspan 变换限制。已检测到的不支持内容在严格模式拒绝，在宽松模式报告诊断并保留可用的静态内容。规则参考 [SVG 1.1 Animation](https://www.w3.org/TR/SVG11/animate.html)。
+几何动画按目标元素支持以下 XML 属性（attributeType=auto/XML）：
+
+| 元素 | 可动画的几何属性 |
+| --- | --- |
+| circle | cx、cy、r |
+| ellipse | cx、cy、rx、ry |
+| rect | x、y、width、height、rx、ry |
+| line | x1、y1、x2、y2 |
+| image、嵌套 svg | x、y、width、height |
+| use | x、y |
+| text、tspan | 单值 x、y、dx、dy；含已有 textLength 排版的文本位置 |
+
+```xml
+<circle cx="24" cy="24" r="4" fill="#2563eb">
+    <animate attributeName="r" values="4;10;4" dur="1.2s"
+             repeatCount="indefinite"/>
+    <animate attributeName="cy" values="24;16;24" dur="1.2s"
+             repeatCount="indefinite"/>
+</circle>
+```
+
+位置和尺寸支持既有长度单位，百分比按当前视口对应轴求值；r 使用归一化视口对角线。圆角半径缺省时采用另一轴已解析的长度，再按当前矩形宽高限幅。延迟期间及 fill=remove 后使用源几何；tspan 动画产生的绝对坐标只在动画贡献期间参与片段布局。
+
+负半径/尺寸会报告诊断（严格模式拒绝）；宽、高或半径为零时，动画图形连同描边和标记隐藏，恢复正值后继续显示。绑定的基本图形几何属性优先于源动画。节点保持复用，插值结果不进入文档长度缓存；几何变化会刷新渐变、裁剪、遮罩、滤镜和固定描边。基本图形的 marker 为动画预留有界实例池，支持零尺寸恢复及矩形圆角变化，使用时仍受 maxElements 限制。
+
+不支持几何 CSS 属性动画、根 svg 的位置/尺寸动画、use 的 width/height 动画、textLength 本身及文字位置列表动画。SvgView 的布局尺寸由 fitWidth/fitHeight 和父布局管理。形状几何语义参考 [SVG Basic Shapes](https://www.w3.org/TR/SVG11/shapes.html)。
+
+首版不支持事件/同步链 begin、begin 时间列表、end/repeatDur、累积动画、数值/颜色的 additive=sum、paced、animateMotion、set、animateColor、路径数据/points、渐变/滤镜属性动画，以及 CSS animation/transition/@keyframes。tspan 支持上述样式动画，自身的变换动画仍受 tspan 变换限制。已检测到的不支持内容在严格模式拒绝，在宽松模式报告诊断并保留可用的静态内容。规则参考 [SVG 1.1 Animation](https://www.w3.org/TR/SVG11/animate.html)。
 
 ## 支持范围
 
@@ -333,7 +361,7 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 | 样式 | 属性、style 属性、style 元素；类型/class/id/复合/后代/逗号选择器；继承、优先级、!important、currentColor |
 | 描边 | 颜色、宽度、透明度、端点、连接、miterlimit、虚线、non-scaling-stroke |
 | 引用 | 本文档内 defs/use/symbol、href/xlink:href；独立实例、循环和展开数量限制 |
-| 动画 | animateTransform、样式 animate；关键帧/缓动、延迟/循环、播放/暂停/停止/时间定位 |
+| 动画 | animateTransform、样式与几何 animate；关键帧/缓动、延迟/循环、播放/暂停/停止/时间定位 |
 | 标记 | marker-start/mid/end、marker 简写；自动定向、两类坐标单位、上下文颜色/线性渐变 |
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |

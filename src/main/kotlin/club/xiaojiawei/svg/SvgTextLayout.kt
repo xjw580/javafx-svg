@@ -7,7 +7,7 @@ import java.util.IdentityHashMap
 
 /** Horizontal text flow. Absolute coordinates start independently anchored chunks. */
 internal class SvgTextLayout(private val lengths: SvgLengthCache, private val viewport: SvgViewport) : Group() {
-    class Scope(val coordinates: Map<String, String>)
+    class Scope(val coordinates: Map<String, String>, val geometry: SvgAnimatedGeometry? = null)
     class Run(val text: Text, val scopes: List<Scope>, val anchor: Double)
     val runs = mutableListOf<Run>()
 
@@ -24,14 +24,21 @@ internal class SvgTextLayout(private val lengths: SvgLengthCache, private val vi
         }
         runs.forEachIndexed { index, run ->
             // A scalar applies to the first rendered character in its scope. Inner values win.
-            val coordinates = mutableMapOf<String, String>()
-            run.scopes.forEach { if (started.add(it)) coordinates.putAll(it.coordinates) }
+            val coordinates = mutableMapOf<String, Double>()
+            run.scopes.forEach { scope ->
+                if (started.add(scope)) for (name in listOf("x", "y", "dx", "dy")) {
+                    val reference = SvgAnimatedGeometry.reference(name, viewport)
+                    val value = scope.geometry?.value(name, reference)
+                        ?: scope.coordinates[name]?.let { lengths.resolve(it, reference) }
+                    if (value != null) coordinates[name] = value
+                }
+            }
             val absolute = "x" in coordinates || "y" in coordinates
             if (absolute || index == 0) finish(index)
-            coordinates["x"]?.let { x = lengths.resolve(it, viewport.width) }
-            coordinates["y"]?.let { y = lengths.resolve(it, viewport.height) }
-            coordinates["dx"]?.let { x += lengths.resolve(it, viewport.width) }
-            coordinates["dy"]?.let { y += lengths.resolve(it, viewport.height) }
+            coordinates["x"]?.let { x = it }
+            coordinates["y"]?.let { y = it }
+            coordinates["dx"]?.let { x += it }
+            coordinates["dy"]?.let { y += it }
             if (absolute || index == 0) {
                 chunkStart = index
                 chunkX = x

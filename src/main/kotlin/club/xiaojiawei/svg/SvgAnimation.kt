@@ -61,6 +61,7 @@ internal class SvgAnimation private constructor(
                     "Opacity animation requires unitless numbers"
                 }
             }
+            if (attribute in NONNEGATIVE && !by) require(numbers.all { it.resolve(1.0) >= 0 }) { "Negative animated size: $attribute" }
             require(!by || attribute !in COLOURS) { "Colour by-animation is unsupported" }
         }
 
@@ -79,7 +80,7 @@ internal class SvgAnimation private constructor(
                 by -> listOf(values[0], add(values[0], values[1]))
                 else -> values
             }
-            if (attribute == "stroke-width") require(endpoints.all { (it as Value.Number).value >= 0 }) { "Negative animated stroke width" }
+            if (attribute in NONNEGATIVE) require(endpoints.all { (it as Value.Number).value >= 0 }) { "Negative animated size: $attribute" }
             if (progress >= 1) return endpoints.last()
             val knots = if (times.isNotEmpty()) times else if (mode == "discrete")
                 List(endpoints.size) { it.toDouble() / endpoints.size }
@@ -120,7 +121,10 @@ internal class SvgAnimation private constructor(
 
     companion object {
         val NAMES = setOf("animate", "animateTransform")
-        val NUMBERS = setOf("opacity", "fill-opacity", "stroke-opacity", "stroke-width", "stroke-dashoffset")
+        private val NONNEGATIVE = setOf("stroke-width", "r", "rx", "ry", "width", "height")
+        val STYLE_NUMBERS = setOf("opacity", "fill-opacity", "stroke-opacity", "stroke-width", "stroke-dashoffset")
+        val GEOMETRY = SvgAnimatedGeometry.attributes.values.flatten().toSet()
+        val NUMBERS = STYLE_NUMBERS + GEOMETRY
         val COLOURS = setOf("fill", "stroke", "color")
         val TARGETS = setOf("svg", "g", "a", "use", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "text", "tspan", "image")
         private val clock = Regex("([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))(h|min|s|ms)?")

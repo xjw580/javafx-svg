@@ -40,3 +40,11 @@ Smoke 使用 10 实例、1 × 100ms 预热及测量、各一个新进程，只�
 输出保留运行计划、源文件、依赖/JAR 哈希、协议、各进程 JMH JSON/日志、FX 每操作原始 CSV、环境说明及固定 SVG。原始记录不删异常值；汇总以进程为单位，给出全部重复与范围。
 
 方法依据：[JMH fork 隔离示例](https://github.com/openjdk/jmh/blob/master/jmh-samples/src/main/java/org/openjdk/jmh/samples/JMHSample_12_Forking.java)、[Invocation fixture 限制](https://github.com/openjdk/jmh/blob/master/jmh-samples/src/main/java/org/openjdk/jmh/samples/JMHSample_07_FixtureLevelInvocation.java)。本工具每次操作是整批毫秒级构建，teardown 与原始 FX 计时分离。
+
+## 汇总
+
+~~~powershell
+./benchmarks/creation/analyze.ps1 -InputDirectory target/svg-creation/formal
+~~~
+
+分析器要求完成标记、每组合完整的三个独立进程及正式迭代；默认拒绝 Smoke。生成 forks.csv（每进程）、iterations.csv（包含预热）、summary.csv（进程中位数及完整范围）和 warnings.txt。漂移提示是审查入口，不自动剔除样本或证明已经/没有达到稳态；若存在明显持续趋势，需要延长预热再验证。

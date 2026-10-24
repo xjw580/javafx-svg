@@ -42,24 +42,7 @@ object SvgLoader {
         try {
             val bytes = input.readNBytes(options.maxBytes + 1)
             if (bytes.size > options.maxBytes) throw SvgException("SVG exceeds maxBytes")
-            val factory = DocumentBuilderFactory.newInstance().apply {
-                isNamespaceAware = true
-                isXIncludeAware = false
-                isExpandEntityReferences = false
-                setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
-                setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-                setFeature("http://xml.org/sax/features/external-general-entities", false)
-                setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-                setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
-                setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
-                setAttribute("http://www.oracle.com/xml/jaxp/properties/maxElementDepth", options.maxDepth.toString())
-            }
-            val builder = factory.newDocumentBuilder()
-            builder.setErrorHandler(object : DefaultHandler() {
-                override fun error(e: SAXParseException) { throw e }
-                override fun fatalError(e: SAXParseException) { throw e }
-            })
-            val dom = builder.parse(ByteArrayInputStream(bytes))
+            val dom = parseDom(bytes, options.maxDepth)
             val root = dom.documentElement ?: throw SvgException("Missing SVG root")
             if (root.localName != "svg" || root.namespaceURI !in listOf(null, "", SVG_NS)) {
                 throw SvgException("Expected an SVG root element")
@@ -129,6 +112,49 @@ object SvgLoader {
         } catch (e: Exception) {
             throw SvgException("Cannot parse SVG: ${e.message}", e)
         }
+    }
+
+
+    private class Parser(val depth: Int, val builder: javax.xml.parsers.DocumentBuilder, var uses: Int = 0, var bytes: Int = 0)
+    private val parsers = ThreadLocal<Parser>()
+    private val errors = object : DefaultHandler() {
+        override fun error(e: SAXParseException) { throw e }
+        override fun fatalError(e: SAXParseException) { throw e }
+    }
+
+    /** Confined to one thread; rotate parsers to bound provider symbol/buffer retention. */
+    private fun parseDom(bytes: ByteArray, depth: Int): org.w3c.dom.Document {
+        val cached = parsers.get()
+        val parser = if (cached != null && cached.depth == depth && cached.uses < 64 &&
+            cached.bytes.toLong() + bytes.size <= 1024 * 1024) cached else createParser(depth)
+        if (bytes.size <= 128 * 1024) parsers.set(parser) else parsers.remove()
+        parser.uses++
+        parser.bytes += bytes.size
+        try {
+            parser.builder.setErrorHandler(errors)
+            return parser.builder.parse(ByteArrayInputStream(bytes))
+        } catch (failure: Exception) {
+            parsers.remove()
+            throw failure
+        } finally {
+            try { parser.builder.reset() } catch (_: UnsupportedOperationException) { parsers.remove() }
+        }
+    }
+
+    private fun createParser(depth: Int): Parser {
+        val factory = DocumentBuilderFactory.newInstance().apply {
+            isNamespaceAware = true
+            isXIncludeAware = false
+            isExpandEntityReferences = false
+            setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+            setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+            setAttribute("http://www.oracle.com/xml/jaxp/properties/maxElementDepth", depth.toString())
+        }
+        return Parser(depth, factory.newDocumentBuilder())
     }
 
     private const val SVG_NS = "http://www.w3.org/2000/svg"

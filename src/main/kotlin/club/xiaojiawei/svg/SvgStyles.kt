@@ -126,4 +126,6 @@ internal class SvgComputedStyle(
     override val cssTransform: Boolean
 ) : AbstractMap<String, String>(), SvgStyleInfo {
     override val entries: Set<Map.Entry<String, String>> get() = staticValues.entries
+    override fun get(key: String): String? = staticValues[key]
+    override fun containsKey(key: String): Boolean = staticValues.containsKey(key)
 }

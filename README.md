@@ -30,7 +30,7 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--benchmark --count=200 --warmup-
 
 SVG 自带动画另有 [动画性能与生命周期报告](benchmarks/animation-2026-10-24.md)，覆盖 100/500 个 SMIL、CSS 及固定描边组合图标；运行 `--animation-benchmark`，用 `--animation-report=记录路径` 分析 JFR。
 
-旧对照中的创建耗时测试已撤回结论，原因及后续复测见 [修复报告中的测试更正](benchmarks/remediation-2026-10-24.md)。
+旧对照中的创建耗时测试已撤回结论，原因及统一协议复测见 [创建复测报告](benchmarks/creation-retest-2026-10-24.md)。
 
 与 fxsvgimage 1.7.3、JSVG 2.2.0（JavaFX/AWT 后端）的 [性能和特性对照](benchmarks/library-comparison-2026-10-24.md) 包含两轮 48 个性能场景及 72 项特性探测；[独立复现工具](benchmarks/comparison/README.md) 不改变库运行依赖。
 

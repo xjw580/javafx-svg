@@ -3,7 +3,7 @@ param(
  [string]$AfterJar='target/javafx-svg-1.0-SNAPSHOT.jar',
  [string]$JavaHome='S:/jdk25.0.1_bellsoft',
  [string]$Output='', [int]$Forks=3,
- [int]$WarmupIterations=5, [int]$MeasurementIterations=5, [string]$IterationTime='1s',
+ [int]$WarmupIterations=15, [int]$MeasurementIterations=5, [string]$IterationTime='1s',
  [string[]]$Kinds=@('path','gradient','smil-transform'),
  [string[]]$Phases=@('parse','buildShared','totalMounted'), [int]$Count=500, [switch]$Smoke
 )

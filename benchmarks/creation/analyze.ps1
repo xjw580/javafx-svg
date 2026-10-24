@@ -39,6 +39,7 @@ foreach($entry in $plan) {
   $iterationRows+=$row
   if($row.measurement -eq 'true') { $perIteration+=$row }
  }
+ $perIteration=@($perIteration | Sort-Object { [int]$_.iteration })
  if($perIteration.Count -ne [int]$json.measurementIterations) { throw 'Incomplete measured iterations' }
  $forkRows+=[pscustomobject]@{
   run=$entry.run;label=$entry.label;kind=$entry.kind;phase=$entry.phase;round=$entry.round

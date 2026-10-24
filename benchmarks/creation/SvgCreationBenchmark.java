@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 /** One operation is a retained batch, never an individual icon microbenchmark. */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Warmup(iterations = 5, time = 1)
+@Warmup(iterations = 15, time = 1)
 @Measurement(iterations = 5, time = 1)
 @Fork(3)
 @Threads(1)

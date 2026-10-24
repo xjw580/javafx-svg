@@ -24,6 +24,8 @@ mvn -Pdemo test-compile exec:java
 | 动画 | 呼吸与颜色过渡 | 缩放、透明度、颜色、线宽与 spline 缓动 |
 | 动画 | 路径描边与进度 | 曲线绘制、环形进度、成功勾选及 keyTimes |
 | 动画 | 变换与缓动 | 平移、旋转、缩放叠加、倾斜 |
+| 动画 | 跳动圆点与半径 | cy/r 同步动画、脉冲圆环、椭圆半径变化 |
+| 动画 | 音量柱与尺寸变化 | 底部对齐的高度动画、零宽恢复、动态圆角 |
 | 图形 | 源 SVG | 文件中的原始填充、描边、渐变和 use |
 | 图形 | 图形与描边 | 基本图形、曲线、圆角、端点、连接和虚线 |
 | 图形 | 固定描边 | 普通描边与固定 3 个逻辑像素描边的缩放对比 |
@@ -53,7 +55,8 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--smoke"
 - `target/demo-preview.png`：蓝色、100%、1440px 宽屏，加载动画与源码并列。
 - `target/demo-preview-themed.png`：绿色、120%，源图与路径 CSS 对比。
 - `target/demo-preview-compact.png`：紫色、80%、960px 布局，深色背景与下方源码。
-- `target/demo-cases/*.png`：全部 19 个示例的预览画布。
+- `target/demo-preview-geometry.png`：圆点跳动、脉冲圆环与椭圆几何动画。
+- `target/demo-cases/*.png`：全部 21 个示例的预览画布。
 
 检查覆盖全部素材的零诊断、独立节点、共享文档、动画帧变化、主题与路径 CSS、源码页、横向边界、滚动和本地资源清空/恢复。需要 JavaFX 图形环境，Linux 无显示器环境可使用 xvfb-run。PNG 导出使用 Java2D，仅存在于测试示例中。
 

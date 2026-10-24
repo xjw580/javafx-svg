@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="180" viewBox="0 0 420 180">
+  <g fill="#2563eb">
+    <rect id="audio-bar" x="30" y="92" width="10" height="20" rx="4">
+      <animate attributeName="y" values="92;36;92" dur="1.5s" repeatCount="indefinite" begin="-.3s"/>
+      <animate attributeName="height" values="20;76;20" dur="1.5s" repeatCount="indefinite" begin="-.3s"/>
+    </rect>
+    <rect x="48" y="76" width="10" height="36" rx="4">
+      <animate attributeName="y" values="76;52;76" dur="1.5s" repeatCount="indefinite" begin="-.6s"/>
+      <animate attributeName="height" values="36;60;36" dur="1.5s" repeatCount="indefinite" begin="-.6s"/>
+    </rect>
+    <rect x="66" y="52" width="10" height="60" rx="4">
+      <animate attributeName="y" values="52;80;52" dur="1.5s" repeatCount="indefinite" begin="-.9s"/>
+      <animate attributeName="height" values="60;32;60" dur="1.5s" repeatCount="indefinite" begin="-.9s"/>
+    </rect>
+    <rect x="84" y="76" width="10" height="36" rx="4">
+      <animate attributeName="y" values="76;52;76" dur="1.5s" repeatCount="indefinite" begin="-1.2s"/>
+      <animate attributeName="height" values="36;60;36" dur="1.5s" repeatCount="indefinite" begin="-1.2s"/>
+    </rect>
+    <rect x="102" y="92" width="10" height="20" rx="4">
+      <animate attributeName="y" values="92;36;92" dur="1.5s" repeatCount="indefinite"/>
+      <animate attributeName="height" values="20;76;20" dur="1.5s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+  <rect x="174" y="60" width="88" height="30" rx="8" fill="#dcfce7"/>
+  <rect id="progress" x="174" y="60" width="0" height="30" rx="8" fill="#059669">
+    <animate attributeName="width" values="0;88;88;0" keyTimes="0;.6;.8;1" dur="3.2s" repeatCount="indefinite"/>
+  </rect>
+  <rect x="316" y="44" width="64" height="64" rx="0" fill="#7c3aed">
+    <animate attributeName="rx" values="0;24;0" dur="2.4s" repeatCount="indefinite"/>
+  </rect>
+  <g font-family="sans-serif" font-size="12" text-anchor="middle" fill="#64748b">
+    <text x="76" y="144">AUDIO BARS</text><text x="218" y="144">WIDTH</text><text x="348" y="144">CORNER RADIUS</text>
+  </g>
+</svg>

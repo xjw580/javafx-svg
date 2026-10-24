@@ -307,7 +307,11 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             val target = document.elementsById[id] ?: throw SvgException("Missing mask: #$id")
             require(target.name == "mask") { "Mask reference is not a mask: #$id" }
             require(target["href"] == null && target["xlink:href"] == null) { "Mask templates are unsupported" }
-            require(paints.styleOf(target).getValue("mask-type") == "alpha") { "Only mask-type=alpha is currently supported" }
+            val maskStyle = paints.styleOf(target)
+            val mode = maskStyle.getValue("mask-type")
+            require(mode in setOf("alpha", "luminance")) { "Invalid mask-type: $mode" }
+            val interpolation = maskStyle.getValue("color-interpolation")
+            require(interpolation in setOf("sRGB", "auto", "linearRGB")) { "Invalid mask color-interpolation: $interpolation" }
             require(activeReferences.add("mask:$id")) { "Circular mask reference: #$id" }
             val previousMasking = masking
             try {
@@ -315,7 +319,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 masking = true
                 val maskViewport = if (target["maskContentUnits"] == "objectBoundingBox") SvgViewport(1.0, 1.0) else viewport
                 val content = render(target, paints.ancestorsOf(target), paints.parentStyleOf(target), maskViewport, referenced = true) ?: Group()
-                return SvgMask(node, content, target, viewport, document.lengths, maskBudget,
+                return SvgMask(node, content, target, viewport, document.lengths, maskBudget, mode == "luminance", interpolation == "linearRGB",
                     { if (themeReady) root.parent?.requestLayout() }) { report(it, owner) }.also {
                     masks += it
                     updates += { it.refresh() }

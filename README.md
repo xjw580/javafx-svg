@@ -294,14 +294,14 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
 | 引用 | 本文档内 defs/use/symbol、href/xlink:href；独立实例、循环和展开数量限制 |
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
-| 遮罩 | 显式 mask-type=alpha；区域、两种坐标单位、嵌套遮罩、CSS 与引用 |
+| 遮罩 | alpha/luminance（默认）；区域、两种坐标单位、嵌套遮罩、CSS 与引用 |
 | 滤镜 | 单个 feGaussianBlur；独立 X/Y 标准差、SourceGraphic/SourceAlpha、filterUnits/primitiveUnits、输入区域及输出子区域裁剪 |
 | 文本 | 单段 text、x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space、textLength/lengthAdjust；字号支持 em 和相对父字号的百分比 |
 | 图片 | image 中的 base64 PNG/JPEG，preserveAspectRatio，视口裁剪 |
 
-### Alpha 遮罩
+### 遮罩
 
-支持本地 `mask: url(#id)` 和 `<mask mask-type="alpha">`，按遮罩合成结果的透明度控制源图可见程度，颜色本身不影响 Alpha：
+支持本地 `mask: url(#id)`，包含 `mask-type="alpha"` 和默认的 `luminance`。Alpha 模式按遮罩合成结果的透明度控制源图可见程度，颜色本身不影响 Alpha：
 
 ```xml
 <svg viewBox="0 0 100 100">
@@ -320,7 +320,9 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
 
 实现使用 JavaFX 快照生成 Alpha 图像，再由原生 clip 合成；无需 WebView 或 Java2D。图像按当前场景变换与窗口输出比例采样，内容和尺寸未变时复用。超高倍率离屏导出仍可能重采样现有遮罩图像。每个视图所有遮罩共用 `SvgOptions.maxMaskPixels` 像素预算（默认 4,194,304），每张图像单轴最多 4096 像素；这是稳态像素数量限制，不是精确堆内存上限。超限严格模式抛异常，宽松模式报告诊断并隐藏受影响图形；缩小后可恢复。
 
-本阶段仅支持显式 alpha，默认的 luminance 遮罩会报告未支持。语义依据 [SVG Masking](https://www.w3.org/TR/css-masking-1/#MaskElement)；亮度遮罩将在后续阶段补齐。
+省略 mask-type 或指定 luminance 时，按最终合成图像的非预乘 RGB 计算亮度，再乘透明度：`alpha × (0.2126 R + 0.7152 G + 0.0722 B)`。白色保留、黑色隐藏、灰色和半透明颜色产生中间透明度。支持遮罩上的 color-interpolation（默认 sRGB，auto 按 sRGB；linearRGB 先对最终像素做线性化再计算亮度）。这只控制遮罩最后的颜色转透明度步骤，不扩展现有绘制器的渐变插值及混色能力。颜色或字体 CSS 更新后会重新生成图像，普通布局复用已有图像。
+
+语义依据 [SVG Masking](https://www.w3.org/TR/css-masking-1/#MaskElement) 与 [luminanceToAlpha](https://www.w3.org/TR/filter-effects-1/#element-attrdef-fecolormatrix-type)。
 
 `textLength` 支持数值、长度单位和百分比，默认 `lengthAdjust="spacing"` 只调整字素簇间距，`spacingAndGlyphs` 同时缩放字形的横向尺寸。支持文本锚点、视口尺寸更新及应用 CSS 修改字体、填充和描边。单个字素簇在 spacing 模式下保持自然宽度。带 textLength 的文字由多个关联 Text 节点绘制，源 id/class 和 `.svg-text` 仍用于样式控制。
 
@@ -335,7 +337,7 @@ Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，
 当前不支持完整 SVG 规范。限制包括：
 
 - 不执行脚本、事件处理器、SMIL/CSS 动画，不渲染 foreignObject。
-- 不支持完整 filter 管线、亮度 mask、pattern、marker、non-scaling-stroke、radialGradient 的 gradientTransform 和非零 fr。
+- 不支持完整 filter 管线、pattern、marker、non-scaling-stroke、radialGradient 的 gradientTransform 和非零 fr。
 - SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量、at-rule、外部样式表；应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
 - 不支持 tspan、textPath、逐字位置列表、复杂排版或嵌入字体；文本外观依赖系统字体。
 - 不自动加载 image/use/gradient/clipPath 中的外部文件或网络引用；load(URL) 仅打开调用方明确提供的顶层地址。

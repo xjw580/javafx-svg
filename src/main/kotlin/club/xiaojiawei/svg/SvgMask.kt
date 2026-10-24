@@ -20,6 +20,8 @@ import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
+import kotlin.math.roundToInt
 
 /** A per-renderer steady-state pixel budget; input/output images may coexist while refreshing. */
 internal class SvgMaskBudget(private val limit: Int) {
@@ -42,6 +44,8 @@ internal class SvgMask(
     private val viewport: SvgViewport,
     private val lengths: SvgLengthCache,
     private val budget: SvgMaskBudget,
+    private val luminance: Boolean,
+    private val linearRgb: Boolean,
     private val invalidateRenderer: () -> Unit,
     private val report: (String) -> Unit
 ) : Group() {
@@ -66,6 +70,19 @@ internal class SvgMask(
         if (!refreshing) { dirty = true; requestLayout(); invalidateRenderer() }
     }
 
+    private val visibilityParents = mutableListOf<Node>()
+    private fun watchAncestors() {
+        visibilityParents.forEach { it.visibleProperty().removeListener(changed) }
+        visibilityParents.clear()
+        if (scene == null) return
+        var current: Node? = source
+        while (current != null) {
+            current.visibleProperty().addListener(changed)
+            visibilityParents += current
+            current = current.parent
+        }
+    }
+
     private var observedWindow: javafx.stage.Window? = null
     private val windowChanged = javafx.beans.value.ChangeListener<javafx.stage.Window?> { _, _, next -> watchWindow(next) }
 
@@ -86,6 +103,7 @@ internal class SvgMask(
             previous?.windowProperty()?.removeListener(windowChanged)
             next?.windowProperty()?.addListener(windowChanged)
             watchWindow(next?.window)
+            watchAncestors()
         }
         transforms.setAll(source.transforms)
         source.transforms.clear()
@@ -93,6 +111,8 @@ internal class SvgMask(
         styleClass += "svg-mask-output"
         observe(mask)
         source.localToSceneTransformProperty().addListener(changed)
+        source.boundsInLocalProperty().addListener(changed)
+        parentProperty().addListener { _, _, _ -> watchAncestors() }
     }
 
     fun geometryBounds(): Bounds = source.localToParentTransform.transform(svgGeometryBounds(source))
@@ -112,6 +132,8 @@ internal class SvgMask(
         if (refreshing) return
         refreshing = true
         try {
+            // JavaFX can defer peer updates below invisible ancestors; keep the dirty raster pending.
+            if (generateSequence(source) { it.parent }.any { !it.isVisible }) { dirty = true; return }
             val bounds = svgGeometryBounds(source)
             placement.setToTransform(source.localToParentTransform)
             if (proportionalContent) contentTransform.setToTransform(bounds.width, 0.0, bounds.minX, 0.0, bounds.height, bounds.minY)
@@ -145,6 +167,7 @@ internal class SvgMask(
                 this.viewport = Rectangle2D(left, top, pixelWidth, pixelHeight)
             }
             val snapshot = mask.snapshot(params, null)
+            if (luminance) toLuminanceAlpha(snapshot)
             image.x = left / sx; image.y = top / sy
             image.fitWidth = pixelWidth / sx; image.fitHeight = pixelHeight / sy
             image.image = snapshot
@@ -154,6 +177,23 @@ internal class SvgMask(
             clear()
             report(failure.message ?: "Invalid SVG mask")
         } finally { refreshing = false }
+    }
+
+    private fun toLuminanceAlpha(snapshot: javafx.scene.image.WritableImage) {
+        val width = snapshot.width.toInt()
+        val height = snapshot.height.toInt()
+        val pixels = IntArray(width * height)
+        val format = javafx.scene.image.PixelFormat.getIntArgbInstance()
+        snapshot.pixelReader.getPixels(0, 0, width, height, format, pixels, 0, width)
+        val channel = if (linearRgb) LINEAR_RGB else SRGB
+        for (index in pixels.indices) {
+            val pixel = pixels[index]
+            val brightness = .2126 * channel[(pixel ushr 16) and 255] +
+                .7152 * channel[(pixel ushr 8) and 255] + .0722 * channel[pixel and 255]
+            val alpha = ((pixel ushr 24) * brightness).roundToInt().coerceIn(0, 255)
+            pixels[index] = (alpha shl 24) or 0x00ffffff
+        }
+        snapshot.pixelWriter.setPixels(0, 0, width, height, format, pixels, 0, width)
     }
 
     private fun clear() {
@@ -195,6 +235,14 @@ internal class SvgMask(
         if (node is Text) node.fontProperty().addListener(changed)
         if (node is ImageView) node.imageProperty().addListener(changed)
         if (node is Group) node.children.forEach(::observe)
+    }
+
+    companion object {
+        private val SRGB = DoubleArray(256) { it / 255.0 }
+        private val LINEAR_RGB = DoubleArray(256) {
+            val channel = SRGB[it]
+            if (channel <= .04045) channel / 12.92 else ((channel + .055) / 1.055).pow(2.4)
+        }
     }
 
     private fun units(value: String): Boolean = when (value) {

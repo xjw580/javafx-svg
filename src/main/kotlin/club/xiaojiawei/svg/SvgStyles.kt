@@ -76,7 +76,7 @@ internal class SvgStyles(
     companion object {
         private val whitespace = Regex("\\s+")
         val defaults = mapOf(
-            "fill" to "black", "stroke" to "none", "color" to "black",
+            "fill" to "black", "stroke" to "none", "color" to "black", "color-interpolation" to "sRGB",
             "stroke-width" to "1", "fill-opacity" to "1", "stroke-opacity" to "1", "opacity" to "1",
             "fill-rule" to "nonzero", "clip-rule" to "nonzero",
             "stroke-linecap" to "butt", "stroke-linejoin" to "miter", "stroke-miterlimit" to "4",

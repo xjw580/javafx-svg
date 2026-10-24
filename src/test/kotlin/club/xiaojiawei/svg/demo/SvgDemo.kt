@@ -73,7 +73,7 @@ class SvgDemo : Application() {
                 card("Shapes & strokes", "GEOMETRY", fixture("shapes"), "Curves, circles, polygons, rounded corners and dashed strokes."),
                 card("Linear & radial", "GRADIENT", fixture("gradients"), "Native gradients, stops, opacity and reflected linear paint."),
                 card("Geometric clipping", "CLIP PATH", fixture("clip"), "A circular window and an even-odd path expose only the selected areas."),
-                card("Text & textLength", "TYPOGRAPHY", fixture("text"), "Native Text, anchors, font styles, spacing and glyph-width adjustment."),
+                card("Text, tspan & length", "TYPOGRAPHY", fixture("text"), "Nested styled spans, baseline offsets, native Text, spacing and glyph-width adjustment."),
                 card("Reusable symbols", "USE + TRANSFORM", fixture("symbols"), "One symbol, independent instances, currentColor and nested transforms."),
                 card("Alpha & luminance", "MASK", fixture("masks"), "Same black / gray / white mask: alpha preserves them, luminance changes visibility."),
                 card("Gaussian blur", "FILTER", fixture("blur"), "Crisp and blurred shapes, using an explicit sRGB filter."),

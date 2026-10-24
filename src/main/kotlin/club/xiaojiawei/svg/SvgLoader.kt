@@ -82,17 +82,34 @@ object SvgLoader {
                 }
                 val children = mutableListOf<SvgElement>()
                 val text = StringBuilder()
+                val content = mutableListOf<SvgContent>()
+                val pending = StringBuilder()
+                fun flushText() {
+                    if (pending.isNotEmpty()) {
+                        content += SvgContent.Characters(pending.toString())
+                        pending.setLength(0)
+                    }
+                }
                 for (i in 0 until element.childNodes.length) {
                     val child = element.childNodes.item(i)
                     when (child.nodeType) {
-                        Node.ELEMENT_NODE -> children += read(child as Element, depth + 1)
-                        Node.TEXT_NODE, Node.CDATA_SECTION_NODE -> text.append(child.nodeValue)
+                        Node.ELEMENT_NODE -> {
+                            flushText()
+                            val parsed = read(child as Element, depth + 1)
+                            children += parsed
+                            content += SvgContent.Child(parsed)
+                        }
+                        Node.TEXT_NODE, Node.CDATA_SECTION_NODE -> {
+                            text.append(child.nodeValue)
+                            pending.append(child.nodeValue)
+                        }
                     }
                 }
+                flushText()
                 val name = if (element.namespaceURI in listOf(null, "", SVG_NS)) element.localName
                     else "{${element.namespaceURI}}${element.localName}"
                 val result = SvgElement(name, Collections.unmodifiableMap(attrs),
-                    Collections.unmodifiableList(children), text.toString())
+                    Collections.unmodifiableList(children), text.toString(), Collections.unmodifiableList(content))
                 result.id?.let {
                     if (ids.putIfAbsent(it, result) != null) throw SvgException("Duplicate SVG id: $it")
                 }

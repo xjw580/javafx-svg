@@ -24,10 +24,17 @@ class SvgElement internal constructor(
     val name: String,
     val attributes: Map<String, String>,
     val children: List<SvgElement>,
-    val text: String
+    val text: String,
+    internal val content: List<SvgContent>
 ) {
     val id: String? get() = attributes["id"]
     operator fun get(name: String): String? = attributes[name]
+}
+
+/** Ordered mixed XML content, including text before and after child elements. */
+internal sealed interface SvgContent {
+    data class Characters(val value: String) : SvgContent
+    data class Child(val element: SvgElement) : SvgContent
 }
 
 /** Immutable and safe to share between views. Contains no JavaFX nodes. */

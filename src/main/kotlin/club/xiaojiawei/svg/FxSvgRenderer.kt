@@ -125,7 +125,9 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         fun length(name: String, axis: Double, default: String = "0") = document.lengths.resolve(element[name] ?: default, axis)
         fun positive(value: Double): Double = value.also { require(it >= 0) { "Negative SVG size" } }
         val node: Node = when (element.name) {
-            "text" -> {
+            "text" -> if (element.children.any { it.name == "tspan" }) {
+                renderTextSpans(element, ancestors, style, viewport)
+            } else {
                 val text = Text()
                 element.children.forEach { report("Unsupported text child: ${it.name}", it) }
                 listOf("rotate", "dominant-baseline", "writing-mode").forEach {
@@ -133,22 +135,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 }
                 val preserve = (element["xml:space"] ?: ancestors.asReversed().firstNotNullOfOrNull { it["xml:space"] }) == "preserve"
                 text.text = if (preserve) element.text else element.text.replace(Regex("\\s+"), " ").trim()
-                val weight = when (val value = style.getValue("font-weight")) {
-                    "normal" -> FontWeight.NORMAL
-                    "bold" -> FontWeight.BOLD
-                    else -> FontWeight.findByWeight(value.toIntOrNull() ?: throw SvgException("Unsupported font-weight: $value"))
-                }
-                val posture = when (style.getValue("font-style")) {
-                    "normal" -> FontPosture.REGULAR
-                    "italic", "oblique" -> FontPosture.ITALIC
-                    else -> throw SvgException("Unsupported font-style")
-                }
-                val family = style.getValue("font-family").substringBefore(',').trim().trim('\'', '"')
-                text.font = Font.font(family, weight, posture, SvgNumbers.scalar(style.getValue("font-size")))
-                val anchor = when (style.getValue("text-anchor")) {
-                    "start" -> 0.0; "middle" -> .5; "end" -> 1.0
-                    else -> throw SvgException("Invalid text-anchor")
-                }
+                configureTextFont(text, style)
+                val anchor = textAnchor(style)
                 val lengthAdjust = element["lengthAdjust"] ?: "spacing"
                 require(lengthAdjust in setOf("spacing", "spacingAndGlyphs")) { "Invalid lengthAdjust" }
                 val adjusted = if (element["textLength"] != null) {
@@ -203,7 +191,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     val instance = if (target.name in setOf("svg", "symbol")) {
                         val attributes = target.attributes.toMutableMap()
                         listOf("width", "height").forEach { key -> element[key]?.let { attributes[key] = it } }
-                        SvgElement(target.name, attributes, target.children, target.text)
+                        SvgElement(target.name, attributes, target.children, target.text, target.content)
                     } else target
                     val group = Group()
                     update(element, viewport) {
@@ -283,7 +271,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
         node.transforms += SvgTransforms.parse(element["transform"])
         styleNode.opacity = if (clipping) 1.0 else SvgNumbers.fraction(style.getValue("opacity"))
-        if (node !is Group || element.name in setOf("image", "text")) node.isVisible = style.getValue("visibility") == "visible"
+        if (node !is Group || element.name in setOf("image", "text") && node !is SvgTextLayout) node.isVisible = style.getValue("visibility") == "visible"
         if (styleNode is Shape) {
             if (clipping) {
                 styleNode.fill = Color.BLACK
@@ -296,6 +284,147 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val result = if (!clipping && style.getValue("filter") != "none") applyFilter(node, style.getValue("filter"), viewport, element) else node
         if (style.getValue("clip-path") != "none") applyClip(result, style.getValue("clip-path"), viewport, element)
         return if (!clipping && style.getValue("mask") != "none") applyMask(result, style.getValue("mask"), viewport, element) else result
+    }
+
+    private fun renderTextSpans(
+        element: SvgElement, ancestors: List<SvgElement>, style: Map<String, String>, viewport: SvgViewport
+    ): SvgTextLayout {
+        val layout = SvgTextLayout(document.lengths, viewport)
+        // Register flow before paint/filter updates, so CSS and resize use the new text geometry.
+        update(element) { layout.position() }
+        data class Piece(
+            val value: String, val preserve: Boolean, val owner: SvgElement,
+            val style: Map<String, String>, val scopes: List<SvgTextLayout.Scope>, var text: Text? = null
+        )
+        val pieces = mutableListOf<Piece>()
+        val childPlans = linkedMapOf<Group, MutableList<() -> Node?>>()
+        fun build(
+            owner: SvgElement, lineage: List<SvgElement>, computed: Map<String, String>, group: Group,
+            parents: List<SvgTextLayout.Scope>, preserveParent: Boolean
+        ) {
+            require(lineage.size < document.options.maxDepth) { "SVG text depth limit exceeded" }
+            val children = mutableListOf<() -> Node?>()
+            childPlans[group] = children
+            for (attribute in listOf("rotate", "dominant-baseline", "writing-mode", "textLength", "lengthAdjust")) {
+                if (owner[attribute] != null) report("Unsupported attribute with tspan: $attribute", owner)
+            }
+            if (owner.name == "tspan") {
+                if (owner["transform"] != null) report("Unsupported tspan attribute: transform", owner)
+                for (property in listOf("filter", "mask", "clip-path")) {
+                    if (computed.getValue(property) != "none") report("Unsupported tspan property: $property", owner)
+                }
+                if (!clipping) {
+                    group.id = owner.id
+                    group.styleClass += "svg-tspan"
+                    owner["class"]?.split(Regex("\\s+"))?.filter { it.isNotBlank() }?.let { group.styleClass.addAll(it) }
+                }
+                group.opacity = if (clipping) 1.0 else SvgNumbers.fraction(computed.getValue("opacity"))
+            }
+            val coordinates = linkedMapOf<String, String>()
+            for (name in listOf("x", "y", "dx", "dy")) {
+                owner[name]?.let { value ->
+                    try {
+                        document.lengths.resolve(value, 1.0)
+                        coordinates[name] = value
+                    } catch (failure: IllegalArgumentException) {
+                        report("Unsupported or invalid text $name (single length required): $value", owner)
+                    }
+                }
+            }
+            val scopes = parents + SvgTextLayout.Scope(coordinates)
+            val preserve = when (owner["xml:space"]) {
+                "preserve" -> true
+                "default" -> false
+                else -> preserveParent
+            }
+            for (part in owner.content) {
+                when (part) {
+                    is SvgContent.Characters -> {
+                        val piece = Piece(part.value, preserve, owner, computed, scopes)
+                        pieces += piece
+                        children += { piece.text }
+                    }
+                    is SvgContent.Child -> {
+                        val child = part.element
+                        if (child.name == "tspan") {
+                            require(++renderedElements <= document.options.maxElements) { "SVG expanded element limit exceeded" }
+                            val childStyle = styles.compute(child, lineage + owner, computed)
+                            if (childStyle.getValue("display") != "none") {
+                                val childGroup = Group()
+                                children += { childGroup }
+                                build(child, lineage + owner, childStyle, childGroup, scopes, preserve)
+                            }
+                        } else if (child.name !in setOf("title", "desc", "metadata")) {
+                            report("Unsupported text child: ${child.name}", child)
+                        }
+                    }
+                }
+            }
+        }
+        val preserve = ancestors.asReversed().firstNotNullOfOrNull { it["xml:space"] } == "preserve"
+        build(element, ancestors, style, layout, emptyList(), preserve)
+        val values = SvgTextLayout.normalize(pieces.map { it.value to it.preserve })
+        val wholeText = values.joinToString("")
+        if (java.text.Bidi.requiresBidi(wholeText.toCharArray(), 0, wholeText.length)) {
+            report("Bidirectional layout across tspan fragments is unsupported", element)
+        } else if (wholeText.codePoints().anyMatch { Character.UnicodeScript.of(it) !in SIMPLE_TEXT_SCRIPTS }) {
+            report("Contextual shaping across tspan fragments is unsupported", element)
+        }
+        val runCount = values.count { it.isNotEmpty() }
+        require(runCount <= document.options.maxElements - renderedElements) { "SVG expanded text node limit exceeded" }
+        renderedElements += runCount
+        pieces.forEachIndexed { index, piece ->
+            if (values[index].isNotEmpty()) {
+                val text = Text(values[index])
+                piece.text = text
+                configureTextFont(text, piece.style)
+                text.isVisible = piece.style.getValue("visibility") == "visible"
+                if (!clipping) text.styleClass.addAll("svg-text-run", "svg-shape")
+                layout.runs += SvgTextLayout.Run(text, piece.scopes, textAnchor(piece.style))
+                text.fontProperty().addListener { _, _, _ ->
+                    layout.requestLayout()
+                    if (themeReady) root.parent?.requestLayout()
+                }
+            }
+        }
+        childPlans.forEach { (group, children) -> group.children.setAll(children.mapNotNull { it() }) }
+        layout.position()
+        pieces.forEach { piece ->
+            piece.text?.let { text ->
+                if (clipping) {
+                    text.fill = Color.BLACK
+                    text.stroke = null
+                } else applyShapeStyle(text, piece.style, viewport, piece.owner, layout, dynamicGeometry = true)
+            }
+        }
+        return layout
+    }
+
+    private fun configureTextFont(text: Text, style: Map<String, String>) {
+        val weight = when (val value = style.getValue("font-weight")) {
+            "normal" -> FontWeight.NORMAL
+            "bold" -> FontWeight.BOLD
+            else -> FontWeight.findByWeight(value.toIntOrNull() ?: throw SvgException("Unsupported font-weight: $value"))
+        }
+        val posture = when (style.getValue("font-style")) {
+            "normal" -> FontPosture.REGULAR
+            "italic", "oblique" -> FontPosture.ITALIC
+            else -> throw SvgException("Unsupported font-style")
+        }
+        val family = style.getValue("font-family").substringBefore(',').trim().trim('\'', '"')
+        text.font = Font.font(family, weight, posture, SvgNumbers.scalar(style.getValue("font-size")))
+    }
+
+    private fun textAnchor(style: Map<String, String>): Double = when (style.getValue("text-anchor")) {
+        "start" -> 0.0; "middle" -> .5; "end" -> 1.0
+        else -> throw SvgException("Invalid text-anchor")
+    }
+
+    private companion object {
+        val SIMPLE_TEXT_SCRIPTS = setOf(Character.UnicodeScript.LATIN, Character.UnicodeScript.GREEK,
+            Character.UnicodeScript.CYRILLIC, Character.UnicodeScript.HAN, Character.UnicodeScript.HIRAGANA,
+            Character.UnicodeScript.KATAKANA, Character.UnicodeScript.HANGUL, Character.UnicodeScript.COMMON,
+            Character.UnicodeScript.INHERITED)
     }
 
     private fun applyMask(node: Node, value: String, viewport: SvgViewport, owner: SvgElement): Node {
@@ -413,9 +542,12 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
     }
 
-    private fun applyShapeStyle(shape: Shape, style: Map<String, String>, viewport: SvgViewport, element: SvgElement, geometry: Node = shape) {
+    private fun applyShapeStyle(
+        shape: Shape, style: Map<String, String>, viewport: SvgViewport, element: SvgElement,
+        geometry: Node = shape, dynamicGeometry: Boolean = false
+    ) {
         val entry = if (masking) null else shapeStyles.register(shape)
-        update(element, viewport) {
+        update(element, if (dynamicGeometry) null else viewport) {
             val fill = paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport)
             val stroke = paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport)
             val width = document.lengths.resolve(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) }

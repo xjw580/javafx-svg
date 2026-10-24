@@ -296,7 +296,7 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
 | 遮罩 | alpha/luminance（默认）；区域、两种坐标单位、嵌套遮罩、CSS 与引用 |
 | 滤镜 | 单个 feGaussianBlur；独立 X/Y 标准差、SourceGraphic/SourceAlpha、filterUnits/primitiveUnits、输入区域及输出子区域裁剪 |
-| 文本 | 单段 text、x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space、textLength/lengthAdjust；字号支持 em 和相对父字号的百分比 |
+| 文本 | text/嵌套 tspan、单值 x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space；单段文字支持 textLength/lengthAdjust；字号支持 em 和相对父字号的百分比 |
 | 图片 | image 中的 base64 PNG/JPEG，preserveAspectRatio，视口裁剪 |
 
 ### 遮罩
@@ -324,6 +324,30 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
 
 语义依据 [SVG Masking](https://www.w3.org/TR/css-masking-1/#MaskElement) 与 [luminanceToAlpha](https://www.w3.org/TR/filter-effects-1/#element-attrdef-fecolormatrix-type)。
 
+含 `tspan` 的 `text` 按原始顺序渲染文字与嵌套片段，支持继承字体、填充、描边、透明度，以及单值 `x/y/dx/dy`。没有绝对坐标的片段接续当前文字位置，新的 `x` 或 `y` 开始独立锚定的文字块，可配合 `dy` 手动换行。`xml:space` 跨片段处理；渐变按整段文字的几何边界计算。
+
+```xml
+<text x="20" y="30" font-size="20" fill="#334155">
+    Hello <tspan id="accent" fill="#2563eb" font-weight="bold">SVG</tspan>
+    <tspan x="20" dy="26">第二行</tspan>
+</text>
+```
+
+含片段的文字使用 Group 保留层级：根节点为 `.svg-text`，片段为 `.svg-tspan`，实际原生 Text 为 `.svg-text-run.svg-shape`。源 id/class 保留在对应容器上；应用 CSS 用后代选择器设置文字外观：
+
+```css
+#accent .svg-text-run {
+    -fx-fill: #ef4444;
+    -fx-stroke: #7f1d1d;
+    -fx-stroke-width: 0.5;
+    -fx-font-size: 24px;
+}
+```
+
+修改字体后会重新计算后续位置和整块锚点，根 `-svg-*` 主题也作用于文字片段。单段、无 `tspan` 的文字仍直接使用原有 Text 样式节点。
+
+当前片段排版支持单行水平的拉丁、汉字等非上下文文字；可用绝对坐标和偏移组织多行。暂不支持 `tspan` 与 `textLength/lengthAdjust` 组合、逐字位置列表、旋转、双向或跨片段连写排版，以及片段自身的 transform/filter/mask/clip-path；整段 text 仍支持变换、滤镜、遮罩和裁剪。上述已检测到的不支持内容在严格模式抛出异常，宽松模式报告诊断并保留自然文字排版。规则参考 [SVG 文本](https://www.w3.org/TR/SVG11/text.html)。
+
 `textLength` 支持数值、长度单位和百分比，默认 `lengthAdjust="spacing"` 只调整字素簇间距，`spacingAndGlyphs` 同时缩放字形的横向尺寸。支持文本锚点、视口尺寸更新及应用 CSS 修改字体、填充和描边。单个字素簇在 spacing 模式下保持自然宽度。带 textLength 的文字由多个关联 Text 节点绘制，源 id/class 和 `.svg-text` 仍用于样式控制。
 
 spacing 模式当前支持单行水平的拉丁、汉字等非上下文文字；双向文字、复杂连写和强制换行会报告诊断，宽松模式回退到自然排版。spacingAndGlyphs 保留整段文字的 JavaFX 原生字形处理。文字展开节点计入 `maxElements` 限制。
@@ -339,7 +363,7 @@ Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，
 - 不执行脚本、事件处理器、SMIL/CSS 动画，不渲染 foreignObject。
 - 不支持完整 filter 管线、pattern、marker、non-scaling-stroke、radialGradient 的 gradientTransform 和非零 fr。
 - SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量、at-rule、外部样式表；应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
-- 不支持 tspan、textPath、逐字位置列表、复杂排版或嵌入字体；文本外观依赖系统字体。
+- 不支持 textPath、逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
 - 不自动加载 image/use/gradient/clipPath 中的外部文件或网络引用；load(URL) 仅打开调用方明确提供的顶层地址。
 - 未实现的属性不构成完整的规范校验。严格模式用于拒绝已检测到的错误或不支持内容，不是 SVG 全规范验证器。
 

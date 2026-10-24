@@ -32,7 +32,7 @@ class SvgContentTest {
     }
 
     @Test fun reportsUnsupportedTextLayout() = FxTest.run {
-        val view = SvgView.parse("""<svg><text>hello<tspan>world</tspan></text></svg>""")
-        assertTrue(view.diagnostics.any { it.message.contains("tspan") })
+        val view = SvgView.parse("""<svg><text>hello<textPath>world</textPath></text></svg>""")
+        assertTrue(view.diagnostics.any { it.message.contains("textPath") })
     }
 }

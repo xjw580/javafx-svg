@@ -19,7 +19,7 @@ mvn -Pdemo test-compile exec:java
 | Shapes & strokes | 基本图形、曲线、端点、连接、虚线 |
 | Linear & radial | 线性、径向、reflect 渐变 |
 | Geometric clipping | 圆形裁剪和 even-odd 镂空 |
-| Text & textLength | 原生文本、间距调整、横向字形缩放 |
+| Text, tspan & length | 嵌套文字片段、颜色/斜体、基线偏移、间距调整、横向字形缩放 |
 | Reusable symbols | use/symbol、currentColor、组合变换 |
 | Alpha & luminance | 同一组黑灰白颜色在两种遮罩中的差别 |
 | Gaussian blur | 原始图形与 sRGB 高斯模糊 |

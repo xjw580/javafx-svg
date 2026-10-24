@@ -39,8 +39,8 @@ internal object SvgStrokeGeometry {
         else -> throw SvgException("Unsupported non-scaling-stroke shape: ${source.javaClass.simpleName}")
     }
 
-    fun centerline(source: Shape): List<PathElement> = when (source) {
-        is SVGPath -> path(source.content)
+    fun centerline(source: Shape, limit: Int = Int.MAX_VALUE): List<PathElement> = when (source) {
+        is SVGPath -> path(source.content, limit)
         is Line -> listOf(MoveTo(source.startX, source.startY), LineTo(source.endX, source.endY))
         is Circle -> ellipse(source.centerX, source.centerY, source.radius, source.radius)
         is Ellipse -> ellipse(source.centerX, source.centerY, source.radiusX, source.radiusY)
@@ -76,13 +76,14 @@ internal object SvgStrokeGeometry {
             ArcTo(rx, ry, 0.0, x + rx, y, false, true), ClosePath())
     }
 
-    internal fun path(data: String): List<PathElement> {
+    internal fun path(data: String, limit: Int = Int.MAX_VALUE): List<PathElement> {
         val result = mutableListOf<PathElement>()
         var x = 0.0; var y = 0.0
         var startX = 0.0; var startY = 0.0
         var controlX = 0.0; var controlY = 0.0
         var previous = ' '
         SvgPathData.forEach(data) { command, a ->
+            require(result.size < limit) { "SVG marker vertex limit exceeded" }
             val c = command.uppercaseChar()
             val ox = if (command.isLowerCase()) x else 0.0
             val oy = if (command.isLowerCase()) y else 0.0

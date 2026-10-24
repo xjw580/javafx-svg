@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 160">
+<defs><path id="arc" d="M26 108Q160 -20 294 108"/><path id="wave" d="M20 137C100 90 220 165 300 118"/></defs>
+<use href="#arc" fill="none" stroke="#cbd5e1" stroke-width="1"/>
+<text font-size="22" fill="#2563eb" font-weight="bold"><textPath href="#arc" startOffset="50%" text-anchor="middle">NATIVE SVG TEXT</textPath></text>
+<use href="#wave" fill="none" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3 3"/>
+<text font-size="14" fill="#059669"><textPath href="#wave" startOffset="12%">Along the curve / CSS ready</textPath></text></svg>

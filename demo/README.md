@@ -20,6 +20,10 @@ mvn -Pdemo test-compile exec:java
 
 | 分类 | 示例 | 可观察内容 |
 | --- | --- | --- |
+| 动画 | 沿曲线运动 | mpath、切线旋转、匀速与 spline，支持暂停/定位 |
+| 颜色与效果 | 图案填充与变换 | 圆点平铺、旋转条纹、viewBox 棋盘 |
+| 颜色与效果 | 柔和与偏移投影 | 模糊阴影、零模糊偏移、颜色和透明度 |
+| 文本与布局 | 沿路径排版 | 弧线/波浪字形、startOffset 与居中锚定 |
 | 动画 | 加载与等待 | 圆弧旋转、错峰透明度、轨道运动与负 begin |
 | 动画 | 呼吸与颜色过渡 | 缩放、透明度、颜色、线宽与 spline 缓动 |
 | 动画 | 路径描边与进度 | 曲线绘制、环形进度、成功勾选及 keyTimes |
@@ -54,12 +58,12 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--smoke"
 
 不显示窗口，也不访问网络。生成：
 
-- `target/demo-preview.png`：蓝色、100%、1440px 宽屏，加载动画与源码并列。
+- `target/demo-preview.png`：蓝色、100%、1440px 宽屏，沿路径运动动画与源码并列。
 - `target/demo-preview-themed.png`：绿色、120%，源图与路径 CSS 对比。
 - `target/demo-preview-compact.png`：紫色、80%、960px 布局，深色背景与下方源码。
 - `target/demo-preview-geometry.png`：圆点跳动、脉冲圆环与椭圆几何动画。
 - `target/demo-preview-css.png`：纯 CSS 关键帧动画与其实际源文件。
-- `target/demo-cases/*.png`：全部 23 个示例的预览画布。
+- `target/demo-cases/*.png`：全部 27 个示例的预览画布。
 
 检查覆盖全部素材的零诊断、独立节点、共享文档、动画帧变化、主题与路径 CSS、源码页、横向边界、滚动和本地资源清空/恢复。需要 JavaFX 图形环境，Linux 无显示器环境可使用 xvfb-run。PNG 导出使用 Java2D，仅存在于测试示例中。
 

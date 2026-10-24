@@ -38,6 +38,11 @@ import kotlin.math.min
 class SvgDemo : Application() {
     private data class Sample(val key: String, val title: String, val group: String, val file: String, val tag: String, val description: String, val tip: String)
     private val samples = listOf(
+        Sample("path-motion", "沿曲线运动", "动画", "showcase-path-motion.svg", "ANIMATE MOTION", "箭头沿曲线匀速运动并自动朝向切线，圆点展示路径缓动。", "默认自动播放；暂停、定位与重复共用现有时间轴。"),
+        Sample("patterns", "图案填充与变换", "颜色与效果", "showcase-pattern.svg", "PATTERN", "重复圆点、旋转条纹与 viewBox 棋盘，展示三种图案坐标配置。", "图案保留透明区域；稳定布局复用图像，CSS 变化后刷新。"),
+        Sample("shadows", "柔和与偏移投影", "颜色与效果", "showcase-shadow.svg", "DROP SHADOW", "柔和蓝色阴影与零模糊偏移阴影，保留原图填充和圆角。", "SVG 的 flood-color 与 flood-opacity 分别控制阴影颜色和透明度。"),
+        Sample("path-text", "沿路径排版", "文本与布局", "showcase-text-path.svg", "TEXT PATH", "原生字形沿弧线和波浪排版，按切线旋转，支持居中锚定。", "调整缩放和主题；源文件中的 startOffset 控制文字沿路径的位置。"),
+
         Sample("spinner", "加载与等待", "动画", "showcase-animation-spinner.svg", "ROTATE · OPACITY", "旋转圆弧、错峰闪烁和轨道运动。拖动时间轴观察同一文档时间的不同动画。", "负 begin 形成相位差；无限循环在视图隐藏时自动暂停。"),
         Sample("breathe", "呼吸与颜色过渡", "动画", "showcase-animation-breathe.svg", "COLOR · SPLINE", "缩放和透明度组合成呼吸效果，纯色与描边属性独立插值。", "开启统一换色可观察主题覆盖；关闭后恢复当前动画颜色。"),
         Sample("draw", "路径描边与进度", "动画", "showcase-animation-draw.svg", "STROKE DASH", "曲线逐步绘制、环形进度和成功勾选。使用原生描边虚线偏移实现。", "暂停后拖动时间轴，比较起笔、绘制完成和回退阶段。"),

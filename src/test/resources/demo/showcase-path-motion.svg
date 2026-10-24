@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 160">
+<defs><path id="orbit" d="M24 90C72 8 188 8 238 90S288 142 296 70"/></defs>
+<use href="#orbit" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="5 5"/>
+<path id="traveler" d="M-11 -7L12 0L-11 7L-5 0Z" fill="#2563eb">
+<animateMotion dur="4s" repeatCount="indefinite" rotate="auto"><mpath href="#orbit"/></animateMotion></path>
+<circle r="4" fill="#059669"><animateMotion path="M28 132H280" dur="3s" calcMode="spline" keyTimes="0;1" keySplines=".42 0 .58 1" repeatCount="indefinite"/></circle>
+<text x="24" y="153" font-size="10" fill="#64748b">MPATH / AUTO ROTATE / SPLINE</text></svg>

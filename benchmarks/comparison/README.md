@@ -38,7 +38,7 @@ results.csv 包含 pulse 分位数、CPU、分配、GC、窗口状态。pulse �
 
 汇总 CSV 位于输出目录根部；每个子目录保留原始 CSV、逐 pulse 明细、SVG、PNG、JFR 和 environment.txt。只有录制保存后才写 completed.txt；提前关闭写 aborted.txt，异常写 failure.txt。完成标记表示场景全部处理，不表示所有特性通过。复现时检查逐场景结果，并保持相同 JDK、JavaFX、硬件、屏幕缩放和窗口状态。
 
-测量报告见 [跨库对照](../library-comparison-2026-10-24.md)。
+测量报告见 [当前版本跨库对照](../library-current-2026-10-24.md)，历史记录见 [旧报告](../library-comparison-2026-10-24.md)。
 
 
 NativeRenderCache 可选 default/on/off。default 保留目标 JAR 的内部缓存默认策略；off 可用于纯向量对照，兼容没有该 API 的历史 JAR；on 要求 JAR 提供该开关。environment.txt 分别记录应用 Node.cache 和内部渲染缓存策略。开始每个场景时请求窗口焦点，但操作系统可能拒绝，仍须检查 unfocused_samples。历史对照报告中“缓存关闭”指当时 JAR 的实现，不与新增内部缓存混淆。

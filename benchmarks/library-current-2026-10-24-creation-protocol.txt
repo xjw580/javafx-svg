@@ -1,0 +1,12 @@
+Framework=JMH 1.37
+smoke=False; external repeats=3; each run JMH forks=1; threads=1
+warmup=15 x 1s; measurement=5 x 1s; batch=500
+Every kind/phase/version/repeat uses a fresh child JVM; fixed 512 MiB heap; no concurrent runs.
+Provider/version order rotates; cases are deterministically shuffled with seed 20261024; actual order is in plan.csv.
+JMH primary score includes FX dispatch, task bookkeeping and retained batch creation.
+Raw FX counters exclude dispatch, row bookkeeping and Invocation teardown.
+No Stage, autoplay, CSS/layout, paint, snapshot or JFR; not a cold-start/first-paint benchmark.
+cross-library=True; providers=native,fxsvgimage,jsvg-fx,jsvg-awt
+JSVG defers skin/Canvas drawing; native trees prepare more before layout; creation is not complete SVG rendering cost.
+buildShared reuses a pre-parsed document; totalMounted parses independent documents and includes Scene/host creation.
+All warmup and measurement rows, JMH JSON, stdout, sources and hashes are retained.

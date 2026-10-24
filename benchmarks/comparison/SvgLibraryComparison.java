@@ -227,7 +227,7 @@ public final class SvgLibraryComparison extends Application {
         if (!smil) for (Rotate rotation : rotations) rotation.setAngle(elapsed * 240);
         if (phase == null) {
             if (elapsed < warmup * .5) return;
-            if (first == null) { first = snapshot((Pane) grid.getChildren().getFirst(), 24); return; }
+            if (first == null) { stage.toFront(); stage.requestFocus(); first = snapshot((Pane) grid.getChildren().getFirst(), 24); return; }
             if (elapsed < warmup) return;
             var next = snapshot((Pane) grid.getChildren().getFirst(), 24);
             boolean changed = differences(first, next) > 5;

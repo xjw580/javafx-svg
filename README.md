@@ -514,7 +514,7 @@ Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，
 - 不执行脚本和事件处理器，不渲染 foreignObject；声明式动画的支持范围见上文。
 - 不支持完整 filter 管线、pattern、radialGradient 的 gradientTransform 和非零 fr；vector-effect 目前只支持 none/non-scaling-stroke。
 - SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量、除 @keyframes 外的 at-rule、外部样式表；应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
-- 不支持 textPath、逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
+- 不支持逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
 - 不自动加载 image/use/gradient/clipPath 中的外部文件或网络引用；load(URL) 仅打开调用方明确提供的顶层地址。
 - 未实现的属性不构成完整的规范校验。严格模式用于拒绝已检测到的错误或不支持内容，不是 SVG 全规范验证器。
 
@@ -545,3 +545,6 @@ feDropShadow 支持 dx/dy、一个或两个 stdDeviation、flood-color/currentCo
 
 
 animateMotion 支持 path、优先的本地 mpath、values/from-to 坐标、默认 paced 弧长匀速，以及 linear/discrete/spline、keyPoints/keyTimes、rotate 数值/auto/auto-reverse、additive replace/sum。共用自动播放、延迟、重复、freeze 和 seek 控制；运动变换追加在基础及 animateTransform 之后。路径测量按文档复用，曲线有界细分；测量线段总数受 maxElements 限制，不共享节点或时钟。暂不支持百分比运动坐标、by、累积、变换后的 mpath；检测到时报告诊断。
+
+
+textPath 支持本地 href/xlink:href 路径引用、startOffset 长度/百分比、pathLength 校准、text-anchor、引用路径自身 transform、父 text 的 x/dx/dy，以及字体/绘制属性继承和 JavaFX CSS。沿路径放置原生 Text 字素簇并按切线旋转，曲线测量复用文档缓存；可组合整段变换、裁剪、遮罩、滤镜及固定描边。当前要求 text 内只有一个 textPath 文字段；不支持混合 tspan、method=stretch、textLength、复杂连写和双向排版。spacing=auto/exact 使用原生字形度量，不额外执行排版优化。规则参考 [SVG textPath](https://www.w3.org/TR/SVG11/text.html#TextPathElement)。

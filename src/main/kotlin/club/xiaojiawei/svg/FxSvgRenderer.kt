@@ -159,7 +159,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop", "filter")) return null
         if (element.name == "symbol" && !referenced) return null
         if (element.name in setOf("clipPath", "mask", "marker") && !referenced) return null
-        if (element.name == "text") hasTextLayout = true
+        if (element.name in setOf("text", "textPath")) hasTextLayout = true
         val computed = computedStyle(element, ancestors, parentStyle, viewport)
         val style = when (element.name) {
             "mask" -> computed + mapOf("display" to "inline", "opacity" to "1", "filter" to "none")
@@ -183,7 +183,17 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
         fun positive(value: Double): Double = value.also { require(it >= 0) { "Negative SVG size" } }
         val node: Node = when (element.name) {
-            "text" -> if (element.children.any { it.name == "tspan" }) {
+            "text", "textPath" -> if (element.children.any { it.name == "textPath" }) {
+                val paths = element.children.filter { it.name == "textPath" }
+                require(paths.size == 1 && element.children.all { it.name in setOf("textPath", "title", "desc", "metadata") + SvgAnimation.NAMES }
+                    && element.content.filterIsInstance<SvgContent.Characters>().all { it.value.isBlank() }) {
+                    "textPath currently requires one path run without mixed text/tspan"
+                }
+                require(element["textLength"] == null) { "textLength with textPath is unsupported" }
+                Group().apply {
+                    render(paths.single(), ancestors + element, style, viewport)?.let { children += it }
+                }
+            } else if (element.children.any { it.name == "tspan" }) {
                 renderTextSpans(element, ancestors, style, viewport, geometry)
             } else {
                 val text = Text()
@@ -197,10 +207,21 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 val anchor = textAnchor(style)
                 val lengthAdjust = element["lengthAdjust"] ?: "spacing"
                 require(lengthAdjust in setOf("spacing", "spacingAndGlyphs")) { "Invalid lengthAdjust" }
-                val adjusted = if (element["textLength"] != null) {
+                val path = if (element.name == "textPath") {
+                    require(element["method"] in setOf(null, "align")) { "textPath method=stretch is unsupported" }
+                    require(element["spacing"] in setOf(null, "auto", "exact")) { "Invalid textPath spacing" }
+                    require(element.children.all { it.name in setOf("title", "desc", "metadata") }) { "Nested textPath runs are unsupported" }
+                    val href = element["href"] ?: element["xlink:href"] ?: throw SvgException("Missing textPath href")
+                    require(href.startsWith('#') && href.length > 1) { "Only local textPath references are supported" }
+                    val target = document.elementsById[href.drop(1)] ?: throw SvgException("Missing textPath path")
+                    require(target.name == "path") { "textPath must reference a path" }
+                    require(element["textLength"] == null) { "textLength with textPath is unsupported" }
+                    document.geometry.measure(target["d"] ?: "", target["transform"])
+                } else null
+                val adjusted = if (element["textLength"] != null || path != null) {
                     try {
                         SvgAdjustedText(text, lengthAdjust == "spacingAndGlyphs", anchor,
-                            document.options.maxElements - renderedElements).also { renderedElements += it.glyphCount }
+                            document.options.maxElements - renderedElements, path).also { renderedElements += it.glyphCount }
                     } catch (e: IllegalArgumentException) {
                         report(e.message ?: "Unsupported textLength layout", element)
                         null
@@ -209,7 +230,17 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 update(element, phase = geometryUpdates) {
                     val x = length("x", viewport.width) + length("dx", viewport.width)
                     val y = length("y", viewport.height) + length("dy", viewport.height)
-                    if (adjusted != null) adjusted.position(x, y, length("textLength", viewport.width))
+                    if (path != null && adjusted != null) {
+                        val reference = document.elementsById[(element["href"] ?: element["xlink:href"])!!.drop(1)]!!
+                        val declared = reference["pathLength"]?.let { SvgNumbers.scalar(it).also { n -> require(n > 0) { "Invalid pathLength" } } }
+                        val calibration = if (declared == null) 1.0 else path.length / declared
+                        val offset = element["startOffset"] ?: "0"
+                        val start = document.lengths.resolve(offset, path.length) * if (offset.trim().endsWith('%')) 1.0 else calibration
+                        val parent = ancestors.lastOrNull { it.name == "text" }
+                        val along = listOf("x","dx").sumOf { document.lengths.resolve(parent?.get(it) ?: "0", viewport.width) }
+                        val normal = document.lengths.resolve(parent?.get("dy") ?: "0", viewport.height)
+                        adjusted.positionPath(start + along + x, normal + length("dy",viewport.height))
+                    } else if (adjusted != null) adjusted.position(x, y, length("textLength", viewport.width))
                     else {
                         setGeometry(text.xProperty(), x - anchor * text.layoutBounds.width)
                         setGeometry(text.yProperty(), y)
@@ -337,7 +368,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         else if (style is SvgAnimatedStyle && "opacity" in style.affected) update(element) {
             setSvgBaseStyle(styleNode.opacityProperty(), svgStyleNumber(style, "opacity", 1.0, document.lengths).coerceIn(0.0, 1.0))
         } else styleNode.opacity = SvgNumbers.fraction(style.getValue("opacity"))
-        if (node !is Group || element.name in setOf("image", "text") && node !is SvgTextLayout) node.isVisible = style.getValue("visibility") == "visible"
+        if (node !is Group || element.name in setOf("image", "text", "textPath") && node !is SvgTextLayout) node.isVisible = style.getValue("visibility") == "visible"
         if (styleNode is Shape) {
             if (clipping) {
                 styleNode.fill = Color.BLACK

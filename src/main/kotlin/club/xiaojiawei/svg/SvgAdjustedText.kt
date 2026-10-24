@@ -16,7 +16,8 @@ internal class SvgAdjustedText(
     val styleText: Text,
     private val adjustGlyphs: Boolean,
     private val anchor: Double,
-    maxGlyphs: Int
+    maxGlyphs: Int,
+    private val path: SvgPathMeasure? = null
 ) : Group() {
     private val starts = mutableListOf<Int>()
     private val runs = mutableListOf<Text>()
@@ -88,9 +89,24 @@ internal class SvgAdjustedText(
         positionRuns()
     }
 
+    fun positionPath(offset: Double, normal: Double) {
+        x = offset; y = normal; ready = true; positionRuns()
+    }
+
     private fun positionRuns() {
         val natural = styleText.layoutBounds.width
-        if (adjustGlyphs) {
+        if (path != null) {
+            runs.forEachIndexed { index, run ->
+                val caret = styleText.caretShape(starts[index], true).filterIsInstance<MoveTo>().firstOrNull()?.x ?: 0.0
+                val half = run.layoutBounds.width / 2
+                val distance = x - anchor * natural + caret + half
+                run.isVisible = distance >= 0 && distance <= path.length
+                val point = path.at(distance)
+                run.x = -half
+                run.y = y
+                run.transforms.setAll(Affine().apply { appendTranslation(point.x, point.y); appendRotation(point.angle) })
+            }
+        } else if (adjustGlyphs) {
             val scale = if (natural > 0) targetLength / natural else 1.0
             content.transforms.setAll(Affine(scale, 0.0, x - anchor * targetLength, 0.0, 1.0, y))
         } else {
@@ -111,7 +127,7 @@ internal class SvgAdjustedText(
 
     /** Excludes the invisible style target and excludes stroke/effects. */
     fun geometryBounds(): Bounds {
-        val bounds = runs.map { content.localToParentTransform.transform(it.layoutBounds) }
+        val bounds = runs.filter { it.isVisible }.map { content.localToParentTransform.transform(it.localToParentTransform.transform(it.layoutBounds)) }
         if (bounds.isEmpty()) return BoundingBox(x, y, 0.0, 0.0)
         val minX = bounds.minOf { it.minX }
         val minY = bounds.minOf { it.minY }

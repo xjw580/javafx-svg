@@ -233,4 +233,52 @@ class SvgRenderCacheTest {
         move.x = 10.0
         assertTrue(caches(translated).isNotEmpty())
     }
+
+    @Test fun sharedBranchReparentingKeepsCommonAncestorsAndDropsDepartedAncestors() = FxTest.run {
+        val a = Group(javafx.scene.shape.Rectangle(50.0, 50.0))
+        val b = Group(javafx.scene.shape.Rectangle(50.0, 50.0))
+        val old = Group(a, b)
+        val next = Group()
+        val common = Group(old, next)
+        Scene(Group(common))
+        val cache = SvgRenderCache(common, listOf(a, b), 15_000)
+        repeat(12) {
+            old.children.remove(a); next.children.add(a)
+            common.scaleX = 3.0
+            assertFalse(a.isCache); assertFalse(b.isCache)
+            common.scaleX = 1.0
+            assertTrue(a.isCache); assertTrue(b.isCache)
+            old.scaleX = 3.0
+            assertTrue(a.isCache); assertFalse(b.isCache)
+            old.scaleX = 1.0
+            next.children.remove(a); old.children.add(a)
+        }
+        cache.enabled = false
+        common.scaleX = 3.0
+        assertFalse(a.isCache); assertFalse(b.isCache)
+        cache.enabled = true
+        assertFalse(a.isCache); assertFalse(b.isCache)
+        common.scaleX = 1.0
+        assertTrue(a.isCache); assertTrue(b.isCache)
+    }
+
+    @Test fun sceneRootReplacementAndAttachingToAnExistingSceneKeepScaleObservation() = FxTest.run {
+        val target = Group(javafx.scene.shape.Rectangle(50.0, 50.0))
+        val host = Group(target)
+        val scene = Scene(host)
+        SvgRenderCache(target, listOf(target), 10_000)
+        assertTrue(target.isCache)
+        val wrapper = Group()
+        scene.root = wrapper
+        wrapper.children += host
+        assertTrue(target.isCache)
+        wrapper.scaleX = 4.0
+        assertFalse(target.isCache)
+        wrapper.scaleX = 1.0
+        assertTrue(target.isCache)
+        scene.root = Group()
+        assertFalse(target.isCache)
+        scene.root = wrapper
+        assertTrue(target.isCache)
+    }
 }

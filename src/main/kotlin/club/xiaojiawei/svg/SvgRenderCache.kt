@@ -30,6 +30,8 @@ internal class SvgRenderCache(private val root: Node, private val nodes: List<No
     private var window: Window? = null
     private var scene: Scene? = null
     private val observed = IdentityHashMap<Node, LocalScale>()
+    private val required = IdentityHashMap<Node, Boolean>()
+    private var observingBounds = false
     var enabled = true
         set(value) {
             if (field == value) return
@@ -142,18 +144,33 @@ internal class SvgRenderCache(private val root: Node, private val nodes: List<No
     }
 
     private fun observeHierarchy() {
-        for (state in observed.values) state.dispose()
-        observed.clear()
-        for (node in nodes) node.boundsInLocalProperty().removeListener(boundsChanged)
-        if (!enabled || limit == 0) return
-        for (node in nodes) {
-            node.boundsInLocalProperty().addListener(boundsChanged)
+        val listening = enabled && limit > 0
+        if (listening != observingBounds) {
+            for (node in nodes) {
+                if (listening) node.boundsInLocalProperty().addListener(boundsChanged)
+                else node.boundsInLocalProperty().removeListener(boundsChanged)
+            }
+            observingBounds = listening
+        }
+        required.clear()
+        if (listening) for (node in nodes) {
             var ancestor: Node? = node
-            while (ancestor != null && !observed.containsKey(ancestor)) {
-                observed[ancestor] = LocalScale(ancestor)
+            while (ancestor != null && required.put(ancestor, true) == null) {
                 ancestor = ancestor.parent
             }
         }
+        val previous = observed.entries.iterator()
+        while (previous.hasNext()) {
+            val entry = previous.next()
+            if (!required.containsKey(entry.key)) {
+                entry.value.dispose()
+                previous.remove()
+            }
+        }
+        for (node in required.keys) {
+            if (!observed.containsKey(node)) observed[node] = LocalScale(node)
+        }
+        required.clear()
     }
 
     private fun watch(next: Window?) {

@@ -6,6 +6,13 @@ import club.xiaojiawei.svg.SvgView;
 import com.sun.management.ThreadMXBean;
 import javafx.application.Platform;
 import javafx.scene.Scene;
+import javafx.scene.Node;
+import org.girod.javafx.svgimage.LoaderParameters;
+import org.girod.javafx.svgimage.SVGImage;
+import com.github.weisj.jsvg.ui.jfx.FXSVGCanvas;
+import com.github.weisj.jsvg.parser.LoaderContext;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import javafx.scene.layout.Pane;
 import javafx.scene.transform.Rotate;
 import org.openjdk.jmh.annotations.*;
@@ -34,6 +41,7 @@ public class SvgCreationBenchmark {
     public static class Input {
         @Param({"path", "gradient", "smil-transform"}) public String kind;
         @Param({"500"}) public int count;
+        @Param({"native"}) public String provider;
         String xml;
         SvgDocument shared;
         volatile Object[] retained;
@@ -47,14 +55,16 @@ public class SvgCreationBenchmark {
 
         @Setup(Level.Trial) public void trial(BenchmarkParams params) throws Exception {
             if (count < 1 || count > 500) throw new IllegalArgumentException("count must be 1..500");
+            if (!provider.equals("native") && !params.getBenchmark().endsWith(".totalMounted"))
+                throw new IllegalArgumentException("Cross-library creation compares totalMounted only");
             Platform.startup(() -> Platform.setImplicitExit(false));
             threads.setThreadCpuTimeEnabled(true);
             threads.setThreadAllocatedMemoryEnabled(true);
             if (!threads.isThreadAllocatedMemoryEnabled() || !threads.isThreadCpuTimeEnabled())
                 throw new IllegalStateException("FX counters unavailable");
             xml = source(kind);
-            shared = fx(() -> SvgLoader.parse(xml));
-            rows.add("phase,kind,count,measurement,iteration,invocation,fx_wall_ns,fx_cpu_ns,fx_alloc_bytes,gc_count,gc_ms");
+            if (provider.equals("native")) shared = fx(() -> SvgLoader.parse(xml));
+            rows.add("provider,phase,kind,count,measurement,iteration,invocation,fx_wall_ns,fx_cpu_ns,fx_alloc_bytes,gc_count,gc_ms");
         }
 
         @Setup(Level.Iteration) public void iteration(IterationParams params) {
@@ -78,13 +88,13 @@ public class SvgCreationBenchmark {
                     if (phase.equals("parse")) {
                         values[i] = SvgLoader.parse(xml);
                     } else {
-                        SvgView view = phase.equals("buildShared") ? new SvgView(shared) : SvgView.parse(xml);
-                        view.setAnimationAutoPlay(false);
-                        if (!view.getDiagnostics().isEmpty()) throw new IllegalStateException(view.getDiagnostics().toString());
+                        Node view = phase.equals("buildShared") ? new SvgView(shared) : createNode(provider, xml, 24);
+                        if (phase.equals("buildShared") && view instanceof SvgView nativeView) {
+                            nativeView.setAnimationAutoPlay(false);
+                            if (!nativeView.getDiagnostics().isEmpty()) throw new IllegalStateException(nativeView.getDiagnostics().toString());
+                        }
                         values[i] = view;
                         if (phase.equals("totalMounted")) {
-                            view.setManaged(false);
-                            view.resize(24, 24);
                             Pane host = new Pane(view);
                             host.setManaged(false);
                             host.resize(24, 24);
@@ -99,7 +109,7 @@ public class SvgCreationBenchmark {
                 long usedCpu = threads.getThreadCpuTime(id) - cpu;
                 long usedBytes = threads.getThreadAllocatedBytes(id) - allocated;
                 long collections = gcCount() - gc, collectionMillis = gcMillis() - gcMillis;
-                rows.add(String.join(",", phase, kind, ""+count, ""+measurement, ""+iteration,
+                rows.add(String.join(",", provider, phase, kind, ""+count, ""+measurement, ""+iteration,
                     ""+(++invocation), ""+wall, ""+usedCpu, ""+usedBytes, ""+collections, ""+collectionMillis));
                 return count;
             });
@@ -111,6 +121,10 @@ public class SvgCreationBenchmark {
                     if (retained.length != count) throw new IllegalStateException("Incomplete batch");
                     for (Object value : retained) {
                         if (value instanceof SvgView view) view.setDocument(null);
+                        else if (value instanceof SVGImage image) image.stopAnimations();
+                        else if (value instanceof FXSVGCanvas canvas) {
+                            canvas.stopAnimation(); canvas.setDocument(null); canvas.setSkin(null);
+                        }
                         else if (!(value instanceof SvgDocument)) throw new IllegalStateException("Missing document");
                     }
                 }
@@ -129,15 +143,16 @@ public class SvgCreationBenchmark {
             String name = phase + "-" + kind + "-" + ProcessHandle.current().pid();
             Files.write(dir.resolve(name + ".csv"), rows);
             Files.writeString(dir.resolve(name + ".txt"), String.join("\n",
-                "label="+System.getProperty("svg.create.label"),
+                "label="+System.getProperty("svg.create.label"), "provider="+provider,
                 "benchmark="+params.getBenchmark(), "kind="+kind, "count="+count,
                 "java="+System.getProperty("java.version"), "javafx="+System.getProperty("javafx.runtime.version"),
                 "args="+ManagementFactory.getRuntimeMXBean().getInputArguments(),
                 "threads=1; FX dispatch included in JMH score; FX counters exclude dispatch.",
                 "No Stage/window, no autoplay, no CSS/layout/first paint. Scene creation is INCLUDED in totalMounted.",
                 "buildShared reuses one pre-parsed document after warmup; parse/totalMounted parse fresh XML.",
+                "All providers use the same runtime/classpath and disabled autoplay. JSVG skin/Canvas drawing is deferred; creation is not full first-paint cost.",
                 "Invocation teardown clears views outside timed benchmark; FX allocation excludes teardown/row bookkeeping.",
-                "No forced GC; batch retained until teardown; JFR disabled in both versions.",
+                "No forced GC; batch retained until teardown; JFR disabled in all modes/versions.",
                 "Warmup AND measurement rows retained; not a cold-start benchmark.")+"\n");
             Files.writeString(dir.resolve(kind + ".svg"), xml);
             Platform.exit();
@@ -147,6 +162,39 @@ public class SvgCreationBenchmark {
     @Benchmark public long parse(Input input) throws Exception { return input.run("parse"); }
     @Benchmark public long buildShared(Input input) throws Exception { return input.run("buildShared"); }
     @Benchmark public long totalMounted(Input input) throws Exception { return input.run("totalMounted"); }
+
+    private static Node createNode(String provider, String xml, double size) throws Exception {
+        Node node;
+        switch (provider) {
+            case "native" -> {
+                SvgView view = SvgView.parse(xml);
+                view.setAnimationAutoPlay(false);
+                if (!view.getDiagnostics().isEmpty()) throw new IllegalStateException(view.getDiagnostics().toString());
+                node = view;
+            }
+            case "fxsvgimage" -> {
+                LoaderParameters parameters = LoaderParameters.createWidthParameters(size);
+                parameters.autoStartAnimations = false;
+                node = org.girod.javafx.svgimage.SVGLoader.load(xml, parameters);
+            }
+            case "jsvg-fx", "jsvg-awt" -> {
+                var document = new com.github.weisj.jsvg.parser.SVGLoader().load(
+                    new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)), null, LoaderContext.createDefault());
+                if (document == null) throw new IllegalStateException("JSVG returned no document");
+                FXSVGCanvas canvas = new FXSVGCanvas();
+                canvas.setRenderBackend(provider.equals("jsvg-fx") ? FXSVGCanvas.RenderBackend.JavaFX : FXSVGCanvas.RenderBackend.AWT);
+                canvas.setAnimated(false);
+                canvas.setDocument(document);
+                canvas.setStyle("-fx-padding:0");
+                node = canvas;
+            }
+            default -> throw new IllegalArgumentException("Unknown provider: "+provider);
+        }
+        if (node == null) throw new IllegalStateException("Missing view");
+        node.setManaged(false);
+        if (node.isResizable()) node.resize(size, size);
+        return node;
+    }
 
     private static <T> T fx(Callable<T> action) throws Exception {
         FutureTask<T> task = new FutureTask<>(action);

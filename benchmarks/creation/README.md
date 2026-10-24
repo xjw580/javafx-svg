@@ -48,3 +48,16 @@ Smoke 使用 10 实例、1 × 100ms 预热及测量、各一个新进程，只�
 ~~~
 
 分析器要求完成标记、每组合完整的三个独立进程及正式迭代；默认拒绝 Smoke。生成 forks.csv（每进程）、iterations.csv（包含预热）、summary.csv（进程中位数及完整范围）和 warnings.txt。漂移提示是审查入口，不自动剔除样本或证明已经/没有达到稳态；若存在明显持续趋势，需要延长预热再验证。
+
+## 跨库创建对照
+
+~~~powershell
+./benchmarks/creation/run.ps1 -Providers native,fxsvgimage,jsvg-fx,jsvg-awt -Output target/svg-creation/cross
+./benchmarks/creation/analyze.ps1 -InputDirectory target/svg-creation/cross
+~~~
+
+Providers 模式只测 totalMounted，取代 BeforeJar/AfterJar 的版本配对；native 使用 AfterJar，其余固定为 comparison/dependencies.json 的 fxsvgimage 1.7.3 与 JSVG 2.2.0。四个模式使用同一完整 classpath、JVM、XML、实例数、预热及测量参数，顺序按运行计划轮换。默认 36 个独立 child JVM，每库/场景三个重复。
+
+所有模式关闭自动播放，计时外释放文档、动画和控件。native 是原生节点树，fxsvgimage 返回 SVGImage，JSVG 返回 FXSVGCanvas；JSVG 的 skin/Canvas 创建与绘制仍会延后到 CSS/layout/首绘。因此本表是“解析、构建 API 返回对象并挂载”的比较，不能直接当作完整 SVG 显示速度。FX 线程分配不等于全部堆、原生内存或显存。实际渲染必须另用 comparison 工具验证图像变化与 pulse。
+
+跨库结果中的 label 表示 provider；原始 provider 字段、JMH 参数与哈希均保留。Smoke 只用于 API/计数/释放检查，不能据其分数比较性能。所有第三方依赖仅用于工具，不进入本库运行时。

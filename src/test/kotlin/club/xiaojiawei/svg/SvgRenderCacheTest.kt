@@ -104,4 +104,107 @@ class SvgRenderCacheTest {
         v.layout()
         assertTrue(v.diagnostics.isEmpty())
     }
+
+    @Test fun ancestorTransformsAndReparentingKeepPixelBudgetBounded() = FxTest.run {
+        val root = Group(javafx.scene.shape.Rectangle(100.0, 100.0))
+        val host = Group(root)
+        val outer = Group(host)
+        Scene(outer)
+        val cache = SvgRenderCache(root, listOf(root), 25_000)
+        assertTrue(root.isCache)
+        outer.scaleX = 2.0
+        assertFalse(root.isCache, "Ancestor scaling must disable an oversized cache")
+        outer.scaleX = 1.0
+        assertTrue(root.isCache)
+        val enlarged = Group().apply { scaleX = 2.0 }
+        outer.children += enlarged
+        host.children.clear()
+        enlarged.children += root
+        assertFalse(root.isCache, "Reparenting must observe the new ancestor chain")
+        enlarged.scaleX = 1.0
+        assertTrue(root.isCache)
+        // The old branch must no longer control the cache.
+        host.scaleX = 100.0
+        assertTrue(root.isCache)
+        cache.enabled = false
+        enlarged.scaleX = 2.0
+        cache.enabled = true
+        assertFalse(root.isCache, "Enabling must recalculate the current ancestry")
+    }
+
+    @Test fun shearRotationAndThreeDimensionalAncestorsRespectBudget() = FxTest.run {
+        val root = Group(javafx.scene.shape.Rectangle(100.0, 40.0))
+        val parent = Group(root)
+        Scene(parent)
+        SvgRenderCache(root, listOf(root), 15_000)
+        assertTrue(root.isCache)
+        parent.transforms += javafx.scene.transform.Shear(3.0, 0.0)
+        assertFalse(root.isCache)
+        parent.transforms.clear()
+        parent.rotate = 90.0
+        assertTrue(root.isCache)
+        parent.rotationAxis = javafx.scene.transform.Rotate.X_AXIS
+        parent.rotate = 45.0
+        assertFalse(root.isCache)
+        parent.rotate = 0.0
+        assertTrue(root.isCache)
+    }
+
+    @Test fun sharedAncestorsAndSeveralTargetsReleaseBudgetAfterGeometryChanges() = FxTest.run {
+        val first = Group(javafx.scene.shape.Rectangle(60.0, 60.0))
+        val rect = javafx.scene.shape.Rectangle(60.0, 60.0)
+        val second = Group(rect)
+        val root = Group(first, second)
+        Scene(Group(root))
+        SvgRenderCache(root, listOf(first, second), 12_000)
+        assertTrue(first.isCache)
+        assertFalse(second.isCache)
+        (first.children.single() as javafx.scene.shape.Rectangle).width = 10.0
+        assertTrue(second.isCache, "Freed cache budget must become available to later targets")
+        rect.width = 100.0
+        assertFalse(second.isCache)
+    }
+
+    @Test fun rotationsAndTranslationKeepCacheEligibilityStableButStretchInvalidates() = FxTest.run {
+        val rect = javafx.scene.shape.Rectangle(60.0, 60.0)
+        val root = Group(rect)
+        val parent = Group(root)
+        Scene(parent)
+        SvgRenderCache(root, listOf(root), 10_000)
+        val affine = javafx.scene.transform.Affine()
+        parent.transforms += affine
+        var changes = 0
+        root.cacheProperty().addListener { _, _, _ -> changes++ }
+        for (angle in 0..360) {
+            parent.rotate = angle.toDouble()
+            affine.setToTransform(javafx.scene.transform.Rotate(angle.toDouble()))
+            parent.translateX = angle.toDouble()
+            assertTrue(root.isCache)
+        }
+        assertEquals(0, changes)
+        val rotation = javafx.scene.transform.Rotate(30.0)
+        parent.transforms.setAll(rotation)
+        assertTrue(root.isCache)
+        rotation.axis = javafx.scene.transform.Rotate.X_AXIS
+        assertFalse(root.isCache)
+        rotation.axis = javafx.scene.transform.Rotate.Z_AXIS
+        assertTrue(root.isCache)
+        val stretch = javafx.scene.transform.Scale(1.0, 1.0)
+        parent.transforms.setAll(stretch)
+        stretch.x = 4.0
+        assertFalse(root.isCache)
+        stretch.x = 1.0
+        assertTrue(root.isCache)
+        val shift = javafx.scene.transform.Translate()
+        parent.transforms.setAll(shift)
+        shift.z = 1.0
+        assertFalse(root.isCache)
+        shift.z = 0.0
+        assertTrue(root.isCache)
+        parent.transforms.setAll(affine)
+        affine.appendScale(4.0, 1.0)
+        assertFalse(root.isCache)
+        parent.transforms.clear()
+        assertTrue(root.isCache)
+    }
 }

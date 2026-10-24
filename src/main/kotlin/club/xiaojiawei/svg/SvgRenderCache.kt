@@ -24,7 +24,8 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 /** Conservative device-pixel budgets without observing allocating local-to-scene snapshots. */
-internal class SvgRenderCache(private val root: Node, private val nodes: List<Node>, private val limit: Int) {
+internal class SvgRenderCache(private val root: Node, private val nodes: List<Node>, private val limit: Int, private val deferUntilMotion: Boolean = false) {
+    private var active = !deferUntilMotion
     private var changing = false
     private var window: Window? = null
     private var scene: Scene? = null
@@ -50,7 +51,8 @@ internal class SvgRenderCache(private val root: Node, private val nodes: List<No
         var twoDimensional = false
         private val properties = arrayOf(
             node.scaleXProperty(), node.scaleYProperty(), node.scaleZProperty(),
-            node.translateZProperty(), node.rotateProperty(), node.rotationAxisProperty()
+            node.translateZProperty(), node.rotateProperty(), node.rotationAxisProperty(),
+            node.translateXProperty(), node.translateYProperty(), node.layoutXProperty(), node.layoutYProperty()
         )
         private val transforms = IdentityHashMap<Transform, TransformWatch>()
         private val changed = InvalidationListener { update() }
@@ -70,7 +72,7 @@ internal class SvgRenderCache(private val root: Node, private val nodes: List<No
             private val properties: Array<Observable>? = when (transform) {
                 is Rotate -> arrayOf(transform.angleProperty(), transform.axisProperty())
                 is Scale -> arrayOf(transform.xProperty(), transform.yProperty(), transform.zProperty())
-                is Translate -> arrayOf(transform.zProperty())
+                is Translate -> arrayOf(transform.xProperty(), transform.yProperty(), transform.zProperty())
                 is Shear -> arrayOf(transform.xProperty(), transform.yProperty())
                 else -> null
             }
@@ -93,6 +95,7 @@ internal class SvgRenderCache(private val root: Node, private val nodes: List<No
             // Reading these scalar properties also rearms their invalidation listeners.
             val x = node.scaleX; val y = node.scaleY; val z = node.scaleZ
             val tz = node.translateZ; val angle = node.rotate; val axis = node.rotationAxis
+            node.translateX; node.translateY; node.layoutX; node.layoutY
             var planar = z == 1.0 && tz == 0.0 && (angle == 0.0 || axis != null && axis.x == 0.0 && axis.y == 0.0)
             var size = max(abs(x), abs(y))
             for (transform in node.transforms) {
@@ -103,6 +106,11 @@ internal class SvgRenderCache(private val root: Node, private val nodes: List<No
                 // Round upward with a small margin: harmless rotation roundoff must not refresh
                 // every view every pulse. Non-finite/oversized transforms remain uncached.
                 size *= ceil((norm * (1.0 + 1e-12) + 1e-9) * 1e6) / 1e6
+            }
+            if (notify && !active && planar && twoDimensional && size == stretch &&
+                root.scene != null && root.parent != null) {
+                active = true
+                refresh()
             }
             if (size != stretch || planar != twoDimensional) {
                 stretch = size; twoDimensional = planar
@@ -159,7 +167,7 @@ internal class SvgRenderCache(private val root: Node, private val nodes: List<No
 
     fun refresh() {
         if (changing) return
-        if (!enabled || limit == 0) {
+        if (!enabled || limit == 0 || !active) {
             for (node in nodes) node.isCache = false
             return
         }

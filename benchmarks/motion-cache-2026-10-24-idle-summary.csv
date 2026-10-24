@@ -1,0 +1,7 @@
+"provider","kind","icons","valid","attempts","rounds","fx_cpu_ms_s","cpu_min","cpu_max","fx_alloc_kib_s","alloc_min","alloc_max","process_cpu_core_pct"
+"fxsvgimage","gradient","500","3","3","r1-fxsvgimage+r2-fxsvgimage+r3-fxsvgimage","0","0","6.24724","32.25636","0.503035","51.944235","0.312365"
+"fxsvgimage","path","500","1","3","r2-fxsvgimage","0","0","0","0.503011","0.503011","0.503011","0"
+"jsvg-fx","gradient","500","3","3","r1-jsvg-fx+r2-jsvg-fx+r3-jsvg-fx","0","0","0","0.498386","0.498349","32.30416","0.312283"
+"jsvg-fx","path","500","2","3","r1-jsvg-fx+r3-jsvg-fx","0","0","0","32.3120715","32.31031","32.313833","0.1561885"
+"native","gradient","500","3","3","r1-native+r2-native+r3-native","0","0","0","0.503103","0.503092","32.26072","0.624723"
+"native","path","500","3","3","r1-native+r2-native+r3-native","0","0","3.123653","32.259644","0.503013","32.261089","0.312431"

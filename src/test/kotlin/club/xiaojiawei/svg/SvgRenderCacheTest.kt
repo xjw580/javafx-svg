@@ -13,9 +13,10 @@ import kotlin.test.*
 class SvgRenderCacheTest {
     private val body = """<defs><linearGradient id="g"><stop stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient></defs>
         <g id="spin"><rect id="p" x="8" y="8" width="48" height="48" rx="8" fill="url(#g)"/></g>"""
-    private fun view(content: String = body, options: SvgOptions = SvgOptions(strict=true)) =
+    private fun view(content: String = body, options: SvgOptions = SvgOptions(strict=true), activate: Boolean = true) =
         SvgView.parse("""<svg viewBox="0 0 64 64">$content</svg>""",options).apply {
             isManaged=false; animationAutoPlay=false; Scene(Group(this)); resize(32.0,32.0); applyCss(); layout()
+            if (activate) { rotate = 1.0; rotate = 0.0 }
         }
     private fun caches(v: SvgView) = v.lookupAll("*").filter { it !== v && it.isCache }
     private fun pixels(v: SvgView): javafx.scene.image.WritableImage = v.snapshot(SnapshotParameters().apply { fill=Color.TRANSPARENT },null)
@@ -206,5 +207,30 @@ class SvgRenderCacheTest {
         assertFalse(root.isCache)
         parent.transforms.clear()
         assertTrue(root.isCache)
+    }
+
+    @Test fun staticContentDefersCachingUntilMotionAndKeepsStylesLive() = FxTest.run {
+        val v = view(activate = false)
+        assertTrue(caches(v).isEmpty(), "Initial static display should not build bitmap caches")
+        v.resize(64.0, 64.0); v.layout()
+        val shape = v.lookup("#p") as javafx.scene.shape.Rectangle
+        shape.style = "-fx-fill: lime;"
+        v.applyCss(); v.layout()
+        assertTrue(caches(v).isEmpty())
+        assertEquals(Color.LIME, pixels(v).pixelReader.getColor(32, 32))
+        v.translateX = 10.0
+        assertTrue(caches(v).isNotEmpty(), "Actual movement should enable bounded bitmap reuse")
+        shape.style = "-fx-fill: red;"
+        v.applyCss(); v.layout()
+        assertEquals(Color.RED, pixels(v).pixelReader.getColor(32, 32))
+        v.scaleX = 100.0
+        assertTrue(caches(v).isEmpty())
+        val translated = view(activate = false)
+        val move = javafx.scene.transform.Translate()
+        translated.transforms += move
+        move.x = 5.0
+        assertTrue(caches(translated).isNotEmpty())
+        move.x = 10.0
+        assertTrue(caches(translated).isNotEmpty())
     }
 }

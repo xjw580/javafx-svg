@@ -32,7 +32,7 @@ SVG 自带动画另有 [动画性能与生命周期报告](benchmarks/animation-
 
 旧对照中的创建耗时测试已撤回结论，原因及统一协议复测见 [创建复测报告](benchmarks/creation-retest-2026-10-24.md)。
 
-性能目标：持平或超过 fxsvgimage，接近或持平 JSVG JavaFX。场景划分、当前差距与优化顺序见 [性能目标](benchmarks/performance-goals.md)；最新跨库实测见 [当前性能对照](benchmarks/library-current-2026-10-24.md)。
+性能目标：持平或超过 fxsvgimage，接近或持平 JSVG JavaFX。最新的完整光栅、完全静态与按需缓存实测见 [当前改进报告](benchmarks/motion-cache-2026-10-24.md)。场景划分、当前差距与优化顺序见 [性能目标](benchmarks/performance-goals.md)；最新跨库实测见 [当前性能对照](benchmarks/library-current-2026-10-24.md)。
 
 与 fxsvgimage 1.7.3、JSVG 2.2.0（JavaFX/AWT 后端）的 [性能和特性对照](benchmarks/library-comparison-2026-10-24.md) 包含两轮 48 个性能场景及 72 项特性探测；[独立复现工具](benchmarks/comparison/README.md) 不改变库运行依赖。
 
@@ -47,7 +47,7 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--cache-visual-check --output=tar
 
 `--cache` 支持 `off`（默认）、`scale`、`quality`，作用于每个 SvgView；`--kinds` 可选 `path,gradient,text,blur`，`--motions` 可选 `scroll,scale,transform,css`，均支持逗号分隔的子集。`scale` 通过 resize 改变视口，`transform` 固定视口大小并改变以左上角为中心的 Scale 变换。两者可能有不同的缓存失效成本。视觉检查会先预热缓存，再比较原始大小、放大、缩小、非整数缩放及 CSS 换色后的画面，输出设备缩放比例下的截图和像素差异；请为它指定空目录。
 
-[节点缓存对照结果](benchmarks/cache-comparison-2026-10-24.md)：当前样本中，SCALE 缓存能改善固定视口的变换动画，但持续 resize 没有收益，放大还会出现位图模糊。SvgView 已继承 JavaFX 的 `isCache`、`cacheHint`，可在短时动画中按需启用，动画结束时关闭以恢复目标尺寸的矢量绘制。Scale 变换只改变显示效果，不改变 Region 的布局尺寸；应用侧 isCache 默认关闭；内部渲染缓存策略见下文 renderCacheEnabled。内部预算采用祖先变换最大拉伸的保守上界；平移与二维旋转不重复估算预算。细长内容、抵消的缩放或剪切组合可能更早退回矢量绘制，避免为了减少监听开销而放松像素限制。
+[节点缓存对照结果](benchmarks/cache-comparison-2026-10-24.md)：当前样本中，SCALE 缓存能改善固定视口的变换动画，但持续 resize 没有收益，放大还会出现位图模糊。SvgView 已继承 JavaFX 的 `isCache`、`cacheHint`，可在短时动画中按需启用，动画结束时关闭以恢复目标尺寸的矢量绘制。Scale 变换只改变显示效果，不改变 Region 的布局尺寸；应用侧 isCache 默认关闭；内部渲染缓存策略见下文 renderCacheEnabled。无 SVG 动画的文档首次按矢量绘制，实际平移/旋转后再自动启用内部缓存；单纯 resize 或换色不要求先建立缓存。带刚体动画的缓存策略继续保留。内部预算采用祖先变换最大拉伸的保守上界；平移与二维旋转不重复估算预算。细长内容、抵消的缩放或剪切组合可能更早退回矢量绘制，避免为了减少监听开销而放松像素限制。
 
 IDEA 中重新加载 Maven 项目后，打开 `src/test/kotlin/club/xiaojiawei/svg/demo/SvgDemo.kt`，运行文件末尾的顶层 `main`，入口类为 `club.xiaojiawei.svg.demo.SvgDemoKt`。旧的 `SvgDemoLauncher` 运行配置已不适用。
 

@@ -96,7 +96,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     other !== candidate && generateSequence(other.parent as Node?) { it.parent }.any { it === candidate }
                 } }
             } else emptyList()
-        renderCache = SvgRenderCache(root,candidates,document.options.maxCachePixels)
+        renderCache = SvgRenderCache(root,candidates,document.options.maxCachePixels, deferUntilMotion = !animations.hasAnimations)
     }
 
     fun setRenderCache(enabled: Boolean) { renderCache.enabled = enabled }

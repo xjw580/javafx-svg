@@ -33,9 +33,22 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private val animations = SvgAnimations(document, ::report) { if (themeReady) root.parent?.requestLayout() }
     val hasAnimations: Boolean get() = animations.hasAnimations
     val animationDuration: Double get() = animations.duration
-    fun seekAnimations(seconds: Double) {
+    /** Prepare the clock without firing node-property listeners before the public time is published. */
+    fun prepareAnimationFrame(seconds: Double, updateTransforms: Boolean): Boolean {
         animations.seek(seconds)
+        return updateTransforms && transformFramesOnly && layoutComplete && issues.isEmpty()
+    }
+
+    fun refreshAnimationTransforms() = animations.refreshTransforms()
+
+    /** Return true when the current viewport can render this frame without a SvgView layout. */
+    fun seekAnimations(seconds: Double, updateTransforms: Boolean = false): Boolean {
+        if (prepareAnimationFrame(seconds, updateTransforms)) {
+            refreshAnimationTransforms()
+            return true
+        }
         if (themeReady) root.parent?.requestLayout()
+        return false
     }
 
     private fun computedStyle(element: SvgElement, ancestors: List<SvgElement>, parent: Map<String, String>, viewport: SvgViewport): Map<String, String> {
@@ -48,6 +61,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private val paintUpdates = mutableListOf<() -> Unit>()
     private val shapeStyles = SvgShapeStyles { if (themeReady) root.parent?.requestLayout() }
     private var themeReady = false
+    private var hasTextLayout = false
+    private val transformFramesOnly: Boolean
     private val activeReferences = linkedSetOf<String>()
     private var clipping = false
     private var masking = false
@@ -68,12 +83,15 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         require(intrinsicWidth >= 0 && intrinsicHeight >= 0) { "Negative SVG dimensions" }
         content = render(document.root, emptyList(), emptyMap(), viewport, true) ?: Group()
         root = Group(content).apply { clip = viewportClip; isManaged = false }
+        // Effect callbacks and text flow must observe the normal geometry/paint/transform order.
+        transformFramesOnly = animations.transformsOnly && updates.isEmpty() && !hasTextLayout
         themeReady = true
     }
 
     fun setTheme(fill: Paint?, stroke: Paint?, strokeWidth: Double) = shapeStyles.setTheme(fill, stroke, strokeWidth)
 
     fun layout(width: Double, height: Double, preserveRatio: Boolean) {
+        layoutComplete = false
         shapeStyles.refresh()
         rootCssViewport.width = width; rootCssViewport.height = height
         if (width != layoutWidth || height != layoutHeight || preserveRatio != layoutPreserveRatio) {
@@ -99,8 +117,10 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         paintUpdates.forEach { it() }
         animations.refreshTransforms()
         updates.forEach { it() }
+        layoutComplete = true
     }
     private var viewportTransform: javafx.scene.transform.Affine? = null
+    private var layoutComplete = false
     private var layoutWidth = Double.NaN
     private var layoutHeight = Double.NaN
     private var layoutPreserveRatio = true
@@ -139,6 +159,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop", "filter")) return null
         if (element.name == "symbol" && !referenced) return null
         if (element.name in setOf("clipPath", "mask", "marker") && !referenced) return null
+        if (element.name == "text") hasTextLayout = true
         val computed = computedStyle(element, ancestors, parentStyle, viewport)
         val style = when (element.name) {
             "mask" -> computed + mapOf("display" to "inline", "opacity" to "1", "filter" to "none")

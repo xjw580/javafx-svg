@@ -32,6 +32,8 @@ SVG 自带动画另有 [动画性能与生命周期报告](benchmarks/animation-
 
 与 fxsvgimage 1.7.3、JSVG 2.2.0（JavaFX/AWT 后端）的 [性能和特性对照](benchmarks/library-comparison-2026-10-24.md) 包含两轮 48 个性能场景及 72 项特性探测；[独立复现工具](benchmarks/comparison/README.md) 不改变库运行依赖。
 
+纯变换动画现已提供自动快速更新路径，适用于无需额外布局的 SMIL/CSS 旋转、平移和缩放；尺寸、主题及依赖效果变化时保留完整刷新。实现边界、311 项回归及最终两轮复测见 [纯变换动画优化报告](benchmarks/transform-fastpath-2026-10-24.md)。
+
 缓存对照可以限制类型、动作和缓存策略，例如：
 
 ```shell

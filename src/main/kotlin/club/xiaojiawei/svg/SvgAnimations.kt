@@ -12,7 +12,7 @@ internal class SvgAnimations(
     private val report: (String, SvgElement?) -> Unit,
     private val requestLayout: () -> Unit
 ) {
-    private data class Binding(val end: Double?, val transform: Boolean = false, val refresh: () -> Unit)
+    private data class Binding(val end: Double?, val transform: Boolean = false, val requiresLayout: Boolean = !transform, val refresh: () -> Unit)
     private val index = IdentityHashMap<SvgElement, MutableList<SvgAnimation>>()
     private val bindings = mutableListOf<Binding>()
     private var cssPointsRemaining = document.options.maxElements
@@ -20,6 +20,7 @@ internal class SvgAnimations(
         private set
     val size: Int get() = bindings.size
     val hasAnimations: Boolean get() = bindings.any { it.end != null }
+    val transformsOnly: Boolean get() = hasAnimations && bindings.none { it.requiresLayout }
     val duration: Double get() = bindings.mapNotNull { it.end }.maxOfOrNull { it.coerceAtLeast(0.0) } ?: 0.0
 
     init {
@@ -75,7 +76,7 @@ internal class SvgAnimations(
             } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid SVG animation values", spec.element) }
         }
         if (accepted.isNotEmpty()) bindings += Binding(accepted.maxOf { it.first.end }) {}
-        if (css != null) bindings += Binding(css.duration) {}
+        if (css != null) bindings += Binding(css.duration, requiresLayout = css.affected.any { it != "transform" }) {}
         return SvgAnimatedStyle(base, parent as? SvgAnimatedStyle, inherited, accepted, this, document.lengths, css)
     }
 
@@ -123,11 +124,14 @@ internal class SvgAnimations(
         if (cssEnabled && !isRoot && style.getValue("transform-box") == "fill-box") {
             node.boundsInLocalProperty().addListener { _, _, _ -> requestLayout() }
         }
+        val result = Affine()
         val refresh = {
-            val box = if (!isRoot && style.getValue("transform-box") == "fill-box") svgGeometryBounds(node)
-                else BoundingBox(viewport.x, viewport.y, viewport.width, viewport.height)
-            val pivot = origin.point(box)
-            val result = if (cssEnabled) css?.transform(time, cssBase, box, pivot) ?: cssBase.affine(box, pivot) else Affine(base)
+            if (cssEnabled) {
+                val box = if (!isRoot && style.getValue("transform-box") == "fill-box") svgGeometryBounds(node)
+                    else BoundingBox(viewport.x, viewport.y, viewport.width, viewport.height)
+                val pivot = origin.point(box)
+                css?.transform(time, cssBase, box, pivot, result) ?: cssBase.affine(box, pivot, result)
+            } else result.setToTransform(base)
             accepted.forEach { (spec, curve) ->
                 spec.progress(time)?.let { progress ->
                     if (!spec.additive) result.setToIdentity()
@@ -136,7 +140,8 @@ internal class SvgAnimations(
             }
             source.setToTransform(result)
         }
-        bindings += Binding(accepted.maxOfOrNull { it.first.end }, transform = true) {
+        bindings += Binding(accepted.maxOfOrNull { it.first.end }, transform = true,
+            requiresLayout = cssEnabled && !isRoot && style.getValue("transform-box") == "fill-box") {
             try { refresh() } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid animated transform", element) }
         }
         refresh()

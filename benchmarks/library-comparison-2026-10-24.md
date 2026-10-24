@@ -2,6 +2,8 @@
 
 本库适合需要 FXML、JavaFX CSS 改色和声明式动画的控件场景，但当前批量加载与纯旋转开销并不占优。fxsvgimage 的基本 SMIL 旋转更轻；JSVG 的 pattern、textPath 和滤镜能力更广，Canvas 静态画面的外部变换也较轻。不能据此给出所有 SVG 场景的统一速度排名。
 
+后续 [纯变换动画优化](transform-fastpath-2026-10-24.md) 已完成；下表保留优化前版本与原始数据，当前实现的收益及波动见新报告。
+
 本报告包括 2 轮、共 48 个性能场景，以及每种模式 18 个像素/动画样本。完整原始记录、SVG、PNG 和 JFR 位于本地 target/svg-library-comparison/；对照工具独立放在 [comparison](comparison/README.md)，第三方依赖不进入本库运行时。
 
 ## 版本与渲染方式

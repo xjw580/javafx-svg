@@ -2,7 +2,6 @@ package club.xiaojiawei.svg
 
 import javafx.scene.paint.Color
 import javafx.scene.transform.Affine
-import javafx.scene.transform.Rotate
 import kotlin.math.floor
 import kotlin.math.pow
 
@@ -54,6 +53,14 @@ internal class SvgAnimation private constructor(
             if (it == "currentColor") requireNotNull(baseColour) { "Animation currentColor has no colour" } else Color.web(it)
         } else emptyList()
         private val vectors = if (transformType != null) raw.map { vector(it, transformType) } else emptyList()
+        // Constant colour/vector endpoints and key positions do not depend on the current viewport.
+        private val fixedValues: List<Value> = if (colours.isNotEmpty()) colours.map { Value.Colour(it) }
+            else vectors.map { Value.Vector(it) }
+        private val knots = if (times.isNotEmpty()) times else {
+            val count = maxOf(2, raw.size)
+            List(count) { it.toDouble() / (if (mode == "discrete") count else count - 1) }
+        }
+
 
         init {
             if (attribute in setOf("opacity", "fill-opacity", "stroke-opacity")) {
@@ -66,11 +73,7 @@ internal class SvgAnimation private constructor(
         }
 
         fun sample(progress: Double, reference: Double, underlying: Value?): Value {
-            val values: List<Value> = when {
-                numbers.isNotEmpty() -> numbers.map { Value.Number(it.resolve(reference)) }
-                colours.isNotEmpty() -> colours.map { Value.Colour(it) }
-                else -> vectors.map { Value.Vector(it) }
-            }
+            val values = if (numbers.isNotEmpty()) numbers.map { Value.Number(it.resolve(reference)) } else fixedValues
             val endpoints = when {
                 raw.size == 1 && by -> {
                     val start = underlying ?: zero()
@@ -82,9 +85,6 @@ internal class SvgAnimation private constructor(
             }
             if (attribute in NONNEGATIVE) require(endpoints.all { (it as Value.Number).value >= 0 }) { "Negative animated size: $attribute" }
             if (progress >= 1) return endpoints.last()
-            val knots = if (times.isNotEmpty()) times else if (mode == "discrete")
-                List(endpoints.size) { it.toDouble() / endpoints.size }
-                else List(endpoints.size) { it.toDouble() / (endpoints.size - 1) }
             var index = 0
             while (index < knots.lastIndex && progress >= knots[index + 1]) index++
             if (mode == "discrete" || index == endpoints.lastIndex) return endpoints[index]
@@ -110,11 +110,12 @@ internal class SvgAnimation private constructor(
         when (transformType) {
             "translate" -> transform.appendTranslation(n[0], n[1])
             "scale" -> transform.appendScale(n[0], n[1])
-            "rotate" -> transform.append(Rotate(n[0], n[1], n[2]))
+            "rotate" -> transform.appendRotation(n[0], n[1], n[2])
             "skewX" -> transform.appendShear(kotlin.math.tan(Math.toRadians(n[0])), 0.0)
             "skewY" -> transform.appendShear(0.0, kotlin.math.tan(Math.toRadians(n[0])))
         }
-        require(listOf(transform.mxx, transform.mxy, transform.tx, transform.myx, transform.myy, transform.ty).all { it.isFinite() }) {
+        require(transform.mxx.isFinite() && transform.mxy.isFinite() && transform.tx.isFinite() &&
+            transform.myx.isFinite() && transform.myy.isFinite() && transform.ty.isFinite()) {
             "Non-finite animated transform"
         }
     }

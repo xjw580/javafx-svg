@@ -63,11 +63,11 @@ internal class SvgCssAnimations private constructor(private val animations: List
             val result = SvgAnimation.interpolate(resolve(a), resolve(b), ratio, linearRgb)
             return if (attribute == "stroke-width") SvgAnimation.Value.Number((result as SvgAnimation.Value.Number).value.coerceAtLeast(0.0)) else result
         }
-        fun transform(progress: Double, base: SvgCssTransform, box: Bounds, origin: Point2D, easing: SvgCssEasing, before: Boolean): Affine {
+        fun transform(progress: Double, base: SvgCssTransform, box: Bounds, origin: Point2D, easing: SvgCssEasing, before: Boolean, output: Affine): Affine {
             val (a, b, ratio) = segment(progress, easing, before)
             val first = (a.value as? Parsed.Transform)?.transform ?: base
             val last = (b.value as? Parsed.Transform)?.transform ?: base
-            return first.interpolate(last, ratio, box, origin)
+            return first.interpolate(last, ratio, box, origin, output)
         }
     }
 
@@ -87,11 +87,11 @@ internal class SvgCssAnimations private constructor(private val animations: List
     fun validateTransformBase(base: SvgCssTransform) {
         animations.forEach { it.curves["transform"]?.validateTransforms(base) }
     }
-    fun transform(time: Double, base: SvgCssTransform, box: Bounds, origin: Point2D): Affine? {
+    fun transform(time: Double, base: SvgCssTransform, box: Bounds, origin: Point2D, output: Affine = Affine()): Affine? {
         for (animation in animations.asReversed()) {
             val curve = animation.curves["transform"] ?: continue
             val progress = animation.timing.progress(time) ?: continue
-            return curve.transform(progress, base, box, origin, animation.timing.easing, animation.timing.isBefore(time))
+            return curve.transform(progress, base, box, origin, animation.timing.easing, animation.timing.isBefore(time), output)
         }
         return null
     }

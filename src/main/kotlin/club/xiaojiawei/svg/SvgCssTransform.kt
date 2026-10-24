@@ -19,10 +19,10 @@ internal class SvgCssTransform private constructor(private val operations: List<
         }
     }
 
-    fun affine(box: Bounds, origin: Point2D): Affine = compose(box, origin, null, 0.0)
+    fun affine(box: Bounds, origin: Point2D, output: Affine = Affine()): Affine = compose(box, origin, null, 0.0, output)
 
-    fun interpolate(other: SvgCssTransform, ratio: Double, box: Bounds, origin: Point2D): Affine =
-        compose(box, origin, other, ratio)
+    fun interpolate(other: SvgCssTransform, ratio: Double, box: Bounds, origin: Point2D, output: Affine = Affine()): Affine =
+        compose(box, origin, other, ratio, output)
 
     fun validatePair(other: SvgCssTransform) {
         for (index in 0 until maxOf(operations.size, other.operations.size)) {
@@ -32,8 +32,8 @@ internal class SvgCssTransform private constructor(private val operations: List<
         }
     }
 
-    private fun compose(box: Bounds, origin: Point2D, other: SvgCssTransform?, ratio: Double): Affine {
-        val output = Affine()
+    private fun compose(box: Bounds, origin: Point2D, other: SvgCssTransform?, ratio: Double, output: Affine): Affine {
+        output.setToIdentity()
         output.appendTranslation(origin.x, origin.y)
         val size = if (other == null) operations.size else maxOf(operations.size, other.operations.size)
         for (index in 0 until size) {
@@ -54,7 +54,8 @@ internal class SvgCssTransform private constructor(private val operations: List<
             }
         }
         output.appendTranslation(-origin.x, -origin.y)
-        require(listOf(output.mxx, output.mxy, output.tx, output.myx, output.myy, output.ty).all { it.isFinite() }) { "Non-finite CSS transform" }
+        require(output.mxx.isFinite() && output.mxy.isFinite() && output.tx.isFinite() &&
+            output.myx.isFinite() && output.myy.isFinite() && output.ty.isFinite()) { "Non-finite CSS transform" }
         return output
     }
 

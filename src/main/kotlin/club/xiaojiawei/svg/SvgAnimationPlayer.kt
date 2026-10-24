@@ -126,11 +126,14 @@ internal class SvgAnimationPlayer(private val view: SvgView) {
         val revision = commandRevision
         val limit = duration.get().toSeconds()
         val value = seconds.coerceAtMost(limit)
-        renderer?.seekAnimations(value)
+        val transformFrame = renderer?.prepareAnimationFrame(value, updateTransforms = !view.isNeedsLayout) == true
         currentTime.set(Duration.seconds(value))
-        // Observers may replace the document or issue a newer playback command synchronously.
-        if (acceptedGeneration != generation || revision != commandRevision) return
-        view.requestLayout()
+        // Publish time first: both time and matrix observers can issue newer playback commands.
+        if (acceptedGeneration != generation) return
+        if (revision != commandRevision) { view.requestLayout(); return }
+        if (transformFrame && !view.isNeedsLayout) renderer?.refreshAnimationTransforms() else view.requestLayout()
+        if (acceptedGeneration != generation) return
+        if (revision != commandRevision) { view.requestLayout(); return }
         if (value >= limit) {
             requested = false
             stopped = true

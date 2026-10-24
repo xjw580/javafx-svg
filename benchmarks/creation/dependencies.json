@@ -1,0 +1,24 @@
+{
+  "downloads": [
+    {
+      "name": "jmh-core-1.37.jar",
+      "path": "org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar",
+      "sha256": "DC0EAF2BBF0036A70B60798C785D6E03A9DAF06B68B8EDB0F1BA9EB3421BAEB3"
+    },
+    {
+      "name": "jmh-generator-annprocess-1.37.jar",
+      "path": "org/openjdk/jmh/jmh-generator-annprocess/1.37/jmh-generator-annprocess-1.37.jar",
+      "sha256": "6A5604B5B804E0DACA1145DF1077609321687734A8B49387E49F10557C186C77"
+    },
+    {
+      "name": "jopt-simple-5.0.4.jar",
+      "path": "net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar",
+      "sha256": "DF26CC58F235F477DB07F753BA5A3AB243EBE5789D9F89ECF68DD62EA9A66C28"
+    },
+    {
+      "name": "commons-math3-3.6.1.jar",
+      "path": "org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar",
+      "sha256": "1E56D7B058D28B65ABD256B8458E3885B674C1D588FA43CD7D1CBB9C7EF2B308"
+    }
+  ]
+}

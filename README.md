@@ -12,7 +12,7 @@ mvn install
 mvn -Pdemo test-compile exec:java
 ```
 
-示例展示同一个 SVG 文档的原始样式和应用 CSS 后的样式，悬停可改变描边颜色。示例代码和资源位于 `src/test`，不进入库 JAR。
+示例提供 12 项特性画廊，涵盖图形/描边、渐变、裁剪、文字、引用、Alpha/亮度遮罩、模糊、视口适配、资源缓存和 FXML。支持三种主题、80%/100%/120% 预览缩放及悬停换色。窗口缩小时自动换列，可用滚轮或 Page Up/Down、Home/End 滚动；Tab 和 Enter/Space 操作按钮。默认全部离线，点击 Load network 才加载网络徽章并显示异步状态。详见 [Demo 使用说明](demo/README.md)。示例代码和资源位于 `src/test`，不进入库 JAR。
 
 可见窗口交互基准（运行约 90 秒，完成后自动关闭窗口）：
 
@@ -49,7 +49,7 @@ Demo 使用 classpath 启动，项目没有 `module-info.java`。不要为它配
 mvn -Pdemo test-compile exec:java "-Dexec.args=--smoke"
 ```
 
-生成 `target/demo-preview.png`。渲染测试及示例仍需要 JavaFX 图形环境；Linux 无显示器环境可使用 `xvfb-run -a mvn verify`。测试不会打开窗口。
+生成 `target/demo-preview.png`（蓝色100%）、`target/demo-preview-themed.png`（绿色120%）和 `target/demo-preview-compact.png`（紫色80%、紧凑布局），并检查主题、路径覆盖、缩放、滚动及本地资源清空/恢复，不访问网络。渲染测试及示例仍需要 JavaFX 图形环境；Linux 无显示器环境可使用 `xvfb-run`。测试不会打开窗口。
 
 ## 使用
 
@@ -278,7 +278,7 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
          svgStroke="#333333" svgStrokeWidth="2"/>
 ```
 
-统一主题会保留在视图上，后续同步/异步加载或替换 document 时应用于新节点。主题未启用的视图保持原有样式；同一文档的不同视图互不影响。默认 Demo 的右侧图标展示根主题与路径 CSS 的组合，悬停改变统一描边色。
+统一主题会保留在视图上，后续同步/异步加载或替换 document 时应用于新节点。主题未启用的视图保持原有样式；同一文档的不同视图互不影响。Demo 的 Theme & path CSS 卡片展示根主题与路径 CSS 的组合，悬停改变统一描边色，紫色勾选保留自己的路径样式。
 
 线宽表示描边宽度，随节点变换一起缩放；无法直接改变填充路径自身的几何厚度。多色图标建议按 id/class 修改，避免对所有图形统一覆盖颜色。CSS 替换填充时提供的是新的完整 Paint，源 fill-opacity 不会额外乘到新颜色上，半透明覆盖可使用 rgba()。
 

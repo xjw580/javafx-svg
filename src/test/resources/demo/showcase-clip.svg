@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 112">
+<defs><clipPath id="round"><circle cx="72" cy="53" r="40"/></clipPath>
+<clipPath id="window"><path clip-rule="evenodd" d="M163 13H284V93H163Z M197 34H250V72H197Z"/></clipPath></defs>
+<g clip-path="url(#round)"><rect x="22" y="8" width="100" height="90" fill="#bfdbfe"/><circle cx="88" cy="30" r="14" fill="#fbbf24"/><path d="M20 95L58 43L90 85L111 62L132 98Z" fill="#059669"/></g>
+<g clip-path="url(#window)"><rect x="160" y="10" width="130" height="86" fill="#a78bfa"/><path d="M152 74L199 21L248 87L292 34V99H152Z" fill="#2563eb"/></g>
+<g font-size="10" fill="#53657d" text-anchor="middle"><text x="72" y="108">circle clip</text><text x="223" y="108">even-odd opening</text></g>
+</svg>

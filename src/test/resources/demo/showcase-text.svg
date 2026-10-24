@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 112">
+<text x="14" y="25" font-family="System" font-size="20" font-weight="bold" fill="#172b4d">Native SVG text</text>
+<path d="M14 58H286 M14 94H286" stroke="#cbd5e1" stroke-dasharray="3 3"/>
+<text x="14" y="56" font-size="17" fill="#2563eb" textLength="272" lengthAdjust="spacing">SPACING</text>
+<text x="14" y="91" font-size="17" fill="#059669" textLength="272" lengthAdjust="spacingAndGlyphs">Spacing and glyphs</text>
+<text x="286" y="108" font-size="9" fill="#63758c" text-anchor="end">same target width</text>
+</svg>

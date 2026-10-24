@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 112">
+<defs><symbol id="star" viewBox="0 0 24 24"><path d="M12 1L15 8L23 9L17 15L19 23L12 19L5 23L7 15L1 9L9 8Z" fill="currentColor"/></symbol></defs>
+<use href="#star" x="16" y="38" width="34" height="34" color="#93c5fd"/>
+<use href="#star" x="74" y="25" width="56" height="56" color="#2563eb"/>
+<g transform="translate(156 16) rotate(12 32 32)"><use href="#star" width="66" height="66" color="#059669"/></g>
+<g transform="translate(248 33) scale(.85)"><use href="#star" width="40" height="40" color="#7c3aed"/></g>
+<text x="150" y="108" font-size="10" fill="#53657d" text-anchor="middle">one symbol · four independent instances</text>
+</svg>

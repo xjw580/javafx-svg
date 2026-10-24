@@ -29,6 +29,7 @@ object SvgLoader {
     @JvmOverloads
     fun load(url: URL, options: SvgOptions = SvgOptions()): SvgDocument {
         val connection = url.openConnection().apply {
+            useCaches = false
             connectTimeout = 5_000
             readTimeout = 10_000
         }
@@ -105,7 +106,7 @@ object SvgLoader {
                 }
             }
             return SvgDocument(read(root, 1), Collections.unmodifiableMap(ids),
-                Collections.unmodifiableList(diagnostics), options)
+                Collections.unmodifiableList(diagnostics), options, bytes.size)
         } catch (e: SvgException) {
             throw e
         } catch (e: Exception) {

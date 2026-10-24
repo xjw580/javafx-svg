@@ -33,7 +33,8 @@ class SvgDocument internal constructor(
     val root: SvgElement,
     val elementsById: Map<String, SvgElement>,
     val diagnostics: List<SvgDiagnostic>,
-    val options: SvgOptions
+    val options: SvgOptions,
+    internal val sourceBytes: Int
 ) {
     internal val styleSheet: SvgStyleSheet by lazy { SvgStyleSheet.compile(root) }
     internal val geometry: SvgGeometryCache by lazy { SvgGeometryCache() }

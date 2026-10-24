@@ -93,7 +93,7 @@ container.getChildren().add(icon);
 
 支持 `SvgLoader.parse(String)`、`load(Path)`、`load(URL)`、`load(InputStream)`；`SvgView` 也提供对应的静态便利方法。调用方传入的流不会被关闭，路径及 URL 方法自行关闭其创建的流。
 
-`SvgLoader` 不创建 JavaFX 节点，可在后台执行。缓存并复用 `SvgDocument` 即可避免重复解析；每个 `SvgView(document)` 会创建独立节点，分别接受 CSS，不应跨视图复用节点。库没有全局缓存；通过 `source` 加载网络地址时会使用后台虚拟线程。
+`SvgLoader` 不创建 JavaFX 节点，可在后台执行。缓存并复用 `SvgDocument` 即可避免重复解析；每个 `SvgView(document)` 会创建独立节点，分别接受 CSS，不应跨视图复用节点。需要按地址复用时可使用下述有界资源缓存；通过 `source` 加载网络地址时会使用后台虚拟线程。
 
 同一个 `SvgDocument` 还会在线程安全的首次初始化中缓存 SVG 选择器、规则索引和内联样式声明，后续视图直接复用。缓存随文档释放，不持有视图或 JavaFX 节点；继承、`use` 实例上下文及应用侧 JavaFX CSS 仍逐实例计算。每个视图独立报告诊断，严格模式检查不会因缓存而跳过。重复调用 `parse/load` 会创建不同文档，不能共享这份缓存。
 
@@ -106,6 +106,29 @@ container.getChildren().add(icon);
 `SvgView` 是可布局的 `Region`。fitWidth/fitHeight 决定首选尺寸，0 表示采用自然尺寸，父布局仍可调整实际尺寸。需要固定图标尺寸时，同时设置 min/maxSize。默认遵循 SVG 的 preserveAspectRatio；`preserveRatio = false` 将 viewBox 拉伸到视口。没有 viewBox 时，调整的是视口，绝对坐标不会自动缩放。
 
 可通过 `view.document = nextDocument` / `setDocument` 替换内容；失败时保留原文档和节点。`documentProperty()` 是只读观察属性。fitWidth、fitHeight、preserveRatio 提供标准 JavaFX 属性方法。
+
+
+### 资源缓存
+
+地址级复用可使用线程安全的 `SvgResourceCache`：
+
+```kotlin
+val cache = SvgResourceCache() // 128 项、源 SVG 合计 16 MiB、写入后 5 分钟过期
+val first = cache.load(Path.of("icon.svg"))
+val second = cache.load(Path.of("icon.svg")) // 同一份 SvgDocument
+val firstView = SvgView(first)
+val secondView = SvgView(second) // 独立节点，CSS 互不影响
+```
+
+`load(Path/URL, SvgOptions)` 是阻塞方法，远程地址应在后台调用。缓存键包含地址和完整 SvgOptions，不会把宽松模式或不同输入限制的结果用于另一组配置。`SvgLoader.parse/load` 保持直接解析、读取，不使用此缓存；调用方传入的流仍由调用方管理。
+
+- 本地文件和 `jar:file:` 资源保存解析成功的文档；每次命中先检查文件/外层 JAR 的大小、修改时间及文件标识。文件变化或过期后重新读取。元数据完全相同的修改可手动 invalidate。
+- 已完成文档采用 LRU 淘汰，构造参数 `maxEntries`、`maxSourceBytes`、`expireAfter` 可调整限制；任一项设为 0 都关闭已完成文档保留。`sourceBytes` 是原始输入字节总和，不是精确 JVM 内存占用。
+- 同地址、同选项的正在进行的请求会合并下载和解析。HTTP 等远程资源在完成后不保留；下一次独立加载仍会请求服务器，适用于动态徽章。
+- 单个等待者被中断，只取消它自己的等待；最后一个等待者退出后中断共享后台线程。网络 I/O 不一定立即响应中断，仍受连接/读取超时约束，过期请求结果不会回填缓存。
+- 下载、解析失败不保存，可直接重试。`clear()` 清理全部缓存；`invalidate(Path/URL)` 清理该地址的全部选项。已在等待的调用可正常完成，但清理后启动的调用不会加入旧请求，旧请求也不会重新填入缓存。
+
+可使用 `cache.size` / `cache.sourceBytes` 查看当前保留量，或显式使用 `SvgResourceCache.shared` 共享默认实例。缓存仅持有文档，不持有 JavaFX 节点或视图。
 
 ## FXML 使用
 

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 112">
+<text x="14" y="15" font-size="11" fill="#63758c">Normal stroke: scales with the path</text>
+<path d="M0 0L24 -5L48 0L72 -5" transform="translate(28 40) scale(3 2.5)"
+    fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="14" y="68" font-size="11" fill="#63758c">Non-scaling stroke: stays 3 px wide</text>
+<path d="M0 0L24 -5L48 0L72 -5" transform="translate(28 94) scale(3 2.5)"
+    fill="none" stroke="#059669" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+    vector-effect="non-scaling-stroke"/>
+</svg>

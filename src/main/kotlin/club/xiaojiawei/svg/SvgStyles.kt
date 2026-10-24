@@ -49,6 +49,10 @@ internal class SvgStyles(
         val parentFontSize = parent["font-size"]?.toDoubleOrNull() ?: 16.0
         result["font-size"] = (if (fontSize.endsWith("em")) SvgNumbers.scalar(fontSize.dropLast(2)) * parentFontSize
             else lengths.resolve(fontSize, parentFontSize)).also { require(it >= 0) { "Negative font size" } }.toString()
+        if (result.getValue("vector-effect") !in setOf("none", "non-scaling-stroke")) {
+            report("Unsupported vector-effect: ${result.getValue("vector-effect")}", element)
+            result["vector-effect"] = "none"
+        }
         return result
     }
 
@@ -80,13 +84,13 @@ internal class SvgStyles(
             "stroke-width" to "1", "fill-opacity" to "1", "stroke-opacity" to "1", "opacity" to "1",
             "fill-rule" to "nonzero", "clip-rule" to "nonzero",
             "stroke-linecap" to "butt", "stroke-linejoin" to "miter", "stroke-miterlimit" to "4",
-            "stroke-dasharray" to "none", "stroke-dashoffset" to "0",
+            "stroke-dasharray" to "none", "stroke-dashoffset" to "0", "vector-effect" to "none",
             "display" to "inline", "visibility" to "visible",
             "clip-path" to "none", "mask" to "none", "mask-type" to "luminance", "filter" to "none", "color-interpolation-filters" to "linearRGB",
             "stop-color" to "black", "stop-opacity" to "1",
             "font-family" to "sans-serif", "font-size" to "16", "font-weight" to "normal",
             "font-style" to "normal", "text-anchor" to "start"
         )
-        private val inherited = defaults.keys - setOf("opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity")
+        private val inherited = defaults.keys - setOf("opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity", "vector-effect")
     }
 }

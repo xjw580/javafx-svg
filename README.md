@@ -12,7 +12,7 @@ mvn install
 mvn -Pdemo test-compile exec:java
 ```
 
-示例提供 12 项特性画廊，涵盖图形/描边、渐变、裁剪、文字、引用、Alpha/亮度遮罩、模糊、视口适配、资源缓存和 FXML。支持三种主题、80%/100%/120% 预览缩放及悬停换色。窗口缩小时自动换列，可用滚轮或 Page Up/Down、Home/End 滚动；Tab 和 Enter/Space 操作按钮。默认全部离线，点击 Load network 才加载网络徽章并显示异步状态。详见 [Demo 使用说明](demo/README.md)。示例代码和资源位于 `src/test`，不进入库 JAR。
+示例提供 13 项特性画廊，涵盖图形/描边、渐变、裁剪、文字、引用、Alpha/亮度遮罩、模糊、视口适配、资源缓存和 FXML。支持三种主题、80%/100%/120% 预览缩放及悬停换色。窗口缩小时自动换列，可用滚轮或 Page Up/Down、Home/End 滚动；Tab 和 Enter/Space 操作按钮。默认全部离线，点击 Load network 才加载网络徽章并显示异步状态。详见 [Demo 使用说明](demo/README.md)。示例代码和资源位于 `src/test`，不进入库 JAR。
 
 可见窗口交互基准（运行约 90 秒，完成后自动关闭窗口）：
 
@@ -257,7 +257,7 @@ SVG 内部样式和应用 JavaFX CSS 是两套语法：SVG 使用 `fill/stroke/s
 
 填充和描边接受 JavaFX Paint（颜色或渐变），支持 looked-up color。设置统一填充会替换已有填充，包括原有渐变和多色填充；原本 `fill="none"` 的路径保持镂空，若要为它填充，应显式设置该路径的 `-fx-fill`。统一描边可为原本无描边的图形添加描边；仅设置线宽不会自动产生描边。剪裁路径和图片像素不参与统一换色。
 
-优先级为：图形绑定属性、图形的应用侧 `-fx-*` CSS（含内联样式）优先于统一主题；统一主题优先于源 SVG 样式。移除主题 CSS 或将属性恢复默认值后，使用当前视口对应的源值，保留独立的路径 CSS。统一 Paint 是完整替换，不额外叠乘源 `fill-opacity/stroke-opacity`，与直接设置 `-fx-fill/-fx-stroke` 一致。线宽以 SVG 用户单位表示，随视口变换缩放；不支持 SVG 百分比字符串，属性值只允许 -1 或有限非负数。
+优先级为：图形绑定属性、图形的应用侧 `-fx-*` CSS（含内联样式）优先于统一主题；统一主题优先于源 SVG 样式。移除主题 CSS 或将属性恢复默认值后，使用当前视口对应的源值，保留独立的路径 CSS。统一 Paint 是完整替换，不额外叠乘源 `fill-opacity/stroke-opacity`，与直接设置 `-fx-fill/-fx-stroke` 一致。线宽通常以 SVG 用户单位表示，随视口变换缩放；non-scaling-stroke 图形按视口逻辑像素解释，缩放时保持线宽；不支持 SVG 百分比字符串，属性值只允许 -1 或有限非负数。
 
 主题属性支持绑定，绑定后的属性不被根节点 CSS 覆盖；所有读写仍在 FX 线程上执行：
 
@@ -290,7 +290,7 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
 | 容器和布局 | svg、嵌套 svg、g、a 的静态内容；viewBox、preserveAspectRatio 的对齐及 meet/slice/none |
 | 坐标 | matrix、translate、scale、rotate、skewX/Y；无单位数、px、%、in、cm、mm、pt、pc、q |
 | 样式 | 属性、style 属性、style 元素；类型/class/id/复合/后代/逗号选择器；继承、优先级、!important、currentColor |
-| 描边 | 颜色、宽度、透明度、端点、连接、miterlimit、虚线 |
+| 描边 | 颜色、宽度、透明度、端点、连接、miterlimit、虚线、non-scaling-stroke |
 | 引用 | 本文档内 defs/use/symbol、href/xlink:href；独立实例、循环和展开数量限制 |
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
@@ -348,6 +348,19 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
 
 当前片段排版支持单行水平的拉丁、汉字等非上下文文字；可用绝对坐标和偏移组织多行。暂不支持 `tspan` 与 `textLength/lengthAdjust` 组合、逐字位置列表、旋转、双向或跨片段连写排版，以及片段自身的 transform/filter/mask/clip-path；整段 text 仍支持变换、滤镜、遮罩和裁剪。上述已检测到的不支持内容在严格模式抛出异常，宽松模式报告诊断并保留自然文字排版。规则参考 [SVG 文本](https://www.w3.org/TR/SVG11/text.html)。
 
+`vector-effect="non-scaling-stroke"` 支持 path、基本图形与文字（含 tspan/textLength），也可在源 SVG 的内联 style、内部样式表中设置。线宽、虚线及端点/连接在最外层 SVG 视口坐标系中计算，支持 viewBox 缩放、嵌套 SVG、引用图形、旋转、非等比缩放、倾斜和镜像。
+
+```xml
+<path d="M10 10L30 20L50 10" fill="none" stroke="#2563eb"
+      stroke-width="2" vector-effect="non-scaling-stroke"/>
+```
+
+该属性默认 none，**不自动继承**；在组内可用 `path { vector-effect: non-scaling-stroke; }` 统一指定，或在子图形上显式 inherit。引用时放在被引用的图形上；直接设置在 use 上暂不支持，会报告诊断。clipPath 只使用填充几何，固定描边对其无效。
+
+原 Shape 作为隐藏的样式节点保留 id/class 和应用 CSS 属性，`-fx-stroke/-fx-stroke-width`、绑定及根 `-svg-stroke/-svg-stroke-width` 优先级保持一致。固定描边的数值线宽以 SVG 视口的逻辑像素解释；例如值 2 在 SvgView resize 时仍保持 2 逻辑像素。SvgView 自身或应用父节点的 JavaFX Scale 属于 SVG 外部变换，仍会缩放整个控件，系统 HiDPI 映射也不改变逻辑像素定义。
+
+实现使用 JavaFX 原生路径轮廓，先在宿主坐标系描边，再映射回原坐标填充，因此渐变描边仍按源图形坐标绘制；填充、透明度、裁剪、遮罩和滤镜可组合使用。每个固定描边增加三个场景节点，计入 `maxElements`；轮廓按需缓存，几何、描边参数或内部缩放/旋转矩阵变化时重新生成，适合图标和中小规模图形。非可逆的变换不绘制描边，恢复有效尺寸后可继续显示。语义参考 [SVG non-scaling-stroke](https://www.w3.org/TR/SVG2/painting.html#NonScalingStroke)。
+
 `textLength` 支持数值、长度单位和百分比，默认 `lengthAdjust="spacing"` 只调整字素簇间距，`spacingAndGlyphs` 同时缩放字形的横向尺寸。支持文本锚点、视口尺寸更新及应用 CSS 修改字体、填充和描边。单个字素簇在 spacing 模式下保持自然宽度。带 textLength 的文字由多个关联 Text 节点绘制，源 id/class 和 `.svg-text` 仍用于样式控制。
 
 spacing 模式当前支持单行水平的拉丁、汉字等非上下文文字；双向文字、复杂连写和强制换行会报告诊断，宽松模式回退到自然排版。spacingAndGlyphs 保留整段文字的 JavaFX 原生字形处理。文字展开节点计入 `maxElements` 限制。
@@ -361,7 +374,7 @@ Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，
 当前不支持完整 SVG 规范。限制包括：
 
 - 不执行脚本、事件处理器、SMIL/CSS 动画，不渲染 foreignObject。
-- 不支持完整 filter 管线、pattern、marker、non-scaling-stroke、radialGradient 的 gradientTransform 和非零 fr。
+- 不支持完整 filter 管线、pattern、marker、radialGradient 的 gradientTransform 和非零 fr；vector-effect 目前只支持 none/non-scaling-stroke。
 - SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量、at-rule、外部样式表；应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
 - 不支持 textPath、逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
 - 不自动加载 image/use/gradient/clipPath 中的外部文件或网络引用；load(URL) 仅打开调用方明确提供的顶层地址。

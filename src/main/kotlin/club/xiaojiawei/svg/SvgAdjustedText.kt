@@ -104,6 +104,11 @@ internal class SvgAdjustedText(
         }
     }
 
+    fun wrapRuns(wrap: (Text) -> javafx.scene.Node) {
+        content.children.clear()
+        content.children.setAll(runs.map(wrap))
+    }
+
     /** Excludes the invisible style target and excludes stroke/effects. */
     fun geometryBounds(): Bounds {
         val bounds = runs.map { content.localToParentTransform.transform(it.layoutBounds) }

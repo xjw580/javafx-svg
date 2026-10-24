@@ -17,6 +17,7 @@ mvn -Pdemo test-compile exec:java
 | Original SVG | 原始渐变与路径；与主题卡片共享文档 |
 | Theme & path CSS | 根主题属性、独立路径 CSS、悬停状态 |
 | Shapes & strokes | 基本图形、曲线、端点、连接、虚线 |
+| Non-scaling stroke | 普通描边与固定 3 逻辑像素描边；切换 Preview 比较缩放 |
 | Linear & radial | 线性、径向、reflect 渐变 |
 | Geometric clipping | 圆形裁剪和 even-odd 镂空 |
 | Text, tspan & length | 嵌套文字片段、颜色/斜体、基线偏移、间距调整、横向字形缩放 |

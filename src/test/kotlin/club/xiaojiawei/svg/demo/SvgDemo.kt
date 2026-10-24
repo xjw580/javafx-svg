@@ -71,6 +71,7 @@ class SvgDemo : Application() {
                 card("Original SVG", "PATH + USE", original, "Source paints and gradients. This document is shared with the next icon."),
                 card("Theme & path CSS", "INTERACTIVE", themeIcon, "Root theme colors the outline. The purple check has its own CSS. Hover the icon."),
                 card("Shapes & strokes", "GEOMETRY", fixture("shapes"), "Curves, circles, polygons, rounded corners and dashed strokes."),
+                card("Non-scaling stroke", "VECTOR EFFECT", fixture("fixed-stroke"), "The blue stroke scales; the green stroke stays 3 px wide. Change Preview to compare."),
                 card("Linear & radial", "GRADIENT", fixture("gradients"), "Native gradients, stops, opacity and reflected linear paint."),
                 card("Geometric clipping", "CLIP PATH", fixture("clip"), "A circular window and an even-odd path expose only the selected areas."),
                 card("Text, tspan & length", "TYPOGRAPHY", fixture("text"), "Nested styled spans, baseline offsets, native Text, spacing and glyph-width adjustment."),
@@ -89,7 +90,7 @@ class SvgDemo : Application() {
         }
         val header = VBox(7.0, text("JAVAFX SVG  /  FEATURE GALLERY", "eyebrow"),
             text("A closer look at native SVG", "page-title"), subtitle)
-        val hint = text("Scroll for all 12 examples and resource loading. Tab + Enter activates controls; Home / End navigates the page.", "hint").apply {
+        val hint = text("Scroll for all 13 examples and resource loading. Tab + Enter activates controls; Home / End navigates the page.", "hint").apply {
             wrappingWidthProperty().bind(content.widthProperty().subtract(48))
         }
         content.children.setAll(header, toolbar(), hint, cards, resourcePanel())

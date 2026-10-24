@@ -84,7 +84,7 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
         set(value) { svgStrokeValue.set(value) }
     fun svgStrokeProperty(): ObjectProperty<Paint?> = svgStrokeValue
 
-    /** Unified stroke width in SVG user units. -1 restores source widths; 0 hides strokes. */
+    /** SVG user units, or viewport logical pixels for non-scaling-stroke. -1 restores source widths; 0 hides strokes. */
     var svgStrokeWidth: Double
         get() = svgStrokeWidthValue.get()
         set(value) { svgStrokeWidthValue.set(value) }

@@ -119,7 +119,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 report("Unsupported child ${it.name} inside ${element.name}", it)
             }
         }
-        for (attribute in listOf("marker-start", "marker-mid", "marker-end", "vector-effect", "paint-order")) {
+        for (attribute in listOf("marker-start", "marker-mid", "marker-end", "paint-order")) {
             if (element[attribute] != null) report("Unsupported SVG attribute: $attribute", element)
         }
         fun length(name: String, axis: Double, default: String = "0") = document.lengths.resolve(element[name] ?: default, axis)
@@ -281,9 +281,30 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 applyShapeStyle(styleNode, style, viewport, element, node)
             }
         }
-        val result = if (!clipping && style.getValue("filter") != "none") applyFilter(node, style.getValue("filter"), viewport, element) else node
+        val painted = if (!clipping && style.getValue("vector-effect") == "non-scaling-stroke") when (node) {
+            is Shape -> nonScalingStroke(node, element)
+            is SvgAdjustedText -> node.apply { wrapRuns { nonScalingStroke(it, element) } }
+            else -> node.also {
+                if (element.name == "use") report("Place non-scaling-stroke on the referenced shapes, not on use", element)
+            }
+        } else node
+        val result = if (!clipping && style.getValue("filter") != "none") applyFilter(painted, style.getValue("filter"), viewport, element) else painted
         if (style.getValue("clip-path") != "none") applyClip(result, style.getValue("clip-path"), viewport, element)
         return if (!clipping && style.getValue("mask") != "none") applyMask(result, style.getValue("mask"), viewport, element) else result
+    }
+
+    private fun nonScalingStroke(shape: Shape, owner: SvgElement): SvgNonScalingStroke {
+        require(document.options.maxElements - renderedElements >= 3) { "SVG expanded stroke node limit exceeded" }
+        renderedElements += 3
+        val visible = shape.isVisible
+        val transforms = shape.transforms.toList()
+        shape.transforms.clear()
+        return SvgNonScalingStroke(shape, { if (themeReady) root else null },
+            { if (themeReady) root.parent?.requestLayout() }, { report(it, owner) }).also {
+            it.transforms.setAll(transforms)
+            it.isVisible = visible
+            update(owner) { it.refresh() }
+        }
     }
 
     private fun renderTextSpans(
@@ -394,7 +415,15 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 if (clipping) {
                     text.fill = Color.BLACK
                     text.stroke = null
-                } else applyShapeStyle(text, piece.style, viewport, piece.owner, layout, dynamicGeometry = true)
+                } else {
+                    applyShapeStyle(text, piece.style, viewport, piece.owner, layout, dynamicGeometry = true)
+                    if (piece.style.getValue("vector-effect") == "non-scaling-stroke") {
+                        val parent = text.parent as Group
+                        val index = parent.children.indexOf(text)
+                        parent.children.removeAt(index)
+                        parent.children.add(index, nonScalingStroke(text, piece.owner))
+                    }
+                }
             }
         }
         return layout

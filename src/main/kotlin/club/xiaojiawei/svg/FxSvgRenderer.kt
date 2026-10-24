@@ -52,18 +52,31 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
 
     fun layout(width: Double, height: Double, preserveRatio: Boolean) {
-        viewport.width = box?.width ?: width
-        viewport.height = box?.height ?: height
-        root.isVisible = width > 0 && height > 0 && viewport.width > 0 && viewport.height > 0
-        viewportClip.width = width
-        viewportClip.height = height
-        root.transforms.clear()
-        content.transforms.removeIf { it === viewportTransform }
-        viewportTransform = box?.transform(width, height, if (preserveRatio) document.root["preserveAspectRatio"] else "none")
-        viewportTransform?.let { content.transforms.add(it) }
+        if (width != layoutWidth || height != layoutHeight || preserveRatio != layoutPreserveRatio) {
+            viewport.width = box?.width ?: width
+            viewport.height = box?.height ?: height
+            root.isVisible = width > 0 && height > 0 && viewport.width > 0 && viewport.height > 0
+            viewportClip.width = width
+            viewportClip.height = height
+            root.transforms.clear()
+            box?.transform(width, height, if (preserveRatio) document.root["preserveAspectRatio"] else "none")?.let { next ->
+                val current = viewportTransform
+                if (current == null) {
+                    viewportTransform = next
+                    content.transforms.add(next)
+                } else current.setToTransform(next)
+            }
+            layoutWidth = width
+            layoutHeight = height
+            layoutPreserveRatio = preserveRatio
+        }
+        // Text, filter and bounding-box updates can depend on CSS even when the viewport is unchanged.
         updates.forEach { it() }
     }
     private var viewportTransform: javafx.scene.transform.Affine? = null
+    private var layoutWidth = Double.NaN
+    private var layoutHeight = Double.NaN
+    private var layoutPreserveRatio = true
 
     private fun render(
         element: SvgElement, ancestors: List<SvgElement>, parentStyle: Map<String, String>,
@@ -159,7 +172,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 val group = Group(imageView)
                 val clip = Rectangle()
                 group.clip = clip
-                update(element) {
+                update(element, viewport) {
                     val x = length("x", viewport.width); val y = length("y", viewport.height)
                     val width = positive(length("width", viewport.width)); val height = positive(length("height", viewport.height))
                     imageView.transforms.setAll(javafx.scene.transform.Translate(x, y),
@@ -181,7 +194,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                         SvgElement(target.name, attributes, target.children, target.text)
                     } else target
                     val group = Group()
-                    update(element) {
+                    update(element, viewport) {
                         group.layoutX = length("x", viewport.width)
                         group.layoutY = length("y", viewport.height)
                     }
@@ -198,7 +211,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     val clip = Rectangle()
                     group.children += inner
                     group.clip = clip
-                    update(element) {
+                    update(element, viewport) {
                         val x = length("x", viewport.width)
                         val y = length("y", viewport.height)
                         val width = positive(length("width", viewport.width, "100%"))
@@ -220,7 +233,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 fillRule = fillRule(style.getValue(if (clipping) "clip-rule" else "fill-rule"))
             }
             "rect" -> Rectangle().also { shape ->
-                update(element) {
+                update(element, viewport) {
                     shape.x = length("x", viewport.width); shape.y = length("y", viewport.height)
                     shape.width = positive(length("width", viewport.width)); shape.height = positive(length("height", viewport.height))
                     val rx = positive(SvgNumbers.length(element["rx"] ?: element["ry"] ?: "0", viewport.width))
@@ -229,15 +242,15 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     shape.arcHeight = 2 * min(ry, shape.height / 2)
                 }
             }
-            "circle" -> Circle().also { shape -> update(element) {
+            "circle" -> Circle().also { shape -> update(element, viewport) {
                 shape.centerX = length("cx", viewport.width); shape.centerY = length("cy", viewport.height)
                 shape.radius = positive(length("r", viewport.diagonal))
             } }
-            "ellipse" -> Ellipse().also { shape -> update(element) {
+            "ellipse" -> Ellipse().also { shape -> update(element, viewport) {
                 shape.centerX = length("cx", viewport.width); shape.centerY = length("cy", viewport.height)
                 shape.radiusX = positive(length("rx", viewport.width)); shape.radiusY = positive(length("ry", viewport.height))
             } }
-            "line" -> Line().also { shape -> update(element) {
+            "line" -> Line().also { shape -> update(element, viewport) {
                 shape.startX = length("x1", viewport.width); shape.startY = length("y1", viewport.height)
                 shape.endX = length("x2", viewport.width); shape.endY = length("y2", viewport.height)
             } }
@@ -317,9 +330,13 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             val parents = paints.ancestorsOf(target)
             val clipNode = render(target, parents, paints.parentStyleOf(target), clipViewport, referenced = true) ?: Group()
             val wrapper = Group(clipNode)
-            if (proportional) update(owner) {
-                val bounds = svgGeometryBounds(node)
-                wrapper.transforms.setAll(javafx.scene.transform.Affine(bounds.width, 0.0, bounds.minX, 0.0, bounds.height, bounds.minY))
+            if (proportional) {
+                val transform = javafx.scene.transform.Affine()
+                wrapper.transforms.add(transform)
+                update(owner) {
+                    val bounds = svgGeometryBounds(node)
+                    transform.setToTransform(bounds.width, 0.0, bounds.minX, 0.0, bounds.height, bounds.minY)
+                }
             }
             wrapper.clip = node.clip
             node.clip = wrapper
@@ -329,24 +346,27 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
     }
 
-    private fun update(element: SvgElement, action: () -> Unit) {
+    private fun update(element: SvgElement, viewport: SvgViewport? = null, action: () -> Unit) {
         action()
+        var previousWidth = viewport?.width ?: Double.NaN
+        var previousHeight = viewport?.height ?: Double.NaN
         updates += {
-            try { action() } catch (e: IllegalArgumentException) { report(e.message ?: "Invalid geometry", element) }
+            if (viewport == null || previousWidth != viewport.width || previousHeight != viewport.height) {
+                try {
+                    action()
+                    previousWidth = viewport?.width ?: Double.NaN
+                    previousHeight = viewport?.height ?: Double.NaN
+                } catch (e: IllegalArgumentException) { report(e.message ?: "Invalid geometry", element) }
+            }
         }
     }
 
     private fun applyShapeStyle(shape: Shape, style: Map<String, String>, viewport: SvgViewport, element: SvgElement, geometry: Node = shape) {
-        var previousWidth = Double.NaN
-        var previousHeight = Double.NaN
-        update(element) {
-            if (previousWidth != viewport.width || previousHeight != viewport.height) {
-                setBase(shape.fillProperty(), paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport))
-                setBase(shape.strokeProperty(), paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport))
-                setBase(shape.strokeWidthProperty(), SvgNumbers.length(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) })
-                setBase(shape.strokeDashOffsetProperty(), SvgNumbers.length(style.getValue("stroke-dashoffset"), viewport.diagonal))
-                previousWidth = viewport.width; previousHeight = viewport.height
-            }
+        update(element, viewport) {
+            setBase(shape.fillProperty(), paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport))
+            setBase(shape.strokeProperty(), paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport))
+            setBase(shape.strokeWidthProperty(), SvgNumbers.length(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) })
+            setBase(shape.strokeDashOffsetProperty(), SvgNumbers.length(style.getValue("stroke-dashoffset"), viewport.diagonal))
         }
         shape.strokeType = StrokeType.CENTERED
         shape.strokeLineCap = when (style.getValue("stroke-linecap")) {

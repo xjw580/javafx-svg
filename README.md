@@ -74,6 +74,8 @@ container.getChildren().add(icon);
 
 路径几何也按需缓存：相同 `d` 的校验结果、相同 `points` 转换出的路径字符串可在文档内复用，折线与多边形分别缓存。未渲染元素不会提前触发几何校验；失败结果仍由每个视图按当前元素报告。JavaFX `SVGPath` 节点及其内部几何处理保持独立，百分比尺寸、变换、填充规则和描边仍按实例处理。
 
+重复布局时，仅依赖视口的几何回调在其所属视口宽高改变后重新执行；固定 `viewBox` 的图标缩放主要更新外层变换。根变换按尺寸和 `preserveRatio` 更新，边界裁剪复用变换对象。文字、滤镜及边界裁剪仍参与刷新，以响应相同尺寸下的 CSS 字体、颜色和几何变化。
+
 `SvgView` 是可布局的 `Region`。fitWidth/fitHeight 决定首选尺寸，0 表示采用自然尺寸，父布局仍可调整实际尺寸。需要固定图标尺寸时，同时设置 min/maxSize。默认遵循 SVG 的 preserveAspectRatio；`preserveRatio = false` 将 viewBox 拉伸到视口。没有 viewBox 时，调整的是视口，绝对坐标不会自动缩放。
 
 可通过 `view.document = nextDocument` / `setDocument` 替换内容；失败时保留原文档和节点。`documentProperty()` 是只读观察属性。fitWidth、fitHeight、preserveRatio 提供标准 JavaFX 属性方法。

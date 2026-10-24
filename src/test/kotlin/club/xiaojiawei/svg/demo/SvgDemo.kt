@@ -73,5 +73,7 @@ class SvgDemo : Application() {
 }
 
 fun main(args: Array<String>) {
-    Application.launch(SvgDemo::class.java, *args)
+    val benchmark = "--benchmark" in args
+    Application.launch(if (benchmark) SvgRenderBenchmark::class.java else SvgDemo::class.java,
+        *args.filterNot { it == "--benchmark" }.toTypedArray())
 }

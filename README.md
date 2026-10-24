@@ -14,6 +14,20 @@ mvn -Pdemo test-compile exec:java
 
 示例展示同一个 SVG 文档的原始样式和应用 CSS 后的样式，悬停可改变描边颜色。示例代码和资源位于 `src/test`，不进入库 JAR。
 
+可见窗口交互基准（运行约 90 秒，完成后自动关闭窗口）：
+
+```shell
+mvn -Pdemo test-compile exec:java "-Dexec.args=--benchmark --count=200 --warmup-seconds=2 --measure-seconds=5"
+```
+
+基准覆盖普通路径、渐变、文字和模糊滤镜，分别执行裁剪网格滚动、逐图标缩放、每个 pulse 全量 CSS 换色；滚动场景不包含 ListView 虚拟化。默认每组 200 个视图，共享同一文档，窗口中只显示网格的一部分。路径、渐变和滤镜样本各有 12 条路径，文字样本有 4 个 Text，不能视为相同复杂度的横向比较。
+
+结果保存在 `target/render-benchmark/时间戳/`，也可用 `--output=目录` 指定新目录：包含汇总及逐 pulse CSV、GC 计数与累计收集时间、JFR 采样、环境信息和预览图。JFR 中的 `club.xiaojiawei.svg.RenderBenchmarkPhase` 事件标出正式测量区间，可排除场景创建和预热。截图仅在预热前生成；运行时请保持窗口可见且不被遮挡，关闭窗口会中断测试，只有完整运行才生成 `completed.txt`。
+
+`pulse_*` 是 AnimationTimer 回调间隔，能反映 FX 调度卡顿，但不是 GPU 耗时或显示器实际呈现帧率；`work_p95_ms` 仅包含前一个回调中属性修改的耗时，不包含后续 CSS、布局及绘制。长帧按间隔超过 33.33 ms、50 ms 统计。GC 时间为 MXBean 收集耗时，并非精确停顿时间。基准显式覆盖的高频 CSS 换色属于压力场景。
+
+首次测量结果见 [2026-10-24 渲染基线](benchmarks/render-baseline-2026-10-24.md)。
+
 IDEA 中重新加载 Maven 项目后，打开 `src/test/kotlin/club/xiaojiawei/svg/demo/SvgDemo.kt`，运行文件末尾的顶层 `main`，入口类为 `club.xiaojiawei.svg.demo.SvgDemoKt`。旧的 `SvgDemoLauncher` 运行配置已不适用。
 
 Demo 使用 classpath 启动，项目没有 `module-info.java`。不要为它配置 `--module club.xiaojiawei.svg` 或 `--add-modules club.xiaojiawei.svg`；这会导致 `Module club.xiaojiawei.svg not found`。POM 不声明 `Automatic-Module-Name`，避免 IDEA 将编译输出目录误识别成可直接启动的命名模块。

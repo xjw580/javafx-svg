@@ -1,0 +1,5 @@
+.root { -fx-font-family: "System"; }
+*:alternate .path .svg-shape,
+*:alternate .blur .svg-shape,
+*:alternate .text .svg-shape { -fx-fill: #e87924; }
+*:alternate .gradient .svg-shape { -fx-fill: linear-gradient(to right, #e87924, #16a34a); }

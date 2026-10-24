@@ -114,6 +114,13 @@ internal class SvgAnimations(
         val css = (style as? SvgAnimatedStyle)?.css
         val info = style as? SvgStyleInfo
         var cssEnabled = info?.cssTransform == true || css?.hasTransform == true || "transform-origin" in (info?.specified ?: emptySet())
+        val motionTracks = motions[element] ?: element.id?.let { document.elementsById[it]?.let(motions::get) } ?: emptyList()
+        if (accepted.isEmpty() && !cssEnabled && motionTracks.isEmpty()) {
+            if (style.getValue("transform-box") != "view-box" && style.getValue("transform-box") != "fill-box") {
+                report("Unsupported CSS transform-box", element)
+            }
+            return
+        }
         var cssBase = SvgCssTransform.fromAffine(source)
         var origin = SvgCssTransform.Origin("0 0")
         try {
@@ -125,7 +132,7 @@ internal class SvgAnimations(
             report(failure.message ?: "Invalid CSS transform", element)
             cssEnabled = false
         }
-        val motion = (motions[element] ?: element.id?.let { document.elementsById[it]?.let(motions::get) } ?: emptyList()).sortedWith(compareBy({ it.timing.begin }, { it.timing.order }))
+        val motion = motionTracks.sortedWith(compareBy({ it.timing.begin }, { it.timing.order }))
         if (accepted.isEmpty() && !cssEnabled && motion.isEmpty()) return
         accepted.sortWith(compareBy({ it.first.begin }, { it.first.order }))
         val base = Affine(source)

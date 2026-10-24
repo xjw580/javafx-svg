@@ -116,7 +116,8 @@ internal fun svgGeometryBounds(node: Node): Bounds = when (node) {
     is Ellipse -> BoundingBox(node.centerX - node.radiusX, node.centerY - node.radiusY, node.radiusX * 2, node.radiusY * 2)
     is Line -> BoundingBox(minOf(node.startX, node.endX), minOf(node.startY, node.endY),
         kotlin.math.abs(node.endX - node.startX), kotlin.math.abs(node.endY - node.startY))
-    is SVGPath -> SVGPath().apply { content = node.content; fillRule = node.fillRule }.boundsInLocal
+    is SVGPath -> if (node.fill != null && (node.stroke == null || node.strokeWidth <= 0.0)) node.layoutBounds
+        else SVGPath().apply { content = node.content; fillRule = node.fillRule }.boundsInLocal
     is Group -> {
         val children = node.children.map { it.localToParentTransform.transform(svgGeometryBounds(it)) }
         if (children.isEmpty()) BoundingBox(0.0, 0.0, 0.0, 0.0)

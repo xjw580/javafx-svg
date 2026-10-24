@@ -41,30 +41,31 @@ internal class SvgStyles(
                 winners[d.name] = next
             }
         }
-        element.attributes.filterKeys { it in defaults }.forEach { (k, v) -> add(Declaration(k, v, false), -1) }
+        element.attributes.forEach { (k, v) -> if (k in defaults) add(Declaration(k, v, false), -1) }
         sheet.candidates(element) { classes(element) }.forEach { rule ->
             if (matches(rule.selector, element, ancestors)) {
                 rule.declarations.forEach { add(it, rule.specificity) }
             }
         }
         sheet.inline(element, report).forEach { d -> add(d, 1_000_000) }
-        val result = defaults.mapValues { (key, default) ->
+        val result = LinkedHashMap<String, String>(defaults.size)
+        defaults.forEach { (key, default) ->
             val initial = if (key == "overflow" && element.name == "marker") "hidden" else default
             val value = winners[key]?.value ?: if (key in inherited) parent[key] ?: initial else initial
             if (value == "inherit" || (value == "unset" && key in inherited) || (winners[key] == null && key in inherited)) inheritedKeys?.add(key)
-            when (value) {
+            result[key] = when (value) {
                 "inherit" -> parent[key] ?: initial
                 "initial" -> initial
                 "unset" -> if (key in inherited) parent[key] ?: initial else initial
                 else -> value
             }
-        }.toMutableMap()
+        }
         if (result["color"] == "currentColor") result["color"] = parent["color"] ?: "black"
         val fontSize = result.getValue("font-size")
         val parentFontSize = parent["font-size"]?.toDoubleOrNull() ?: 16.0
         result["font-size"] = (if (fontSize.endsWith("em")) SvgNumbers.scalar(fontSize.dropLast(2)) * parentFontSize
             else lengths.resolve(fontSize, parentFontSize)).also { require(it >= 0) { "Negative font size" } }.toString()
-        if (result.getValue("vector-effect") !in setOf("none", "non-scaling-stroke")) {
+        if (result.getValue("vector-effect") != "none" && result.getValue("vector-effect") != "non-scaling-stroke") {
             report("Unsupported vector-effect: ${result.getValue("vector-effect")}", element)
             result["vector-effect"] = "none"
         }

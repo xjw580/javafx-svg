@@ -17,7 +17,7 @@ object SvgLoader {
     @JvmStatic
     @JvmOverloads
     fun parse(xml: String, options: SvgOptions = SvgOptions()): SvgDocument =
-        load(ByteArrayInputStream(xml.toByteArray(Charsets.UTF_8)), options)
+        loadBytes(xml.toByteArray(Charsets.UTF_8), options)
 
     @JvmStatic
     @JvmOverloads
@@ -38,9 +38,13 @@ object SvgLoader {
 
     @JvmStatic
     @JvmOverloads
-    fun load(input: InputStream, options: SvgOptions = SvgOptions()): SvgDocument {
+    fun load(input: InputStream, options: SvgOptions = SvgOptions()): SvgDocument =
+        try { loadBytes(input.readNBytes(options.maxBytes + 1), options) }
+        catch (e: SvgException) { throw e }
+        catch (e: Exception) { throw SvgException("Cannot parse SVG: ${e.message}", e) }
+
+    private fun loadBytes(bytes: ByteArray, options: SvgOptions): SvgDocument {
         try {
-            val bytes = input.readNBytes(options.maxBytes + 1)
             if (bytes.size > options.maxBytes) throw SvgException("SVG exceeds maxBytes")
             val dom = parseDom(bytes, options.maxDepth)
             val root = dom.documentElement ?: throw SvgException("Missing SVG root")

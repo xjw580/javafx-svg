@@ -52,9 +52,9 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
 
     private fun computedStyle(element: SvgElement, ancestors: List<SvgElement>, parent: Map<String, String>, viewport: SvgViewport): Map<String, String> {
-        val inherited = mutableSetOf<String>()
+        val inherited = if (parent is SvgAnimatedStyle) mutableSetOf<String>() else null
         val base = styles.compute(element, ancestors, parent, inherited)
-        return animations.style(element, base, parent, inherited, viewport)
+        return animations.style(element, base, parent, inherited ?: emptySet(), viewport)
     }
     private val updates = mutableListOf<() -> Unit>()
     private val geometryUpdates = mutableListOf<() -> Unit>()
@@ -172,9 +172,9 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         viewport: SvgViewport, isRoot: Boolean, referenced: Boolean
     ): Node? {
         if (element.name.startsWith('{') || element.name in SvgAnimation.NAMES) return null
-        if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop", "filter")) return null
+        if (element.name in NON_RENDERED_ELEMENTS) return null
         if (element.name == "symbol" && !referenced) return null
-        if (element.name in setOf("clipPath", "mask", "marker", "pattern") && !referenced) return null
+        if (element.name in REFERENCE_ONLY_ELEMENTS && !referenced) return null
         if (element.name in setOf("text", "textPath")) hasTextLayout = true
         val computed = computedStyle(element, ancestors, parentStyle, viewport)
         val style = when (element.name) {
@@ -183,8 +183,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             else -> computed
         }
         if (style.getValue("display") == "none") return null
-        if (element.name in setOf("path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "image", "use")) {
-            element.children.filter { !it.name.startsWith('{') && it.name !in setOf("title", "desc", "metadata", "marker") + SvgAnimation.NAMES }.forEach {
+        if (element.name in LEAF_ELEMENTS) {
+            element.children.filter { !it.name.startsWith('{') && it.name !in LEAF_CHILDREN }.forEach {
                 report("Unsupported child ${it.name} inside ${element.name}", it)
             }
         }
@@ -201,7 +201,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val node: Node = when (element.name) {
             "text", "textPath" -> if (element.children.any { it.name == "textPath" }) {
                 val paths = element.children.filter { it.name == "textPath" }
-                require(paths.size == 1 && element.children.all { it.name.startsWith('{') || it.name in setOf("textPath", "title", "desc", "metadata") + SvgAnimation.NAMES }
+                require(paths.size == 1 && element.children.all { it.name.startsWith('{') || it.name in TEXT_PATH_CHILDREN }
                     && element.content.filterIsInstance<SvgContent.Characters>().all { it.value.isBlank() }) {
                     "textPath currently requires one path run without mixed text/tspan"
                 }
@@ -430,7 +430,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             val value = style.getValue("marker-$kind")
             if (value == "none") continue
             try {
-                val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)").matchEntire(value)?.groupValues?.get(1)
+                val id = LOCAL_REFERENCE.matchEntire(value)?.groupValues?.get(1)
                     ?: throw SvgException("Only local marker references are supported")
                 require("marker:$id" !in activeReferences) { "Circular marker reference: #$id" }
                 val target = document.elementsById[id] ?: throw SvgException("Missing marker: #$id")
@@ -590,7 +590,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                                 children += { childGroup }
                                 build(child, lineage + owner, childStyle, childGroup, scopes, preserve)
                             }
-                        } else if (!child.name.startsWith('{') && child.name !in setOf("title", "desc", "metadata") + SvgAnimation.NAMES) {
+                        } else if (!child.name.startsWith('{') && child.name !in TEXT_CHILDREN) {
                             report("Unsupported text child: ${child.name}", child)
                         }
                     }
@@ -665,6 +665,14 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
 
     private companion object {
+        val NON_RENDERED_ELEMENTS = setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop", "filter")
+        val REFERENCE_ONLY_ELEMENTS = setOf("clipPath", "mask", "marker", "pattern")
+        val LEAF_ELEMENTS = setOf("path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "image", "use")
+        val LEAF_CHILDREN = setOf("title", "desc", "metadata", "marker") + SvgAnimation.NAMES
+        val TEXT_PATH_CHILDREN = setOf("textPath", "title", "desc", "metadata") + SvgAnimation.NAMES
+        val TEXT_CHILDREN = setOf("title", "desc", "metadata") + SvgAnimation.NAMES
+        val PAINT_REFERENCE = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)\\s*(.*)")
+        val LOCAL_REFERENCE = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)")
         val SIMPLE_TEXT_SCRIPTS = setOf(Character.UnicodeScript.LATIN, Character.UnicodeScript.GREEK,
             Character.UnicodeScript.CYRILLIC, Character.UnicodeScript.HAN, Character.UnicodeScript.HIRAGANA,
             Character.UnicodeScript.KATAKANA, Character.UnicodeScript.HANGUL, Character.UnicodeScript.COMMON,
@@ -679,7 +687,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val patternCheckpoint = patterns.size
         val animationCheckpoint = animations.size
         try {
-            val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)").matchEntire(value)?.groupValues?.get(1)
+            val id = LOCAL_REFERENCE.matchEntire(value)?.groupValues?.get(1)
                 ?: throw SvgException("Only local mask references are supported")
             val target = document.elementsById[id] ?: throw SvgException("Missing mask: #$id")
             require(target.name == "mask") { "Mask reference is not a mask: #$id" }
@@ -721,7 +729,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
 
     private fun applyFilter(node: Node, value: String, viewport: SvgViewport, owner: SvgElement): Node {
         return try {
-            val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)").matchEntire(value)?.groupValues?.get(1)
+            val id = LOCAL_REFERENCE.matchEntire(value)?.groupValues?.get(1)
                 ?: throw SvgException("Only local filter references are supported")
             val filter = document.elementsById[id] ?: throw SvgException("Missing filter: #$id")
             require(filter.name == "filter") { "Filter reference is not a filter: #$id" }
@@ -753,7 +761,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
 
     private fun applyClip(node: Node, value: String, viewport: SvgViewport, owner: SvgElement) {
-        val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)").matchEntire(value)?.groupValues?.get(1)
+        val id = LOCAL_REFERENCE.matchEntire(value)?.groupValues?.get(1)
             ?: throw SvgException("Only local clip-path references are supported")
         val target = document.elementsById[id] ?: throw SvgException("Missing clipPath: #$id")
         require(target.name == "clipPath") { "clip-path target is not a clipPath" }
@@ -803,7 +811,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
 
     private fun pattern(value: String, owner: SvgElement, target: Node, viewport: SvgViewport): SvgPattern? {
         if (!value.startsWith("url(")) return null
-        val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)\\s*.*").matchEntire(value)?.groupValues?.get(1) ?: return null
+        val id = PAINT_REFERENCE.matchEntire(value)?.groupValues?.get(1) ?: return null
         if (document.elementsById[id]?.name != "pattern") return null
         require(activeReferences.add("pattern:$id")) { "Circular pattern reference: #$id" }
         val oldMasking = masking
@@ -893,7 +901,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         if (value == "none") return null
         if (value in setOf("context-fill", "context-stroke")) return context?.paint(value, opacity, shape, element)
         if (value.startsWith("url(")) {
-            val match = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)\\s*(.*)").matchEntire(value)
+            val match = PAINT_REFERENCE.matchEntire(value)
                 ?: throw SvgException("Only local paint references are supported: $value")
             return try {
                 if (pattern != null) { if (themeReady) pattern.paint(opacity) else Color.TRANSPARENT }

@@ -6,7 +6,7 @@
 mvn -Pdemo test-compile exec:java
 ```
 
-入口为 `club.xiaojiawei.svg.demo.SvgDemoKt`。演示仅使用 javafx-graphics 和已有 javafx-fxml 测试依赖，界面与素材全部离线；只有「加载网络徽章」会请求远程资源。
+入口为 `club.xiaojiawei.svg.demo.SvgDemoKt`。演示使用 javafx-graphics、javafx-fxml 和实时编辑器所需的 javafx-controls 测试依赖，界面与素材全部离线；只有「加载网络徽章」会请求远程资源。
 
 界面包含分类目录、大尺寸实时预览、源图对比、源码面板和动画时间轴。宽屏并列展示预览与源码，较窄窗口将源码移到下方。鼠标滚轮与 Page Up/Down 滚动，Tab 切换焦点，Enter/Space 操作按钮；源码区支持独立滚动。
 
@@ -68,3 +68,16 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--smoke"
 检查覆盖全部素材的零诊断、独立节点、共享文档、动画帧变化、主题与路径 CSS、源码页、横向边界、滚动和本地资源清空/恢复。需要 JavaFX 图形环境，Linux 无显示器环境可使用 xvfb-run。PNG 导出使用 Java2D，仅存在于测试示例中。
 
 `--benchmark` 和 `--cache-visual-check` 入口继续使用原有参数；参见主 README 中的基准和缓存对照说明。
+
+## 输入 SVG 代码实时查看
+
+点击源码面板上方的「输入 SVG · 实时预览」，打开独立编辑窗口，初始内容为当前 SVG 示例；FXML 示例使用基础 SVG 模板。已打开窗口会保留当前输入。
+
+- 左侧直接输入或粘贴完整 SVG，停止输入 300 ms 后自动刷新右侧预览。
+- XML 解析在后台执行，旧请求的结果不会覆盖新输入；图形节点在 FX 线程创建。
+- XML 错误显示行、列；渲染诊断显示原因。失败时保留上一次有效预览，修正代码后自动恢复。
+- Ctrl+Enter 或「立即刷新」跳过等待；支持恢复载入示例、清空代码、复制 SVG 和代码换行。
+- 保持比例、深色/网格背景、播放/暂停/回到起点均可直接操作。带动画的有效 SVG 默认自动播放。
+- 关闭窗口会取消待处理任务、停止动画并释放预览文档。
+
+编辑区使用标准 TextArea，支持选区、复制粘贴、撤销重做和输入法。javafx-controls 仅为 Demo/test 依赖，不增加库运行时依赖。

@@ -34,7 +34,7 @@ import javax.imageio.ImageIO
 import kotlin.math.max
 import kotlin.math.min
 
-/** An offline-first, graphics-only SVG workbench. Network access requires an explicit button. */
+/** An offline-first SVG workbench. Network access requires an explicit button. */
 class SvgDemo : Application() {
     private data class Sample(val key: String, val title: String, val group: String, val file: String, val tag: String, val description: String, val tip: String)
     private val samples = listOf(
@@ -86,6 +86,7 @@ class SvgDemo : Application() {
     private var codeMode = 0
     private var resumeAfterSeek = false
     private var smoke = false
+    private var playgroundStage: Stage? = null
     private lateinit var active: SvgView
     private lateinit var reference: SvgView
     private lateinit var content: VBox
@@ -222,7 +223,8 @@ class SvgDemo : Application() {
             Clipboard.getSystemClipboard().setContent(ClipboardContent().apply { putString(codeText.text) })
             codeFilename.text = "已复制 · " + selected.file.substringAfterLast('/')
         }
-        val codePanel = VBox(12.0, text("查看与复用", "section-label"), codeTabs, codeFilename, codeViewport, copy).apply {
+        val live = DemoAction("输入 SVG · 实时预览") { openPlayground() }.apply { styleClass += "primary-action" }
+        val codePanel = VBox(12.0, text("查看与复用", "section-label"), live, codeTabs, codeFilename, codeViewport, copy).apply {
             styleClass += "panel"; padding = Insets(18.0); minWidth = 0.0
         }
         val panels = FlowPane(16.0, 16.0, previewPanel, codePanel).apply { minWidth = 0.0 }
@@ -240,6 +242,24 @@ class SvgDemo : Application() {
         }
         return column
     }
+
+    private fun openPlayground() {
+        playgroundStage?.takeIf { it.isShowing }?.let { it.toFront(); it.requestFocus(); return }
+        val source = if (selected.file.endsWith(".svg")) javaClass.getResource(location(selected.file))!!.readText()
+            else """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="35" fill="#2563eb"/></svg>"""
+        val editor = SvgPlayground(source)
+        playgroundStage = Stage().apply {
+            title = "SVG 代码实时预览"
+            minWidth = 820.0; minHeight = 520.0
+            content.scene?.window?.let(::initOwner)
+            scene = Scene(editor, 1180.0, 760.0).apply { stylesheets += resource("demo.css") }
+            setOnHidden { editor.close(); if (playgroundStage === this) playgroundStage = null }
+            show()
+        }
+        editor.codeArea.requestFocus()
+    }
+
+    override fun stop() { playgroundStage?.close() }
 
     private fun resourcePanel(): VBox {
         sourceStatus = text("", "resource-status")

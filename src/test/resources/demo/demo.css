@@ -62,3 +62,13 @@
 .svg-view.cache-blue { -svg-fill: #2563eb; -svg-stroke: #2563eb; -svg-stroke-width: 2.5; }
 .svg-view.cache-green { -svg-fill: #059669; -svg-stroke: #059669; -svg-stroke-width: 2.5; }
 .svg-view.marker-preview .svg-text, .svg-view.animation-preview .svg-text { -fx-stroke: null; -fx-fill: #64748b; }
+
+.svg-playground { -fx-font-size: 12px; }
+.editor-title { -fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #172b49; }
+.editor-split { -fx-background-color: white; -fx-border-color: #e1e8f2; -fx-border-radius: 8px; }
+.live-svg-source { -fx-font-family: "Consolas"; -fx-font-size: 13px; -fx-focus-color: -demo-accent; }
+.live-svg-source .content { -fx-background-color: #122039; }
+.live-svg-source { -fx-text-fill: #dbeafe; -fx-highlight-fill: #1d4ed8; -fx-highlight-text-fill: white; }
+.live-svg-source:invalid { -fx-border-color: #dc2626; -fx-border-width: 1px; }
+.editor-status { -fx-text-fill: #047857; -fx-font-size: 12px; }
+.editor-status.editor-error { -fx-text-fill: #b91c1c; }

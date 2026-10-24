@@ -30,7 +30,7 @@ internal class DemoAction(label: String, private val action: () -> Unit) : Stack
     }
 }
 
-/** Graphics-only scrolling; the demo has no javafx-controls runtime dependency. */
+/** Graphics-only scrolling for the example browser; the standalone editor uses standard controls. */
 internal class DemoViewport(private val content: VBox) : Region() {
     private val viewportClip = Rectangle()
     var offset = 0.0

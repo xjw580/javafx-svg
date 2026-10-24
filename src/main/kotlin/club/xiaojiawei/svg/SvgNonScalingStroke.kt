@@ -21,6 +21,7 @@ internal class SvgNonScalingStroke(
 ) : Group() {
     private val fillShape = SvgStrokeGeometry.copy(styleShape)
     private val strokeShape = Path()
+    private val nativeStroke = SvgStrokeGeometry.copy(styleShape)
     private val centerline = Path()
     private val empty = Path()
     private val placement = Affine()
@@ -45,6 +46,12 @@ internal class SvgNonScalingStroke(
         styleShape.isManaged = false
         fillShape.styleClass += "svg-vector-fill"
         strokeShape.styleClass += "svg-vector-stroke"
+        nativeStroke.styleClass += "svg-native-vector-stroke"
+        nativeStroke.fillProperty().bind(noPaint)
+        nativeStroke.strokeProperty().bind(styleShape.strokeProperty())
+        nativeStroke.smoothProperty().bind(styleShape.smoothProperty())
+        nativeStroke.transforms.setAll(placement)
+        nativeStroke.isVisible = false
         fillShape.fillProperty().bind(styleShape.fillProperty())
         strokeShape.fillProperty().bind(strokePaint)
         fillShape.strokeProperty().bind(noPaint)
@@ -54,7 +61,7 @@ internal class SvgNonScalingStroke(
         fillShape.transforms.setAll(placement)
         strokeShape.transforms.setAll(placement, paintMapping)
         opacityProperty().bind(styleShape.opacityProperty())
-        children.setAll(styleShape, fillShape, strokeShape)
+        children.setAll(styleShape, fillShape, strokeShape, nativeStroke)
         listOf(styleShape.boundsInLocalProperty(), styleShape.strokeWidthProperty(), styleShape.strokeTypeProperty(),
             styleShape.strokeLineCapProperty(), styleShape.strokeLineJoinProperty(), styleShape.strokeMiterLimitProperty(),
             styleShape.strokeDashOffsetProperty(), styleShape.localToParentTransformProperty()).forEach { it.addListener(changed) }
@@ -103,6 +110,14 @@ internal class SvgNonScalingStroke(
         return paintMapping.createInverse()
     }
 
+    private fun similarity(mapping: Affine): Boolean {
+        val x = mapping.mxx * mapping.mxx + mapping.myx * mapping.myx
+        val y = mapping.mxy * mapping.mxy + mapping.myy * mapping.myy
+        val dot = mapping.mxx * mapping.mxy + mapping.myx * mapping.myy
+        val tolerance = kotlin.math.max(x,y) * 1e-10
+        return x > 0 && x.isFinite() && y.isFinite() && kotlin.math.abs(x-y) <= tolerance && kotlin.math.abs(dot) <= tolerance
+    }
+
     fun refresh() {
         if (refreshing) return
         val target = host() ?: return
@@ -125,13 +140,27 @@ internal class SvgNonScalingStroke(
         try {
             placement.setToTransform(styleShape.localToParentTransform)
             require(mapping.isType2D) { "non-scaling-stroke requires a 2D SVG transform" }
-            val sourceToPaint = updatePaint()
+            nativeStroke.isVisible = false
+            strokeShape.isVisible = true
             require(key.all { it.isFinite() }) { "Non-finite stroke transform" }
             val determinant = linear.determinant()
             require(determinant.isFinite()) { "Non-finite stroke transform determinant" }
             if (determinant == 0.0 || styleShape.strokeWidth <= 0) {
                 strokeShape.elements.clear()
+            } else if (similarity(linear)) {
+                val scale = kotlin.math.hypot(linear.mxx, linear.myx)
+                nativeStroke.strokeWidth = styleShape.strokeWidth / scale
+                nativeStroke.strokeType = styleShape.strokeType
+                nativeStroke.strokeLineCap = styleShape.strokeLineCap
+                nativeStroke.strokeLineJoin = styleShape.strokeLineJoin
+                nativeStroke.strokeMiterLimit = styleShape.strokeMiterLimit
+                nativeStroke.strokeDashOffset = styleShape.strokeDashOffset / scale
+                nativeStroke.strokeDashArray.setAll(styleShape.strokeDashArray.map { it / scale })
+                strokeShape.isVisible = false
+                nativeStroke.isVisible = true
+                strokeShape.elements.clear()
             } else {
+                val sourceToPaint = updatePaint()
                 centerline.elements.setAll(SvgStrokeGeometry.transform(SvgStrokeGeometry.centerline(styleShape), linear))
                 centerline.fill = null
                 centerline.stroke = Color.BLACK

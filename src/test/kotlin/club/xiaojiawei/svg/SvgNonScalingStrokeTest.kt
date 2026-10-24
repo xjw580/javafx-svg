@@ -20,6 +20,21 @@ import kotlin.test.*
 class SvgNonScalingStrokeTest {
     @TempDir lateinit var directory: java.nio.file.Path
 
+    @Test fun similarityAndOutlinePathsSwitchWithoutChangingCapsDashesOrPaint() = FxTest.run {
+        val v = view("""<g id="group"><path id="p" d="M10 20H40" stroke="blue" stroke-width="4"
+            stroke-dasharray="7 3" stroke-linecap="round" vector-effect="non-scaling-stroke"/></g>""")
+        val matrix = v.lookup("#group").transforms.first() as javafx.scene.transform.Affine
+        for ((sx,sy) in listOf(1.0 to 1.0, 2.0 to 1.0, 1.5 to 1.5, -1.0 to 1.0, 1.0 to 2.0, 1.0 to 1.0)) {
+            val tx = if(sx<0) 60.0 else 0.0
+            matrix.setToTransform(sx,0.0,tx,0.0,sy,0.0)
+            val data = "M" + (10*sx+tx) + " " + (20*sy) + "H" + (40*sx+tx)
+            val expected = view("""<path d="$data" stroke="blue" stroke-width="4"
+                stroke-dasharray="7 3" stroke-linecap="round"/>""")
+            assertSimilar(snapshot(expected),snapshot(v))
+            assertTrue(v.diagnostics.isEmpty())
+        }
+    }
+
     @Test fun viewportResizeKeepsWidthWhileOrdinaryStrokeScales() = FxTest.run {
         val fixed = view("""<path id="p" d="M10 50H90" stroke-width="4" vector-effect="non-scaling-stroke"/>""")
         val ordinary = view("""<path d="M10 50H90" stroke-width="4"/>""")
@@ -86,7 +101,7 @@ class SvgNonScalingStrokeTest {
     @Test fun ellipseStrokeHasTheSpecifiedWidthAlongObliqueNormals() = FxTest.run {
         val v = view("""<ellipse id="p" cx="50" cy="50" rx="25" ry="15" stroke-width="3" vector-effect="non-scaling-stroke"/>""")
         snapshot(v)
-        val outline = (v.lookup("#p").parent as Group).children.last() as Path
+        val outline = (v.lookup("#p").parent as Group).children.filterIsInstance<Shape>().last { it.isVisible }
         for (degrees in listOf(0.0, 30.0, 45.0, 60.0, 90.0, 135.0, 225.0, 315.0)) {
             val angle = Math.toRadians(degrees)
             val x = 50 + 25 * kotlin.math.cos(angle); val y = 50 + 15 * kotlin.math.sin(angle)
@@ -110,7 +125,9 @@ class SvgNonScalingStrokeTest {
         val v = view("""<path id="p" d="M10 20H70V70" vector-effect="non-scaling-stroke"/>""")
         snapshot(v)
         val wrapper = v.lookup("#p").parent as SvgNonScalingStroke
-        val outline = wrapper.children.last() as Path
+        wrapper.scaleX = 1.2
+        snapshot(v)
+        val outline = wrapper.children.filterIsInstance<Path>().single()
         val first = outline.elements.first()
         snapshot(v)
         assertSame(first, outline.elements.first())

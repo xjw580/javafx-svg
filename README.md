@@ -497,7 +497,7 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 
 原 Shape 作为隐藏的样式节点保留 id/class 和应用 CSS 属性，`-fx-stroke/-fx-stroke-width`、绑定及根 `-svg-stroke/-svg-stroke-width` 优先级保持一致。固定描边的数值线宽以 SVG 视口的逻辑像素解释；例如值 2 在 SvgView resize 时仍保持 2 逻辑像素。SvgView 自身或应用父节点的 JavaFX Scale 属于 SVG 外部变换，仍会缩放整个控件，系统 HiDPI 映射也不改变逻辑像素定义。
 
-实现使用 JavaFX 原生路径轮廓，先在宿主坐标系描边，再映射回原坐标填充，因此渐变描边仍按源图形坐标绘制；填充、透明度、裁剪、遮罩和滤镜可组合使用。每个固定描边增加三个场景节点，计入 `maxElements`；轮廓按需缓存，几何、描边参数或内部缩放/旋转矩阵变化时重新生成，适合图标和中小规模图形。非可逆的变换不绘制描边，恢复有效尺寸后可继续显示。语义参考 [SVG non-scaling-stroke](https://www.w3.org/TR/SVG2/painting.html#NonScalingStroke)。
+实现使用 JavaFX 原生路径轮廓，先在宿主坐标系描边，再映射回原坐标填充，因此渐变描边仍按源图形坐标绘制；填充、透明度、裁剪、遮罩和滤镜可组合使用。每个固定描边增加四个场景节点，计入 `maxElements`；轮廓按需缓存，几何、描边参数或内部缩放/旋转矩阵变化时重新生成，适合图标和中小规模图形。非可逆的变换不绘制描边，恢复有效尺寸后可继续显示。语义参考 [SVG non-scaling-stroke](https://www.w3.org/TR/SVG2/painting.html#NonScalingStroke)。
 
 `textLength` 支持数值、长度单位和百分比，默认 `lengthAdjust="spacing"` 只调整字素簇间距，`spacingAndGlyphs` 同时缩放字形的横向尺寸。支持文本锚点、视口尺寸更新及应用 CSS 修改字体、填充和描边。单个字素簇在 spacing 模式下保持自然宽度。带 textLength 的文字由多个关联 Text 节点绘制，源 id/class 和 `.svg-text` 仍用于样式控制。
 
@@ -551,3 +551,6 @@ textPath 支持本地 href/xlink:href 路径引用、startOffset 长度/百分�
 
 
 pattern 支持填充/描边、本地 href 模板、patternUnits/patternContentUnits、viewBox/preserveAspectRatio、x/y/width/height 与二维 patternTransform。定义内容使用原生场景节点，通过 JavaFX 快照和 Canvas 生成重复图案；无需 WebView/Java2D。CSS 和内容动画变化会刷新，稳定布局复用图像，纯外部旋转复用同尺寸采样；定义内容不受根 -svg-* 主题改色。每视图所有图案的 tile 与目标图像共用 maxPatternPixels 像素预算（默认 4,194,304），单轴最多 4096，超限报告诊断。当前按 tile 边界裁剪，不支持 overflow=visible 跨 tile 绘制；快照后极端离屏放大仍可能重采样。模板循环、引用深度和展开节点有界。规则参考 [SVG Patterns](https://www.w3.org/TR/SVG11/pservers.html#Patterns)。
+
+
+固定描边在内部矩阵为均匀缩放、旋转或反射时，复用原生 Shape，仅按缩放比例调整描边宽度与虚线长度/偏移，避免每帧创建布尔运算轮廓。非均匀缩放、斜切仍使用原轮廓算法；切换时保留端点、连接、渐变、几何绑定和 CSS 行为。

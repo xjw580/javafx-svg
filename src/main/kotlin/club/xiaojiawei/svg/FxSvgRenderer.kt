@@ -495,8 +495,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
 
     private fun nonScalingStroke(shape: Shape, owner: SvgElement): SvgNonScalingStroke {
-        require(document.options.maxElements - renderedElements >= 3) { "SVG expanded stroke node limit exceeded" }
-        renderedElements += 3
+        require(document.options.maxElements - renderedElements >= 4) { "SVG expanded stroke node limit exceeded" }
+        renderedElements += 4
         val visible = shape.isVisible
         val transforms = shape.transforms.toList()
         shape.transforms.clear()

@@ -153,6 +153,8 @@ class SvgAnimationBenchmark : Application() {
         detail.text = "Warmup " + warmup + "s, measure " + measure + "s - keep window visible"
         stage.scene.root.applyCss()
         stage.scene.root.layout()
+        stage.toFront()
+        stage.requestFocus()
         val snapshot = stage.scene.snapshot(null)
         val image = BufferedImage(snapshot.width.toInt(), snapshot.height.toInt(), BufferedImage.TYPE_INT_ARGB)
         for (y in 0 until image.height) for (x in 0 until image.width) image.setRGB(x, y, snapshot.pixelReader.getArgb(x, y))

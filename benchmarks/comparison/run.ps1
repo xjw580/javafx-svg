@@ -6,6 +6,7 @@ param(
     [string[]]$Providers = @('native','fxsvgimage','jsvg-fx','jsvg-awt'),
     [string]$Counts = '100,500',
     [string]$Kinds = 'path,gradient,smil-transform',
+    [ValidateSet('default','on','off')][string]$NativeRenderCache = 'default',
     [double]$WarmupSeconds = 2,
     [double]$MeasureSeconds = 5
 )
@@ -56,7 +57,7 @@ foreach ($provider in $Providers) {
     foreach ($currentMode in $modes) {
         $destination = Join-Path $Output "$currentMode/$provider"
         $arguments = @('-Xms512m','-Xmx512m','-Djavafx.animation.pulse=60','--enable-native-access=ALL-UNNAMED',
-            '-cp',$cp,'svgbench.ComparisonMain',"--provider=$provider","--output=$destination",
+            ('-Dsvg.nativeRenderCache=' + $NativeRenderCache), '-cp',$cp,'svgbench.ComparisonMain',"--provider=$provider","--output=$destination",
             "--counts=$Counts","--kinds=$Kinds",('--warmup-seconds=' + $WarmupSeconds.ToString($invariant)),
             ('--measure-seconds=' + $MeasureSeconds.ToString($invariant)))
         if ($currentMode -eq 'features') { $arguments += '--probes' }

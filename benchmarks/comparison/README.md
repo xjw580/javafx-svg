@@ -28,7 +28,7 @@ mvn verify
 
 ## 测量边界
 
-每次创建视图都从相同内存 XML 独立解析，统一关闭文档/资源复用与节点缓存。creation.csv 记录批量“解析＋建节点＋挂载”的 FX 线程耗时和分配；计数在 applyCss、layout、首绘之前停止。node_count 为随后 CSS/layout 后的渲染子树节点数，不含所有库共用的宿主 Pane。不是冷 JVM 启动时间，也不是最终保留堆大小。使用文档缓存的真实应用应另外测量复用模式。
+每次创建视图都从相同内存 XML 独立解析，统一关闭文档/资源复用与应用 Node.cache；本库内部 renderCacheEnabled 按 NativeRenderCache 指定。creation.csv 记录批量“解析＋建节点＋挂载”的 FX 线程耗时和分配；计数在 applyCss、layout、首绘之前停止。node_count 为随后 CSS/layout 后的渲染子树节点数，不含所有库共用的宿主 Pane。不是冷 JVM 启动时间，也不是最终保留堆大小。使用文档缓存的真实应用应另外测量复用模式。
 
 path/gradient 使用相同的应用侧 Rotate 更新固定 24px 宿主，所有 100/500 图标都在窗口中。这时 Canvas/图像可复用像素表面，节点树仍可能重新栅格化；该场景不代表它们重绘 SVG 的速度相同。smil-transform 使用源 SVG 中的 2 秒旋转及各库自己的自动播放实现，按实际实现的语义执行，不保证完整 SVG 动画规范一致。
 
@@ -39,3 +39,6 @@ results.csv 包含 pulse 分位数、CPU、分配、GC、窗口状态。pulse �
 汇总 CSV 位于输出目录根部；每个子目录保留原始 CSV、逐 pulse 明细、SVG、PNG、JFR 和 environment.txt。只有录制保存后才写 completed.txt；提前关闭写 aborted.txt，异常写 failure.txt。完成标记表示场景全部处理，不表示所有特性通过。复现时检查逐场景结果，并保持相同 JDK、JavaFX、硬件、屏幕缩放和窗口状态。
 
 测量报告见 [跨库对照](../library-comparison-2026-10-24.md)。
+
+
+NativeRenderCache 可选 default/on/off。default 保留目标 JAR 的内部缓存默认策略；off 可用于纯向量对照，兼容没有该 API 的历史 JAR；on 要求 JAR 提供该开关。environment.txt 分别记录应用 Node.cache 和内部渲染缓存策略。开始每个场景时请求窗口焦点，但操作系统可能拒绝，仍须检查 unfocused_samples。历史对照报告中“缓存关闭”指当时 JAR 的实现，不与新增内部缓存混淆。

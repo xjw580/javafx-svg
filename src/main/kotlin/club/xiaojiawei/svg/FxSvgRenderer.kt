@@ -81,6 +81,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private val content: Node
     val root: Group
     private val viewportClip = Rectangle()
+    private val renderCache: SvgRenderCache
 
     init {
         require(intrinsicWidth >= 0 && intrinsicHeight >= 0) { "Negative SVG dimensions" }
@@ -89,7 +90,16 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         // Effect callbacks and text flow must observe the normal geometry/paint/transform order.
         transformFramesOnly = animations.transformsOnly && updates.isEmpty() && !hasTextLayout
         themeReady = true
+        val candidates = if (!animations.hasAnimations) listOf(root)
+            else if (transformFramesOnly) animations.cacheTargets.let { targets ->
+                targets.filter { candidate -> targets.none { other ->
+                    other !== candidate && generateSequence(other.parent as Node?) { it.parent }.any { it === candidate }
+                } }
+            } else emptyList()
+        renderCache = SvgRenderCache(root,candidates,document.options.maxCachePixels)
     }
+
+    fun setRenderCache(enabled: Boolean) { renderCache.enabled = enabled }
 
     fun setTheme(fill: Paint?, stroke: Paint?, strokeWidth: Double) = shapeStyles.setTheme(fill, stroke, strokeWidth)
 
@@ -120,6 +130,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         paintUpdates.forEach { it() }
         animations.refreshTransforms()
         updates.forEach { it() }
+        renderCache.refresh()
         layoutComplete = true
     }
     private var viewportTransform: javafx.scene.transform.Affine? = null

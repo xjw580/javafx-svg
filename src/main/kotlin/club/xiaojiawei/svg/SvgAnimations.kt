@@ -12,7 +12,7 @@ internal class SvgAnimations(
     private val report: (String, SvgElement?) -> Unit,
     private val requestLayout: () -> Unit
 ) {
-    private data class Binding(val end: Double?, val transform: Boolean = false, val requiresLayout: Boolean = !transform, val refresh: () -> Unit)
+    private data class Binding(val end: Double?, val transform: Boolean = false, val requiresLayout: Boolean = !transform, val cacheTarget: Node? = null, val cacheBlocked: Boolean = false, val refresh: () -> Unit)
     private val index = IdentityHashMap<SvgElement, MutableList<SvgAnimation>>()
     private val motions = IdentityHashMap<SvgElement, MutableList<SvgMotion>>()
     private val bindings = mutableListOf<Binding>()
@@ -20,6 +20,7 @@ internal class SvgAnimations(
     var time = 0.0
         private set
     val size: Int get() = bindings.size
+    val cacheTargets: List<Node> get() = if (bindings.any { it.cacheBlocked }) emptyList() else bindings.mapNotNull { it.cacheTarget }.distinct()
     val hasAnimations: Boolean get() = bindings.any { it.end != null }
     val transformsOnly: Boolean get() = hasAnimations && bindings.none { it.requiresLayout }
     val duration: Double get() = bindings.mapNotNull { it.end }.maxOfOrNull { it.coerceAtLeast(0.0) } ?: 0.0
@@ -155,8 +156,11 @@ internal class SvgAnimations(
             result.append(motionResult)
             source.setToTransform(result)
         }
+        val animated = accepted.isNotEmpty() || motion.isNotEmpty() || css?.hasTransform == true
+        val cacheable = accepted.all { it.first.transformType in setOf("rotate", "translate") } && css?.rotationCacheable(cssBase) != false
         bindings += Binding((accepted.map { it.first.end } + motion.map { it.timing.end }).maxOrNull(), transform = true,
-            requiresLayout = cssEnabled && !isRoot && style.getValue("transform-box") == "fill-box") {
+            requiresLayout = cssEnabled && !isRoot && style.getValue("transform-box") == "fill-box",
+            cacheTarget = if (animated && cacheable) node else null, cacheBlocked = animated && !cacheable) {
             try { refresh() } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid animated transform", element) }
         }
         refresh()

@@ -7,7 +7,8 @@ data class SvgOptions @JvmOverloads constructor(
     val maxDepth: Int = 128,
     val maxElements: Int = 100_000,
     val maxMaskPixels: Int = 4 * 1024 * 1024,
-    val maxPatternPixels: Int = 4 * 1024 * 1024
+    val maxPatternPixels: Int = 4 * 1024 * 1024,
+    val maxCachePixels: Int = 64 * 1024
 ) {
     init {
         require(maxBytes in 1 until Int.MAX_VALUE)
@@ -15,6 +16,7 @@ data class SvgOptions @JvmOverloads constructor(
         require(maxElements > 0)
         require(maxMaskPixels > 0)
         require(maxPatternPixels > 0)
+        require(maxCachePixels >= 0)
     }
 }
 

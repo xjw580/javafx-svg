@@ -38,6 +38,9 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
     private val loadExceptionValue = ReadOnlyObjectWrapper<SvgException?>(this, "loadException")
     private var pendingLoad: Task<SvgDocument>? = null
     private var loadGeneration = 0L
+    private val renderCacheValue = SimpleBooleanProperty(this, "renderCacheEnabled", true).apply {
+        addListener { _, _, value -> renderer?.setRenderCache(value) }
+    }
     private val fitWidthValue = SimpleDoubleProperty(this, "fitWidth", 0.0)
     private val fitHeightValue = SimpleDoubleProperty(this, "fitHeight", 0.0)
     private val preserveRatioValue = SimpleBooleanProperty(this, "preserveRatio", true)
@@ -213,6 +216,7 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
     }
 
     private fun installDocument(value: SvgDocument?, replacement: FxSvgRenderer?) {
+        replacement?.setRenderCache(renderCacheEnabled)
         replacement?.setTheme(svgFill, svgStroke, svgStrokeWidth)
         renderer = replacement
         children.setAll(listOfNotNull(replacement?.root))
@@ -222,6 +226,12 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
         requestLayout()
         documentValue.set(value)
     }
+
+    /** Native bitmap reuse for static content; false keeps internal nodes vector-rendered. */
+    var renderCacheEnabled: Boolean
+        get() = renderCacheValue.get()
+        set(value) { checkFxThread(); renderCacheValue.set(value) }
+    fun renderCacheEnabledProperty(): BooleanProperty = renderCacheValue
 
     /** Zero uses the document's natural size. Parent layout may still resize this Region. */
     var fitWidth: Double

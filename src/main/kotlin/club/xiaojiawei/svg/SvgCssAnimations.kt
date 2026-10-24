@@ -84,6 +84,10 @@ internal class SvgCssAnimations private constructor(private val animations: List
         return null
     }
 
+    fun rotationCacheable(base: SvgCssTransform): Boolean = animations.all { animation ->
+        animation.curves["transform"]?.points?.all { ((it.value as? Parsed.Transform)?.transform ?: base).rigid } != false
+    }
+
     fun validateTransformBase(base: SvgCssTransform) {
         animations.forEach { it.curves["transform"]?.validateTransforms(base) }
     }

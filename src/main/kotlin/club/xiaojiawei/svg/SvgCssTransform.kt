@@ -19,6 +19,8 @@ internal class SvgCssTransform private constructor(private val operations: List<
         }
     }
 
+    val rigid: Boolean get() = operations.all { it.kind == "rotate" || it.kind == "translate" }
+
     fun affine(box: Bounds, origin: Point2D, output: Affine = Affine()): Affine = compose(box, origin, null, 0.0, output)
 
     fun interpolate(other: SvgCssTransform, ratio: Double, box: Bounds, origin: Point2D, output: Affine = Affine()): Affine =

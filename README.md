@@ -43,7 +43,7 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--cache-visual-check --output=tar
 
 `--cache` 支持 `off`（默认）、`scale`、`quality`，作用于每个 SvgView；`--kinds` 可选 `path,gradient,text,blur`，`--motions` 可选 `scroll,scale,transform,css`，均支持逗号分隔的子集。`scale` 通过 resize 改变视口，`transform` 固定视口大小并改变以左上角为中心的 Scale 变换。两者可能有不同的缓存失效成本。视觉检查会先预热缓存，再比较原始大小、放大、缩小、非整数缩放及 CSS 换色后的画面，输出设备缩放比例下的截图和像素差异；请为它指定空目录。
 
-[节点缓存对照结果](benchmarks/cache-comparison-2026-10-24.md)：当前样本中，SCALE 缓存能改善固定视口的变换动画，但持续 resize 没有收益，放大还会出现位图模糊。SvgView 已继承 JavaFX 的 `isCache`、`cacheHint`，可在短时动画中按需启用，动画结束时关闭以恢复目标尺寸的矢量绘制。Scale 变换只改变显示效果，不改变 Region 的布局尺寸；库保持默认关闭缓存。
+[节点缓存对照结果](benchmarks/cache-comparison-2026-10-24.md)：当前样本中，SCALE 缓存能改善固定视口的变换动画，但持续 resize 没有收益，放大还会出现位图模糊。SvgView 已继承 JavaFX 的 `isCache`、`cacheHint`，可在短时动画中按需启用，动画结束时关闭以恢复目标尺寸的矢量绘制。Scale 变换只改变显示效果，不改变 Region 的布局尺寸；应用侧 isCache 默认关闭；内部渲染缓存策略见下文 renderCacheEnabled。
 
 IDEA 中重新加载 Maven 项目后，打开 `src/test/kotlin/club/xiaojiawei/svg/demo/SvgDemo.kt`，运行文件末尾的顶层 `main`，入口类为 `club.xiaojiawei.svg.demo.SvgDemoKt`。旧的 `SvgDemoLauncher` 运行配置已不适用。
 
@@ -355,7 +355,7 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 
 不支持几何 CSS 属性动画、根 svg 的位置/尺寸动画、use 的 width/height 动画、textLength 本身及文字位置列表动画。SvgView 的布局尺寸由 fitWidth/fitHeight 和父布局管理。形状几何语义参考 [SVG Basic Shapes](https://www.w3.org/TR/SVG11/shapes.html)。
 
-首版不支持事件/同步链 begin、begin 时间列表、end/repeatDur、累积动画、数值/颜色的 additive=sum、paced、set、animateColor、路径数据/points、渐变/滤镜属性动画，以及 CSS transition。tspan 支持上述样式动画，自身的变换动画仍受 tspan 变换限制。已检测到的不支持内容在严格模式拒绝，在宽松模式报告诊断并保留可用的静态内容。规则参考 [SVG 1.1 Animation](https://www.w3.org/TR/SVG11/animate.html)。
+首版不支持事件/同步链 begin、begin 时间列表、end/repeatDur、累积动画、数值/颜色的 additive=sum、普通属性轨道的 paced、set、animateColor、路径数据/points、渐变/滤镜属性动画，以及 CSS transition。tspan 支持上述样式动画，自身的变换动画仍受 tspan 变换限制。已检测到的不支持内容在严格模式拒绝，在宽松模式报告诊断并保留可用的静态内容。规则参考 [SVG 1.1 Animation](https://www.w3.org/TR/SVG11/animate.html)。
 
 ### SVG 内嵌 CSS 动画
 
@@ -554,3 +554,6 @@ pattern 支持填充/描边、本地 href 模板、patternUnits/patternContentUn
 
 
 固定描边在内部矩阵为均匀缩放、旋转或反射时，复用原生 Shape，仅按缩放比例调整描边宽度与虚线长度/偏移，避免每帧创建布尔运算轮廓。非均匀缩放、斜切仍使用原轮廓算法；切换时保留端点、连接、渐变、几何绑定和 CSS 行为。
+
+
+renderCacheEnabled 默认 true，静态文档及仅旋转/平移/路径运动的动画可复用内部 JavaFX 位图；内部缩放/斜切、绘制或几何动画保留向量绘制。设置 false（可绑定，支持 FXML）关闭内部缓存与逐帧缓存监听；SvgView 自身的 isCache/cacheHint 保持应用控制。采用 [CacheHint.ROTATE](https://openjfx.io/javadoc/18/javafx.graphics/javafx/scene/CacheHint.html)，缩放会重新栅格化，旋转的抗锯齿可能与直接矢量绘制略有不同。每视图按当前二维边界及输出比例估算，所有候选节点合计不超过 maxCachePixels（默认 65,536；0 关闭），单轴最多 4096；超过时回退向量，恢复尺寸后重新评估。这是估算像素预算，不是精确显存或进程内存上限。像素缓存、稳态分配与旋转收益须按场景权衡；测量记录见 [缺口修复报告](benchmarks/remediation-2026-10-24.md)。

@@ -115,7 +115,7 @@ public final class SvgLibraryComparison extends Application {
             "javafx=" + System.getProperty("javafx.runtime.version"), "os=" + System.getProperty("os.name"),
             "jvmArgs=" + ManagementFactory.getRuntimeMXBean().getInputArguments(),
             "screens=" + Screen.getScreens().stream().map(s -> s.getBounds() + ";scale=" + s.getOutputScaleX()).toList(),
-            "warmup=" + warmup + "; measure=" + measure + "; scene=740x650; columns=25; tile=28; icon=24; cache=off",
+            "warmup=" + warmup + "; measure=" + measure + "; scene=740x650; columns=25; tile=28; icon=24; application Node.cache=off; native internal render cache=" + System.getProperty("svg.nativeRenderCache", "default") + "",
             "Every view freshly parses the SAME in-memory XML; document/resource caches are not reused in any provider.",
             "Creation records parse+node construction only, excluding applyCss/layout/first paint. It is NOT cold JVM startup.",
             "Path/gradient use identical application Rotate transforms on the 24px host. Canvas backends can retain a raster surface.",
@@ -142,6 +142,13 @@ public final class SvgLibraryComparison extends Application {
         switch (provider) {
             case "native" -> {
                 var view = SvgView.parse(svg);
+                String cache = System.getProperty("svg.nativeRenderCache", "default");
+                if (!cache.equals("default")) {
+                    try { SvgView.class.getMethod("setRenderCacheEnabled", boolean.class).invoke(view, cache.equals("on")); }
+                    catch (NoSuchMethodException oldVersion) {
+                        if (cache.equals("on")) throw new IllegalStateException("Native jar has no internal render cache control");
+                    }
+                }
                 if (!view.getDiagnostics().isEmpty()) throw new IllegalStateException(view.getDiagnostics().toString());
                 view.resize(size, size); node = view;
             }
@@ -206,6 +213,7 @@ public final class SvgLibraryComparison extends Application {
         Files.write(output.resolve("creation.csv"), loads);
         caption.setText(provider + " / " + c.kind + " / " + c.count);
         stage.getScene().getRoot().applyCss(); stage.getScene().getRoot().layout();
+        stage.toFront(); stage.requestFocus();
         started = 0; previous = 0; phase = null; samples = 0; unfocused = 0; iconified = 0; first = null;
     }
     private static long nodeCount(Node node) {

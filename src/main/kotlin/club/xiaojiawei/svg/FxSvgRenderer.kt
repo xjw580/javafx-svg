@@ -5,9 +5,6 @@ import javafx.scene.Node
 import javafx.scene.paint.Color
 import javafx.scene.paint.Paint
 import javafx.scene.shape.*
-import javafx.beans.property.Property
-import javafx.css.StyleableProperty
-import javafx.css.StyleOrigin
 import javafx.scene.text.Text
 import javafx.scene.text.Font
 import javafx.scene.text.FontWeight
@@ -34,6 +31,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private val styles = SvgStyles(document, ::report)
     private val paints = SvgPaints(document, styles)
     private val updates = mutableListOf<() -> Unit>()
+    private val shapeStyles = SvgShapeStyles { if (themeReady) root.parent?.requestLayout() }
+    private var themeReady = false
     private val activeReferences = linkedSetOf<String>()
     private var clipping = false
     private var renderedElements = 0
@@ -49,9 +48,13 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         require(intrinsicWidth >= 0 && intrinsicHeight >= 0) { "Negative SVG dimensions" }
         content = render(document.root, emptyList(), emptyMap(), viewport, true) ?: Group()
         root = Group(content).apply { clip = viewportClip; isManaged = false }
+        themeReady = true
     }
 
+    fun setTheme(fill: Paint?, stroke: Paint?, strokeWidth: Double) = shapeStyles.setTheme(fill, stroke, strokeWidth)
+
     fun layout(width: Double, height: Double, preserveRatio: Boolean) {
+        shapeStyles.refresh()
         if (width != layoutWidth || height != layoutHeight || preserveRatio != layoutPreserveRatio) {
             viewport.width = box?.width ?: width
             viewport.height = box?.height ?: height
@@ -83,12 +86,14 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         viewport: SvgViewport, isRoot: Boolean = false, referenced: Boolean = false
     ): Node? {
         val updateCheckpoint = updates.size
+        val styleCheckpoint = shapeStyles.size
         return try {
             require(ancestors.size < document.options.maxDepth) { "SVG reference depth limit exceeded" }
             require(++renderedElements <= document.options.maxElements) { "SVG expanded element limit exceeded" }
             renderElement(element, ancestors, parentStyle, viewport, isRoot, referenced)
         } catch (e: IllegalArgumentException) {
             while (updates.size > updateCheckpoint) updates.removeAt(updates.lastIndex)
+            shapeStyles.discardFrom(styleCheckpoint)
             report(e.message ?: "Invalid SVG element", element)
             null
         }
@@ -362,11 +367,13 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
 
     private fun applyShapeStyle(shape: Shape, style: Map<String, String>, viewport: SvgViewport, element: SvgElement, geometry: Node = shape) {
+        val entry = shapeStyles.register(shape)
         update(element, viewport) {
-            setBase(shape.fillProperty(), paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport))
-            setBase(shape.strokeProperty(), paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport))
-            setBase(shape.strokeWidthProperty(), document.lengths.resolve(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) })
-            setBase(shape.strokeDashOffsetProperty(), document.lengths.resolve(style.getValue("stroke-dashoffset"), viewport.diagonal))
+            entry.setBase(
+                paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport),
+                paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport),
+                document.lengths.resolve(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) })
+            setSvgBaseStyle(shape.strokeDashOffsetProperty(), document.lengths.resolve(style.getValue("stroke-dashoffset"), viewport.diagonal))
         }
         shape.strokeType = StrokeType.CENTERED
         shape.strokeLineCap = when (style.getValue("stroke-linecap")) {
@@ -385,11 +392,6 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             }
             if (values.any { it > 0 }) shape.strokeDashArray.setAll(if (values.size % 2 == 0) values else values + values)
         }
-    }
-
-    private fun <T> setBase(property: Property<T>, value: T) {
-        val origin = (property as? StyleableProperty<*>)?.styleOrigin
-        if (!property.isBound && origin != StyleOrigin.AUTHOR && origin != StyleOrigin.INLINE) property.value = value
     }
 
     private fun paint(value: String, style: Map<String, String>, opacity: Double, element: SvgElement, shape: Node, viewport: SvgViewport): Paint? {

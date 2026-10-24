@@ -3,6 +3,7 @@ package club.xiaojiawei.svg
 import javafx.application.Platform
 import javafx.beans.property.BooleanProperty
 import javafx.beans.property.DoubleProperty
+import javafx.beans.property.ObjectProperty
 import javafx.beans.property.ReadOnlyBooleanProperty
 import javafx.beans.property.ReadOnlyBooleanWrapper
 import javafx.beans.property.ReadOnlyObjectProperty
@@ -12,7 +13,16 @@ import javafx.beans.property.ReadOnlyStringWrapper
 import javafx.beans.property.SimpleBooleanProperty
 import javafx.beans.property.SimpleDoubleProperty
 import javafx.concurrent.Task
+import javafx.css.CssMetaData
+import javafx.css.Styleable
+import javafx.css.StyleOrigin
+import javafx.css.StyleableDoubleProperty
+import javafx.css.StyleableObjectProperty
+import javafx.css.StyleableProperty
+import javafx.css.converter.PaintConverter
+import javafx.css.converter.SizeConverter
 import javafx.scene.layout.Region
+import javafx.scene.paint.Paint
 import java.io.InputStream
 import java.net.URI
 import java.net.URL
@@ -30,6 +40,65 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
     private val fitWidthValue = SimpleDoubleProperty(this, "fitWidth", 0.0)
     private val fitHeightValue = SimpleDoubleProperty(this, "fitHeight", 0.0)
     private val preserveRatioValue = SimpleBooleanProperty(this, "preserveRatio", true)
+    private val svgFillValue: StyleableObjectProperty<Paint?> = object : StyleableObjectProperty<Paint?>() {
+        override fun getBean(): Any = this@SvgView
+        override fun getName() = "svgFill"
+        override fun getCssMetaData() = FILL_CSS
+        override fun applyStyle(origin: StyleOrigin?, value: Paint?) {
+            if (!isBound) super.applyStyle(origin, value)
+        }
+        override fun invalidated() = updateTheme()
+    }
+    private val svgStrokeValue: StyleableObjectProperty<Paint?> = object : StyleableObjectProperty<Paint?>() {
+        override fun getBean(): Any = this@SvgView
+        override fun getName() = "svgStroke"
+        override fun getCssMetaData() = STROKE_CSS
+        override fun applyStyle(origin: StyleOrigin?, value: Paint?) {
+            if (!isBound) super.applyStyle(origin, value)
+        }
+        override fun invalidated() = updateTheme()
+    }
+    private val svgStrokeWidthValue: StyleableDoubleProperty = object : StyleableDoubleProperty(-1.0) {
+        override fun getBean(): Any = this@SvgView
+        override fun getName() = "svgStrokeWidth"
+        override fun getCssMetaData() = STROKE_WIDTH_CSS
+        override fun applyStyle(origin: StyleOrigin?, value: Number?) {
+            if (!isBound) super.applyStyle(origin, value)
+        }
+        override fun set(value: Double) {
+            require(value == -1.0 || (value.isFinite() && value >= 0)) { "svgStrokeWidth must be -1 or finite and nonnegative" }
+            super.set(value)
+        }
+        override fun invalidated() = updateTheme()
+    }
+
+    /** Unified fill for originally filled shapes; null restores source paints. Child JavaFX CSS wins. */
+    var svgFill: Paint?
+        get() = svgFillValue.get()
+        set(value) { svgFillValue.set(value) }
+    fun svgFillProperty(): ObjectProperty<Paint?> = svgFillValue
+
+    /** Unified stroke, including shapes with no source stroke; null restores source paints. */
+    var svgStroke: Paint?
+        get() = svgStrokeValue.get()
+        set(value) { svgStrokeValue.set(value) }
+    fun svgStrokeProperty(): ObjectProperty<Paint?> = svgStrokeValue
+
+    /** Unified stroke width in SVG user units. -1 restores source widths; 0 hides strokes. */
+    var svgStrokeWidth: Double
+        get() = svgStrokeWidthValue.get()
+        set(value) { svgStrokeWidthValue.set(value) }
+    fun svgStrokeWidthProperty(): DoubleProperty = svgStrokeWidthValue
+
+    private fun updateTheme() {
+        checkFxThread()
+        val width = svgStrokeWidth
+        require(width == -1.0 || (width.isFinite() && width >= 0)) { "svgStrokeWidth must be -1 or finite and nonnegative" }
+        renderer?.setTheme(svgFill, svgStroke, width)
+        requestLayout()
+    }
+
+    override fun getCssMetaData(): List<CssMetaData<out Styleable, *>> = CSS_META_DATA
 
     var document: SvgDocument?
         get() = documentValue.get()
@@ -138,6 +207,7 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
     }
 
     private fun installDocument(value: SvgDocument?, replacement: FxSvgRenderer?) {
+        replacement?.setTheme(svgFill, svgStroke, svgStrokeWidth)
         renderer = replacement
         children.setAll(listOfNotNull(replacement?.root))
         requestLayout()
@@ -200,6 +270,25 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
     }
 
     companion object {
+        // JavaFX 21 can reuse an incomplete CSS cache if the first matching icon has a bound property
+        // (JDK-8388378). Always calculate CSS; the properties guard bindings in applyStyle instead.
+        private val FILL_CSS: CssMetaData<SvgView, Paint?> = object : CssMetaData<SvgView, Paint?>("-svg-fill", PaintConverter.getInstance(), null) {
+            override fun isSettable(view: SvgView) = true
+            override fun getStyleableProperty(view: SvgView): StyleableProperty<Paint?> = view.svgFillValue
+        }
+        private val STROKE_CSS: CssMetaData<SvgView, Paint?> = object : CssMetaData<SvgView, Paint?>("-svg-stroke", PaintConverter.getInstance(), null) {
+            override fun isSettable(view: SvgView) = true
+            override fun getStyleableProperty(view: SvgView): StyleableProperty<Paint?> = view.svgStrokeValue
+        }
+        private val STROKE_WIDTH_CSS: CssMetaData<SvgView, Number> = object : CssMetaData<SvgView, Number>("-svg-stroke-width", SizeConverter.getInstance(), -1.0) {
+            override fun isSettable(view: SvgView) = true
+            override fun getStyleableProperty(view: SvgView): StyleableProperty<Number> = view.svgStrokeWidthValue
+        }
+        private val CSS_META_DATA = java.util.Collections.unmodifiableList(
+            Region.getClassCssMetaData() + listOf(FILL_CSS, STROKE_CSS, STROKE_WIDTH_CSS))
+        @Suppress("ACCIDENTAL_OVERRIDE")
+        @JvmStatic fun getClassCssMetaData(): List<CssMetaData<out Styleable, *>> = CSS_META_DATA
+
         private fun checkFxThread() {
             check(Platform.isFxApplicationThread()) { "SvgView must be used on the JavaFX application thread; parse with SvgLoader in background threads" }
         }

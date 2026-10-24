@@ -201,7 +201,57 @@ icon.source = "https://img.shields.io/github/release/xjw580/Hearthstone-Script.s
 
 还支持 Shape 自带的虚线、描边连接、填充等样式。源 SVG 的属性及样式先计算为节点初始值，应用的 JavaFX CSS 可以覆盖它们，包括源 SVG 内联样式中的值。
 
-SVG 内部样式和应用 JavaFX CSS 是两套语法：SVG 使用 `fill/stroke/stroke-width`，应用使用 `-fx-fill/-fx-stroke/-fx-stroke-width`。普通 Group/Region 没有 fill 属性，必须用选择器定位图形；本版本没有自定义 `-svg-fill` 属性。
+SVG 内部样式和应用 JavaFX CSS 是两套语法：SVG 使用 `fill/stroke/stroke-width`，应用使用 `-fx-fill/-fx-stroke/-fx-stroke-width`。普通 Group/Region 没有 fill 属性；SvgView 额外提供下述统一主题属性，也可继续用选择器定位具体图形。
+
+统一主题属性直接作用于 SvgView，默认已有 `svg-view` 样式类，无需再设置 styleClass：
+
+```css
+.svg-view {
+    -svg-fill: #409eff;
+    -svg-stroke: #333333;
+    -svg-stroke-width: 2;
+}
+
+.svg-view:hover {
+    -svg-fill: #e67700;
+}
+
+/* 内部图形的 JavaFX CSS 优先于统一主题 */
+.svg-view #accent {
+    -fx-fill: purple;
+}
+```
+
+| CSS 属性 | Kotlin/Java 属性 | 默认值及恢复方式 |
+| --- | --- | --- |
+| `-svg-fill` | `svgFill` / `svgFillProperty()` | `null`：使用源 SVG 填充 |
+| `-svg-stroke` | `svgStroke` / `svgStrokeProperty()` | `null`：使用源 SVG 描边 |
+| `-svg-stroke-width` | `svgStrokeWidth` / `svgStrokeWidthProperty()` | `-1`：使用源 SVG 线宽；`0`：隐藏描边 |
+
+填充和描边接受 JavaFX Paint（颜色或渐变），支持 looked-up color。设置统一填充会替换已有填充，包括原有渐变和多色填充；原本 `fill="none"` 的路径保持镂空，若要为它填充，应显式设置该路径的 `-fx-fill`。统一描边可为原本无描边的图形添加描边；仅设置线宽不会自动产生描边。剪裁路径和图片像素不参与统一换色。
+
+优先级为：图形绑定属性、图形的应用侧 `-fx-*` CSS（含内联样式）优先于统一主题；统一主题优先于源 SVG 样式。移除主题 CSS 或将属性恢复默认值后，使用当前视口对应的源值，保留独立的路径 CSS。统一 Paint 是完整替换，不额外叠乘源 `fill-opacity/stroke-opacity`，与直接设置 `-fx-fill/-fx-stroke` 一致。线宽以 SVG 用户单位表示，随视口变换缩放；不支持 SVG 百分比字符串，属性值只允许 -1 或有限非负数。
+
+主题属性支持绑定，绑定后的属性不被根节点 CSS 覆盖；所有读写仍在 FX 线程上执行：
+
+```kotlin
+icon.svgFill = Color.web("#409eff")
+icon.svgStrokeWidth = 2.0
+icon.svgFillProperty().bind(themePaintProperty) // ObservableValue<Paint?>
+// 取消覆盖前先解除绑定
+icon.svgFillProperty().unbind()
+icon.svgFill = null
+icon.svgStrokeWidth = -1.0
+```
+
+FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
+
+```xml
+<SvgView source="@icon.svg" svgFill="#409eff"
+         svgStroke="#333333" svgStrokeWidth="2"/>
+```
+
+统一主题会保留在视图上，后续同步/异步加载或替换 document 时应用于新节点。主题未启用的视图保持原有样式；同一文档的不同视图互不影响。默认 Demo 的右侧图标展示根主题与路径 CSS 的组合，悬停改变统一描边色。
 
 线宽表示描边宽度，随节点变换一起缩放；无法直接改变填充路径自身的几何厚度。多色图标建议按 id/class 修改，避免对所有图形统一覆盖颜色。CSS 替换填充时提供的是新的完整 Paint，源 fill-opacity 不会额外乘到新颜色上，半透明覆盖可使用 rgba()。
 

@@ -172,6 +172,28 @@ class SvgAsyncLoadTest {
         } finally { second.release.countDown() }
     }
 
+    @Test fun remoteInstallUsesLatestThemeWhileRequestIsPending() = TestServer().use { server ->
+        val response = server.respond("/theme", svg("themed"), delayed = true)
+        lateinit var view: SvgView
+        try {
+            FxTest.run {
+                view = SvgView().apply {
+                    svgFill = javafx.scene.paint.Color.BLUE
+                    source = server.url("/theme")
+                }
+            }
+            await(response.entered)
+            FxTest.run { view.svgFill = javafx.scene.paint.Color.PURPLE }
+            response.release.countDown()
+            awaitLoad(view)
+            FxTest.run {
+                assertNull(view.loadException)
+                assertEquals(javafx.scene.paint.Color.PURPLE,
+                    (view.lookup("#themed") as javafx.scene.shape.Shape).fill)
+            }
+        } finally { response.release.countDown() }
+    }
+
     private fun svg(id: String) = """<svg viewBox="0 0 24 24"><path id="$id" d="M0 0L12 12"/></svg>"""
 
     private fun await(latch: CountDownLatch, seconds: Long = 5) {

@@ -62,3 +62,6 @@ NativeRenderCache 可选 default/on/off。default 保留目标 JAR 的内部缓�
 
 可单独使用 `-RecordJfr` 诊断完整光栅分配与调用栈。每批记录 RasterBenchmarkPhase，字段区分库、场景、预热和完成状态；分析时只选择 complete=true、warmup=false 的事件区间，截图验证与写盘在区间外。默认仍关闭 JFR；采样结果不能与关闭录制的数据直接合并排名。display-analyze.ps1 默认拒绝录制数据，诊断汇总需显式传 -AllowJfr。此开关不影响原有动画基准的录制策略。
 
+
+最新静态加载分配优化及三库完整光栅复测见 [2026-10-25 报告](../static-preparation-2026-10-25.md)。DisplayProfile.java 可用 JDK 21+ 单独编译，运行 `java -cp 分析器目录 DisplayProfile 路径/display.jfr`，仅分析已完成的正式 RasterBenchmarkPhase；输出分配采样权重与稀疏 CPU 样本，不能作为精确时间或字节归因。
+

@@ -1,0 +1,7 @@
+"provider","kind","icons","valid","attempts","rounds","fx_cpu_ms_s","cpu_min","cpu_max","fx_alloc_kib_s","alloc_min","alloc_max","process_cpu_core_pct"
+"fxsvgimage","gradient","500","3","3","r1-fxsvgimage+r2-fxsvgimage+r3-fxsvgimage","0","0","0","0.503042","0.502927","32.25628","0.312364"
+"fxsvgimage","path","500","3","3","r1-fxsvgimage+r2-fxsvgimage+r3-fxsvgimage","0","0","0","32.255645","0.503035","32.257885","0"
+"jsvg-fx","gradient","500","3","3","r1-jsvg-fx+r2-jsvg-fx+r3-jsvg-fx","0","0","0","0.498371","0.498319","32.317085","0.312425"
+"jsvg-fx","path","500","3","3","r1-jsvg-fx+r2-jsvg-fx+r3-jsvg-fx","0","0","0","32.307057","0.498268","32.31498","0"
+"native","gradient","500","3","3","r1-native+r2-native+r3-native","0","0","3.123634","0.507695","0.50301","78.615631","0.312429"
+"native","path","500","3","3","r1-native+r2-native+r3-native","0","0","3.124792","32.256387","0.503092","32.264124","0"

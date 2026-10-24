@@ -1,0 +1,7 @@
+"provider","kind","icons","seconds","fx_cpu_ms_s","process_cpu_core_pct","fx_alloc_kib_s","total_alloc_kib_s","gc_count","gc_ms","focus_start","focus_end","focus_losses","iconified_start","iconified_end","run","round","eligible"
+"native","path","500","5.001841","0.000000","0.937155","32.263119","33.337723","0","0","true","true","0","false","false","r1-native","1","True"
+"native","gradient","500","5.001550","0.000000","0.000000","0.507655","1.582322","0","0","true","true","0","false","false","r1-native","1","True"
+"native","gradient","500","5.001750","0.000000","0.000000","32.263706","33.338330","0","0","true","true","0","false","false","r2-native","2","True"
+"native","path","500","5.001057","0.000000","0.000000","0.507705","1.582478","0","0","true","true","0","false","false","r2-native","2","True"
+"native","path","500","5.002713","0.000000","0.312331","32.257499","33.331916","0","0","true","true","0","false","false","r3-native","3","True"
+"native","gradient","500","5.000508","0.000000","0.000000","0.507761","1.582652","0","0","true","true","0","false","false","r3-native","3","True"

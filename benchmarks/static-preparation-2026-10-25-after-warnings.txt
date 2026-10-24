@@ -1,0 +1,1 @@
+r2-native/path : last warm=80.35725; early measured=93.83055; late measured=76.4965; inspect GC/JIT/noise; no rows removed.

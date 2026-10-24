@@ -8,6 +8,7 @@ import kotlin.math.tan
 
 internal object SvgNumbers {
     private val number = Regex("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+    private val lengthPattern = Regex("^($number)(px|%|in|cm|mm|pt|pc|q)?$", RegexOption.IGNORE_CASE)
     fun list(value: String): List<Double> {
         var end = 0
         val result = number.findAll(value).map {
@@ -27,8 +28,7 @@ internal object SvgNumbers {
     }
 
     fun length(value: String, reference: Double): Double {
-        val match = Regex("^($number)(px|%|in|cm|mm|pt|pc|q)?$", RegexOption.IGNORE_CASE)
-            .matchEntire(value.trim()) ?: throw SvgException("Unsupported length: $value")
+        val match = lengthPattern.matchEntire(value.trim()) ?: throw SvgException("Unsupported length: $value")
         val n = scalar(match.groupValues[1])
         return when (match.groupValues[2].lowercase()) {
             "%" -> n * reference / 100

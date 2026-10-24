@@ -216,8 +216,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 group
             }
             "path" -> SVGPath().apply {
-                content = element["d"] ?: ""
-                SvgPathData.validate(content)
+                content = document.geometry.path(element["d"] ?: "")
                 fillRule = fillRule(style.getValue(if (clipping) "clip-rule" else "fill-rule"))
             }
             "rect" -> Rectangle().also { shape ->
@@ -243,11 +242,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 shape.endX = length("x2", viewport.width); shape.endY = length("y2", viewport.height)
             } }
             "polyline", "polygon" -> SVGPath().apply {
-                val points = SvgNumbers.list(element["points"] ?: "")
-                require(points.size % 2 == 0) { "Odd number of polygon coordinates" }
-                content = points.chunked(2).mapIndexed { index, pair ->
-                    (if (index == 0) "M" else "L") + pair.joinToString(" ")
-                }.joinToString(" ") + if (element.name == "polygon" && points.isNotEmpty()) " Z" else ""
+                content = document.geometry.points(element["points"] ?: "", element.name == "polygon")
                 fillRule = fillRule(style.getValue(if (clipping) "clip-rule" else "fill-rule"))
             }
             else -> {

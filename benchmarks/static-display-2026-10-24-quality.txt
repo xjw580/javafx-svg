@@ -1,0 +1,4 @@
+r1-jsvg-fx/path : last warm=183.09795; early measured=188.73875; late measured=217.2013; inspect GC/JIT/noise; no rows removed.
+r2-fxsvgimage/gradient : last warm=127.5213; early measured=159.71505; late measured=169.10645; inspect GC/JIT/noise; no rows removed.
+r3-jsvg-fx/gradient : last warm=210.2021; early measured=171.25385; late measured=206.07285; inspect GC/JIT/noise; no rows removed.
+r3-native/path : last warm=204.36435; early measured=215.0752; late measured=176.25; inspect GC/JIT/noise; no rows removed.

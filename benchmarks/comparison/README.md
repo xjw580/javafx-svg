@@ -42,3 +42,20 @@ results.csv 包含 pulse 分位数、CPU、分配、GC、窗口状态。pulse �
 
 
 NativeRenderCache 可选 default/on/off。default 保留目标 JAR 的内部缓存默认策略；off 可用于纯向量对照，兼容没有该 API 的历史 JAR；on 要求 JAR 提供该开关。environment.txt 分别记录应用 Node.cache 和内部渲染缓存策略。开始每个场景时请求窗口焦点，但操作系统可能拒绝，仍须检查 unfocused_samples。历史对照报告中“缓存关闭”指当时 JAR 的实现，不与新增内部缓存混淆。
+
+## 完整像素结果与完全静态显示
+
+~~~powershell
+./benchmarks/comparison/display-run.ps1 -JavaHome 'S:/jdk25.0.1_bellsoft' -NativeJar '目标.jar' -Smoke -Output target/svg-display-comparison/smoke
+./benchmarks/comparison/display-run.ps1 -JavaHome 'S:/jdk25.0.1_bellsoft' -NativeJar '目标.jar' -Output target/svg-display-comparison/formal
+~~~
+
+工具比较 native、fxsvgimage、jsvg-fx，复用本目录已下载并校验的依赖。每模式三个独立 JVM，轮换模式顺序并在偶数轮反转场景；512 MiB 堆，默认 500 个图标，纯色和渐变分别测试。不会打开动画，不开启 JFR，不强制 GC。
+
+- 完整像素：每批新建 Scene、独立解析并构建全部实例，执行 CSS/layout，再异步快照为 740×650 逻辑像素图像，计时结束后验证每个图标的像素。覆盖延迟创建的 skin/Canvas，包含快照与像素回读。至少预热 5 批并持续 10 秒，再采 5 批；预热也全部保存。这是端到端光栅结果就绪时间，不是屏幕实际呈现延迟或纯 GPU 绘制耗时。
+- 完全静态：显示最后一批完整场景，预热 3 秒、测量 5 秒。测量区间没有 AnimationTimer、FX 定时轮询或快照；后台线程只在结束时读取 FX CPU/分配及进程计数。窗口焦点变化单独记录，仍无法探测局部遮挡。接近零的 CPU/分配可能低于计数器分辨率，不能据此断言绝对零成本。
+- 输入相同；各模式使用独立文档，关闭自动播放和应用 Node.cache，本库内部缓存保留默认策略。光栅快照在无可见窗口时进行，目标逻辑像素比例为 1；静态窗口使用设备缩放，环境文件记录其值。不得将两种像素密度的绝对数值混为同一场景。
+
+参数 Count、Repeats、WarmupBatches、RasterWarmupSeconds、MeasureBatches、IdleWarmupSeconds、IdleMeasureSeconds 可调整；正式比较必须相同。Smoke 使用 10 实例、一个预热/测量批次和 1 秒空闲区间，仅检查 API、像素、生命周期与输出完整性，不能用于性能结论。
+
+每进程保留 raster.csv（全部批次）、idle.csv、PNG、输入 SVG、环境和日志，根目录保留源码、运行计划、协议与 JAR 哈希。仅全部进程完成才写 completed.txt。汇总应先在各独立进程内统计，再比较进程中位数与完整范围；批次不能充当独立 JVM 重复。短测与固定预热都不保证稳态，需审查迭代漂移和 GC，不能只挑最快值。

@@ -77,7 +77,7 @@ public final class SvgDisplayComparison extends Application {
         Platform.setImplicitExit(false);
         this.stage=stage; fxId=Thread.currentThread().threadId();
         provider=arg("provider","native");
-        if(!List.of("native","fxsvgimage","jsvg-fx").contains(provider))throw new IllegalArgumentException("Provider");
+        if(!List.of("native","native-before","fxsvgimage","jsvg-fx").contains(provider))throw new IllegalArgumentException("Provider");
         kinds=List.of(arg("kinds","path,gradient").split(","));
         if(kinds.stream().anyMatch(k -> !List.of("path","gradient").contains(k)))throw new IllegalArgumentException("Kinds");
         count=Integer.parseInt(arg("count","500")); warmups=Integer.parseInt(arg("warmups","5"));
@@ -99,7 +99,7 @@ public final class SvgDisplayComparison extends Application {
         }
         stage.focusedProperty().addListener((o,a,b) -> {if(measuringIdle&&!b)focusLosses++;});
         Files.writeString(output.resolve("environment.txt"),String.join("\n",
-            "provider="+provider,"java="+System.getProperty("java.version"),
+            "provider="+provider,"native.api.source="+SvgView.class.getProtectionDomain().getCodeSource().getLocation(),"java="+System.getProperty("java.version"),
             "javafx="+System.getProperty("javafx.runtime.version"),"jvm="+ManagementFactory.getRuntimeMXBean().getInputArguments(),
             "icons="+count+"; raster minimum warmup batches="+warmups+"; minimum warmup seconds="+rasterWarmupSeconds+"; measured batches="+measurements,
             "idle warmup="+warmupSeconds+"; idle measure="+measureSeconds,
@@ -115,7 +115,7 @@ public final class SvgDisplayComparison extends Application {
     private Node create(String xml) throws Exception {
         Node node;
         switch(provider) {
-            case "native" -> {
+            case "native", "native-before" -> {
                 var view=SvgView.parse(xml);view.setAnimationAutoPlay(false);
                 if(!view.getDiagnostics().isEmpty())throw new IllegalStateException(view.getDiagnostics().toString());
                 view.resize(24,24);node=view;

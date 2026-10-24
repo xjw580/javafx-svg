@@ -213,17 +213,17 @@ internal class SvgAnimation private constructor(
             else -> throw SvgException("Incompatible animation values")
         }
 
-        private fun interpolate(a: Value, b: Value, t: Double, linearRgb: Boolean): Value = when {
+        fun interpolate(a: Value, b: Value, t: Double, linearRgb: Boolean): Value = when {
             a is Value.Number && b is Value.Number -> Value.Number(a.value * (1 - t) + b.value * t)
             a is Value.Vector && b is Value.Vector -> Value.Vector(DoubleArray(a.value.size) { a.value[it] * (1 - t) + b.value[it] * t })
-            a is Value.Colour && b is Value.Colour -> Value.Colour(if (!linearRgb) a.value.interpolate(b.value, t) else {
+            a is Value.Colour && b is Value.Colour -> Value.Colour(if (!linearRgb) Color((a.value.red * (1 - t) + b.value.red * t).coerceIn(0.0, 1.0), (a.value.green * (1 - t) + b.value.green * t).coerceIn(0.0, 1.0), (a.value.blue * (1 - t) + b.value.blue * t).coerceIn(0.0, 1.0), (a.value.opacity * (1 - t) + b.value.opacity * t).coerceIn(0.0, 1.0)) else {
                 fun channel(x: Double, y: Double): Double {
                     fun linear(n: Double) = if (n <= .04045) n / 12.92 else ((n + .055) / 1.055).pow(2.4)
                     val mixed = linear(x) * (1 - t) + linear(y) * t
                     return if (mixed <= .0031308) 12.92 * mixed else 1.055 * mixed.pow(1 / 2.4) - .055
                 }
-                Color(channel(a.value.red, b.value.red), channel(a.value.green, b.value.green), channel(a.value.blue, b.value.blue),
-                    a.value.opacity * (1 - t) + b.value.opacity * t)
+                Color(channel(a.value.red, b.value.red).coerceIn(0.0, 1.0), channel(a.value.green, b.value.green).coerceIn(0.0, 1.0), channel(a.value.blue, b.value.blue).coerceIn(0.0, 1.0),
+                    (a.value.opacity * (1 - t) + b.value.opacity * t).coerceIn(0.0, 1.0))
             })
             else -> throw SvgException("Incompatible animation values")
         }

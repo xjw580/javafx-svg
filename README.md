@@ -349,7 +349,47 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 
 不支持几何 CSS 属性动画、根 svg 的位置/尺寸动画、use 的 width/height 动画、textLength 本身及文字位置列表动画。SvgView 的布局尺寸由 fitWidth/fitHeight 和父布局管理。形状几何语义参考 [SVG Basic Shapes](https://www.w3.org/TR/SVG11/shapes.html)。
 
-首版不支持事件/同步链 begin、begin 时间列表、end/repeatDur、累积动画、数值/颜色的 additive=sum、paced、animateMotion、set、animateColor、路径数据/points、渐变/滤镜属性动画，以及 CSS animation/transition/@keyframes。tspan 支持上述样式动画，自身的变换动画仍受 tspan 变换限制。已检测到的不支持内容在严格模式拒绝，在宽松模式报告诊断并保留可用的静态内容。规则参考 [SVG 1.1 Animation](https://www.w3.org/TR/SVG11/animate.html)。
+首版不支持事件/同步链 begin、begin 时间列表、end/repeatDur、累积动画、数值/颜色的 additive=sum、paced、animateMotion、set、animateColor、路径数据/points、渐变/滤镜属性动画，以及 CSS transition。tspan 支持上述样式动画，自身的变换动画仍受 tspan 变换限制。已检测到的不支持内容在严格模式拒绝，在宽松模式报告诊断并保留可用的静态内容。规则参考 [SVG 1.1 Animation](https://www.w3.org/TR/SVG11/animate.html)。
+
+### SVG 内嵌 CSS 动画
+
+支持 SVG 内部 style 元素与内联 style 中的 CSS 动画，仍使用 JavaFX 原生节点与现有播放时钟：
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+        .spinner {
+            animation: spin 1s linear infinite;
+            transform-origin: 12px 12px;
+        }
+    </style>
+    <g class="spinner">
+        <path d="M12 3a9 9 0 0 1 9 9" fill="none"
+              stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
+    </g>
+</svg>
+```
+
+- 支持 @keyframes 的 from/to、百分比与逗号选择器，合并同一偏移的声明，同名规则采用最后定义。缺省 0%/100% 使用可插值的源值；每个属性使用自己的关键帧序列。
+- 支持 animation 简写和 name/duration/delay/iteration-count/direction/fill-mode/timing-function/play-state 长属性、多个动画列表及长属性列表的循环匹配。方向包含 normal/reverse/alternate/alternate-reverse；fill-mode 支持 none/forwards/backwards/both，延迟可为负数，循环可为小数或 infinite，零时长/零次数按其填充模式求值。
+- 支持 linear、ease、ease-in/out/in-out、cubic-bezier、step-start/end，以及 steps(n[,start/end/jump-start/jump-end])；关键帧可覆盖其后一个区间的 timing-function。
+- 可动画的属性：opacity、fill-opacity、stroke-opacity、fill、stroke、color、stroke-width、stroke-dashoffset 和 transform。颜色要求纯色，currentColor 在创建实例时按源 color 解析；保留 sRGB/linearRGB 插值规则。数值插值不写入文档长度缓存。
+- 2D transform 支持 translate/X/Y、scale/X/Y、rotate、skew/X/Y。兼容函数列表及 none 之间按参数插值，角度支持 deg/rad/grad/turn。静态 CSS matrix 可以使用，动画中的矩阵分解、不同类型列表的矩阵回退及 3D 变换会报告诊断。
+- transform-origin 支持长度、百分比、center/left/right/top/bottom（Z 只能为零）；transform-box 支持 view-box 和 fill-box。普通图形的 view-box 包含 viewBox 的非零原点，fill-box 使用不含描边、标记和效果的几何边界。根 SVG 使用 SvgView 当前内部布局尺寸作为 CSS 布局参考框；旋转中心会随尺寸及几何变化刷新。
+
+内部 SVG 的 !important 声明优先于 CSS 动画，关键帧中的 !important 声明按 CSS 规则忽略。多个动画同时作用于同一属性时，后列且正在贡献值的动画优先；源动画仍位于统一主题、应用 JavaFX CSS 和属性绑定之下。CSS 动画属性及变换不自动继承，组上的动态填充/描边按 SVG 样式继承。
+
+默认自动播放及 play/pause/stop/seek 对 CSS 和 SMIL 共用文档时间。静态 animation-play-state:paused 固定在文档时间零对应的画面，修改源文档可更换此配置；全局时长不计入暂停轨道。CSS 和 SMIL 可分别控制不同属性；首版对同一元素同一属性的重叠动画报告诊断，宽松模式保留 SMIL。tspan 支持上述绘制属性，其自身变换仍不支持。
+
+布局按几何、绘制属性、变换、效果顺序刷新，固定描边、marker、clipPath、mask 和滤镜读取同一帧的结果。关键帧声明缓存随 SvgDocument 共享，曲线、时钟及节点逐视图独立；展开关键帧点另受 maxElements 上限约束。
+
+此能力处理 SVG 源文档中的 CSS；Scene.stylesheets 继续使用 JavaFX 自身的 CSS 规则。首版不支持 CSS 几何/字体/滤镜属性动画、transition、动画事件、CSS 变量/calc、转义或非 ASCII 动画名称，以及其他 CSS at-rule。未知 @media/@supports/@import 等规则会独立报告并跳过，保留其前后的可用普通规则；不会加载外部样式表。严格模式仍拒绝已报告的错误或不支持内容，宽松模式保留可用样式和属性轨道。
+
+规则参考 [CSS Animations](https://www.w3.org/TR/css-animations-1/) 与 [CSS Transforms](https://www.w3.org/TR/css-transforms-1/)。
 
 ## 支持范围
 
@@ -361,7 +401,7 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 | 样式 | 属性、style 属性、style 元素；类型/class/id/复合/后代/逗号选择器；继承、优先级、!important、currentColor |
 | 描边 | 颜色、宽度、透明度、端点、连接、miterlimit、虚线、non-scaling-stroke |
 | 引用 | 本文档内 defs/use/symbol、href/xlink:href；独立实例、循环和展开数量限制 |
-| 动画 | animateTransform、样式与几何 animate；关键帧/缓动、延迟/循环、播放/暂停/停止/时间定位 |
+| 动画 | animateTransform、样式与几何 animate、CSS @keyframes；关键帧/缓动、延迟/循环、播放/暂停/停止/时间定位 |
 | 标记 | marker-start/mid/end、marker 简写；自动定向、两类坐标单位、上下文颜色/线性渐变 |
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
@@ -467,7 +507,7 @@ Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，
 
 - 不执行脚本和事件处理器，不渲染 foreignObject；声明式动画的支持范围见上文。
 - 不支持完整 filter 管线、pattern、radialGradient 的 gradientTransform 和非零 fr；vector-effect 目前只支持 none/non-scaling-stroke。
-- SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量、at-rule、外部样式表；应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
+- SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量、除 @keyframes 外的 at-rule、外部样式表；应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
 - 不支持 textPath、逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
 - 不自动加载 image/use/gradient/clipPath 中的外部文件或网络引用；load(URL) 仅打开调用方明确提供的顶层地址。
 - 未实现的属性不构成完整的规范校验。严格模式用于拒绝已检测到的错误或不支持内容，不是 SVG 全规范验证器。

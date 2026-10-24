@@ -17,7 +17,7 @@ import java.util.Collections
 import kotlin.math.hypot
 import kotlin.math.min
 
-internal data class SvgViewport(var width: Double, var height: Double) {
+internal data class SvgViewport(var width: Double, var height: Double, var x: Double = 0.0, var y: Double = 0.0) {
     val diagonal: Double get() = hypot(width, height) / kotlin.math.sqrt(2.0)
 }
 
@@ -30,7 +30,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
     private val styles = SvgStyles(document, ::report)
     private val paints = SvgPaints(document, styles)
-    private val animations = SvgAnimations(document, ::report)
+    private val animations = SvgAnimations(document, ::report) { if (themeReady) root.parent?.requestLayout() }
     val hasAnimations: Boolean get() = animations.hasAnimations
     val animationDuration: Double get() = animations.duration
     fun seekAnimations(seconds: Double) {
@@ -44,6 +44,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         return animations.style(element, base, parent, inherited, viewport)
     }
     private val updates = mutableListOf<() -> Unit>()
+    private val geometryUpdates = mutableListOf<() -> Unit>()
+    private val paintUpdates = mutableListOf<() -> Unit>()
     private val shapeStyles = SvgShapeStyles { if (themeReady) root.parent?.requestLayout() }
     private var themeReady = false
     private val activeReferences = linkedSetOf<String>()
@@ -56,7 +58,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private val box = document.root["viewBox"]?.let(SvgBox::parse)
     val intrinsicWidth = document.root["width"]?.let { document.lengths.resolve(it, box?.width ?: 300.0) } ?: box?.width ?: 300.0
     val intrinsicHeight = document.root["height"]?.let { document.lengths.resolve(it, box?.height ?: 150.0) } ?: box?.height ?: 150.0
-    private val viewport = SvgViewport(box?.width ?: intrinsicWidth, box?.height ?: intrinsicHeight)
+    private val viewport = SvgViewport(box?.width ?: intrinsicWidth, box?.height ?: intrinsicHeight, box?.x ?: 0.0, box?.y ?: 0.0)
+    private val rootCssViewport = SvgViewport(intrinsicWidth, intrinsicHeight)
     private val content: Node
     val root: Group
     private val viewportClip = Rectangle()
@@ -72,6 +75,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
 
     fun layout(width: Double, height: Double, preserveRatio: Boolean) {
         shapeStyles.refresh()
+        rootCssViewport.width = width; rootCssViewport.height = height
         if (width != layoutWidth || height != layoutHeight || preserveRatio != layoutPreserveRatio) {
             viewport.width = box?.width ?: width
             viewport.height = box?.height ?: height
@@ -90,7 +94,10 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             layoutHeight = height
             layoutPreserveRatio = preserveRatio
         }
-        // Text, filter and bounding-box updates can depend on CSS even when the viewport is unchanged.
+        // Resolve geometry and source paints before transforms; effects then see the completed frame.
+        geometryUpdates.forEach { it() }
+        paintUpdates.forEach { it() }
+        animations.refreshTransforms()
         updates.forEach { it() }
     }
     private var viewportTransform: javafx.scene.transform.Affine? = null
@@ -103,6 +110,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         viewport: SvgViewport, isRoot: Boolean = false, referenced: Boolean = false
     ): Node? {
         val updateCheckpoint = updates.size
+        val geometryCheckpoint = geometryUpdates.size
+        val paintCheckpoint = paintUpdates.size
         val styleCheckpoint = shapeStyles.size
         val maskCheckpoint = masks.size
         val animationCheckpoint = animations.size
@@ -112,6 +121,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             renderElement(element, ancestors, parentStyle, viewport, isRoot, referenced)
         } catch (e: IllegalArgumentException) {
             while (updates.size > updateCheckpoint) updates.removeAt(updates.lastIndex)
+            while (geometryUpdates.size > geometryCheckpoint) geometryUpdates.removeAt(geometryUpdates.lastIndex)
+            while (paintUpdates.size > paintCheckpoint) paintUpdates.removeAt(paintUpdates.lastIndex)
             animations.discardFrom(animationCheckpoint)
             shapeStyles.discardFrom(styleCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
@@ -145,7 +156,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
         val geometry = animations.geometry(element, viewport)
         fun length(name: String, axis: Double, default: String = "0") = geometry.length(name, axis, default)
-        fun updateGeometry(action: () -> Unit) = update(element, if (geometry.isAnimated) null else viewport, action)
+        fun updateGeometry(action: () -> Unit) = update(element, if (geometry.isAnimated) null else viewport, phase = geometryUpdates, action = action)
         fun setGeometry(property: javafx.beans.property.Property<Number>, value: Double) {
             if (geometry.isAnimated) setSvgBaseStyle(property, value) else property.value = value
         }
@@ -174,7 +185,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                         null
                     }
                 } else null
-                update(element) {
+                update(element, phase = geometryUpdates) {
                     val x = length("x", viewport.width) + length("dx", viewport.width)
                     val y = length("y", viewport.height) + length("dy", viewport.height)
                     if (adjusted != null) adjusted.position(x, y, length("textLength", viewport.width))
@@ -234,7 +245,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 if (element.name in setOf("svg", "symbol") && !isRoot) {
                     val inner = Group()
                     val nestedBox = element["viewBox"]?.let(SvgBox::parse)
-                    val nested = SvgViewport(nestedBox?.width ?: viewport.width, nestedBox?.height ?: viewport.height)
+                    val nested = SvgViewport(nestedBox?.width ?: viewport.width, nestedBox?.height ?: viewport.height, nestedBox?.x ?: 0.0, nestedBox?.y ?: 0.0)
                     val clip = Rectangle()
                     group.children += inner
                     group.clip = clip
@@ -300,7 +311,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
         val sourceTransform = SvgTransforms.parse(element["transform"])
         node.transforms += sourceTransform
-        animations.transform(element, sourceTransform)
+        animations.transform(element, sourceTransform, computed, if (isRoot) rootCssViewport else viewport, node, isRoot)
         if (clipping) styleNode.opacity = 1.0
         else if (style is SvgAnimatedStyle && "opacity" in style.affected) update(element) {
             setSvgBaseStyle(styleNode.opacityProperty(), svgStyleNumber(style, "opacity", 1.0, document.lengths).coerceIn(0.0, 1.0))
@@ -364,6 +375,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
         if (references.isEmpty()) return source
         val updateCheckpoint = updates.size
+        val geometryCheckpoint = geometryUpdates.size
+        val paintCheckpoint = paintUpdates.size
         val styleCheckpoint = shapeStyles.size
         val maskCheckpoint = masks.size
         val animationCheckpoint = animations.size
@@ -389,6 +402,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     require(document.options.maxElements - renderedElements >= 3) { "SVG expanded marker node limit exceeded" }
                     renderedElements += 3
                     val instance = SvgMarkerInstance(spec, viewport)
+                    update(owner, phase = geometryUpdates) { instance.frame(viewport) }
                     val context = SvgMarkerContext(shape, layer, ::report)
                     instance.context = context
                     layer.add(index, kind == "start", instance, end = kind == "end")
@@ -408,6 +422,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             }
         } catch (failure: IllegalArgumentException) {
             while (updates.size > updateCheckpoint) updates.removeAt(updates.lastIndex)
+            while (geometryUpdates.size > geometryCheckpoint) geometryUpdates.removeAt(geometryUpdates.lastIndex)
+            while (paintUpdates.size > paintCheckpoint) paintUpdates.removeAt(paintUpdates.lastIndex)
             animations.discardFrom(animationCheckpoint)
             shapeStyles.discardFrom(styleCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
@@ -438,7 +454,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     ): SvgTextLayout {
         val layout = SvgTextLayout(document.lengths, viewport)
         // Register flow before paint/filter updates, so CSS and resize use the new text geometry.
-        update(element) { layout.position() }
+        update(element, phase = geometryUpdates) { layout.position() }
         data class Piece(
             val value: String, val preserve: Boolean, val owner: SvgElement,
             val style: Map<String, String>, val scopes: List<SvgTextLayout.Scope>, var text: Text? = null
@@ -456,7 +472,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 if (owner[attribute] != null) report("Unsupported attribute with tspan: $attribute", owner)
             }
             if (owner.name == "tspan") {
-                if (owner["transform"] != null) report("Unsupported tspan attribute: transform", owner)
+                if (owner["transform"] != null || (computed as? SvgStyleInfo)?.cssTransform == true) report("Unsupported tspan attribute: transform", owner)
                 for (property in listOf("filter", "mask", "clip-path")) {
                     if (computed.getValue(property) != "none") report("Unsupported tspan property: $property", owner)
                 }
@@ -587,6 +603,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
 
     private fun applyMask(node: Node, value: String, viewport: SvgViewport, owner: SvgElement): Node {
         val updateCheckpoint = updates.size
+        val geometryCheckpoint = geometryUpdates.size
+        val paintCheckpoint = paintUpdates.size
         val maskCheckpoint = masks.size
         val animationCheckpoint = animations.size
         try {
@@ -618,6 +636,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             }
         } catch (failure: IllegalArgumentException) {
             while (updates.size > updateCheckpoint) updates.removeAt(updates.lastIndex)
+            while (geometryUpdates.size > geometryCheckpoint) geometryUpdates.removeAt(geometryUpdates.lastIndex)
+            while (paintUpdates.size > paintCheckpoint) paintUpdates.removeAt(paintUpdates.lastIndex)
             animations.discardFrom(animationCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
             report(failure.message ?: "Invalid mask", owner)
@@ -687,11 +707,11 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
     }
 
-    private fun update(element: SvgElement, viewport: SvgViewport? = null, action: () -> Unit) {
+    private fun update(element: SvgElement, viewport: SvgViewport? = null, phase: MutableList<() -> Unit> = updates, action: () -> Unit) {
         action()
         var previousWidth = viewport?.width ?: Double.NaN
         var previousHeight = viewport?.height ?: Double.NaN
-        updates += {
+        phase += {
             if (viewport == null || previousWidth != viewport.width || previousHeight != viewport.height) {
                 try {
                     action()
@@ -722,7 +742,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         if (context != null && (style.getValue("fill").startsWith("context-") || style.getValue("stroke").startsWith("context-"))) {
             action()
             context.updates += { try { action() } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid marker paint", element) } }
-        } else update(element, if (dynamicGeometry || style is SvgAnimatedStyle && style.affected.isNotEmpty()) null else viewport) { action() }
+        } else update(element, if (dynamicGeometry || style is SvgAnimatedStyle && style.affected.isNotEmpty()) null else viewport, phase = paintUpdates) { action() }
         shape.strokeType = StrokeType.CENTERED
         shape.strokeLineCap = when (style.getValue("stroke-linecap")) {
             "butt" -> StrokeLineCap.BUTT; "round" -> StrokeLineCap.ROUND; "square" -> StrokeLineCap.SQUARE

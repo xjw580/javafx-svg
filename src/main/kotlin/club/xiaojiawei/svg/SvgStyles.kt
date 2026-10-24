@@ -22,6 +22,15 @@ internal class SvgStyles(
         val winners = mutableMapOf<String, Winner>()
         var order = 0
         fun add(d: Declaration, specificity: Int) {
+            if (d.name == "animation") {
+                try { SvgCssTiming.expand(d.value).forEach { (name, value) -> add(d.copy(name = name, value = value), specificity) } }
+                catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid CSS animation", element) }
+                return
+            }
+            if (d.name in SvgCssTiming.defaults) {
+                try { SvgCssTiming.validate(d.name, d.value) }
+                catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid CSS animation property", element); return }
+            }
             if (d.name == "marker") {
                 listOf("marker-start", "marker-mid", "marker-end").forEach { add(d.copy(name = it), specificity) }
                 return
@@ -59,7 +68,8 @@ internal class SvgStyles(
             report("Unsupported vector-effect: ${result.getValue("vector-effect")}", element)
             result["vector-effect"] = "none"
         }
-        return result
+        return SvgComputedStyle(result, winners.filterValues { it.important }.keys.toSet(), winners.keys.toSet(),
+            winners["transform"]?.let { it.specificity >= 0 } == true)
     }
 
     private fun matches(selector: List<Compound>, element: SvgElement, ancestors: List<SvgElement>): Boolean {
@@ -96,8 +106,24 @@ internal class SvgStyles(
             "clip-path" to "none", "mask" to "none", "mask-type" to "luminance", "filter" to "none", "color-interpolation-filters" to "linearRGB",
             "stop-color" to "black", "stop-opacity" to "1",
             "font-family" to "sans-serif", "font-size" to "16", "font-weight" to "normal",
-            "font-style" to "normal", "text-anchor" to "start"
-        )
-        private val inherited = defaults.keys - setOf("opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity", "vector-effect", "overflow")
+            "font-style" to "normal", "text-anchor" to "start",
+            "transform" to "none", "transform-origin" to "0 0", "transform-box" to "view-box", "animation" to "none"
+        ) + SvgCssTiming.defaults
+        private val inherited = defaults.keys - setOf("opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity", "vector-effect", "overflow", "transform", "transform-origin", "transform-box", "animation") - SvgCssTiming.defaults.keys
     }
+}
+
+internal interface SvgStyleInfo {
+    val important: Set<String>
+    val specified: Set<String>
+    val cssTransform: Boolean
+}
+
+internal class SvgComputedStyle(
+    private val staticValues: Map<String, String>,
+    override val important: Set<String>,
+    override val specified: Set<String>,
+    override val cssTransform: Boolean
+) : AbstractMap<String, String>(), SvgStyleInfo {
+    override val entries: Set<Map.Entry<String, String>> get() = staticValues.entries
 }

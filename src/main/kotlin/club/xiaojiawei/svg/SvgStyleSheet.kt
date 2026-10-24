@@ -7,8 +7,11 @@ internal class SvgStyleSheet private constructor(
     private val typeRules: Map<String, List<Rule>>,
     private val universalRules: List<Rule>,
     private val inlineDeclarations: Map<String, ParsedDeclarations>,
-    private val issues: List<Pair<String, SvgElement>>
+    private val issues: List<Pair<String, SvgElement>>,
+    val keyframes: Map<String, Keyframes>
 ) {
+    data class Keyframe(val offset: Double, val declarations: List<Declaration>)
+    data class Keyframes(val frames: List<Keyframe>)
     data class Declaration(val name: String, val value: String, val important: Boolean)
     data class Compound(val type: String?, val ids: List<String>, val classes: List<String>)
     data class Rule(
@@ -48,6 +51,7 @@ internal class SvgStyleSheet private constructor(
         private val inlineDeclarations = mutableMapOf<String, ParsedDeclarations>()
         private val issues = mutableListOf<Pair<String, SvgElement>>()
         private var ruleOrder = 0
+        private val keyframes = linkedMapOf<String, Keyframes>()
 
         private fun report(message: String, element: SvgElement) {
             issues += message to element
@@ -70,24 +74,22 @@ internal class SvgStyleSheet private constructor(
             return SvgStyleSheet(
                 idRules.mapValues { it.value.toList() }, classRules.mapValues { it.value.toList() },
                 typeRules.mapValues { it.value.toList() }, universalRules.toList(),
-                inlineDeclarations.toMap(), issues.toList()
+                inlineDeclarations.toMap(), issues.toList(), keyframes.toMap()
             )
         }
 
         private fun parseSheet(text: String, element: SvgElement) {
-            val source = comments.replace(text, "")
-            if ('@' in source || source.count { it == '{' } != source.count { it == '}' }) {
-                report("CSS at-rules or malformed stylesheet are unsupported", element)
-                return
-            }
-            var end = 0
-            for (block in blocks.findAll(source)) {
-                if (source.substring(end, block.range.first).isNotBlank()) report("Malformed CSS stylesheet", element)
-                end = block.range.last + 1
-                val parsed = parseDeclarations(block.groupValues[2])
+            for (block in SvgCssSyntax.rules(text) { report(it, element) }) {
+                if (block.header.startsWith('@')) {
+                    if (Regex("@keyframes\\s+.*", RegexOption.IGNORE_CASE).matches(block.header)) parseKeyframes(block, element)
+                    else report("Unsupported CSS at-rule: " + block.header.substringBefore(' '), element)
+                    continue
+                }
+                if (block.body == null || block.header.isEmpty()) { report("Malformed CSS stylesheet", element); continue }
+                val parsed = parseDeclarations(block.body)
                 parsed.issues.forEach { report(it, element) }
                 val declarations = parsed.values
-                for (selector in block.groupValues[1].split(',')) {
+                for (selector in SvgCssSyntax.split(block.header)) {
                     val parts = selector.trim().split(whitespace)
                     if (parts.any { it.isEmpty() || !compound.matches(it) }) {
                         report("Unsupported CSS selector: ${selector.trim()}", element)
@@ -114,14 +116,39 @@ internal class SvgStyleSheet private constructor(
                     }.add(rule)
                 }
             }
-            if (source.substring(end).isNotBlank()) report("Malformed CSS stylesheet", element)
+        }
+
+        private fun parseKeyframes(block: SvgCssSyntax.Rule, element: SvgElement) {
+            try {
+                val name = SvgCssSyntax.name(block.header.substring(10).trim())
+                val body = requireNotNull(block.body) { "Missing CSS keyframes body" }
+                val frames = mutableListOf<Keyframe>()
+                for (frame in SvgCssSyntax.rules(body) { report(it, element) }) {
+                    try {
+                        val declarations = parseDeclarations(requireNotNull(frame.body) { "Missing CSS keyframe body" })
+                        declarations.issues.forEach { report(it, element) }
+                        val values = declarations.values.filterNot { it.important }
+                        for (selector in SvgCssSyntax.split(frame.header)) {
+                            val offset = when (selector.trim().lowercase()) {
+                                "from" -> 0.0; "to" -> 1.0
+                                else -> {
+                                    require(selector.endsWith('%')) { "Invalid CSS keyframe selector" }
+                                    SvgNumbers.scalar(selector.dropLast(1)) / 100
+                                }
+                            }
+                            require(offset in 0.0..1.0) { "CSS keyframe offset outside 0..100%" }
+                            frames += Keyframe(offset, values)
+                        }
+                    } catch (e: IllegalArgumentException) { report(e.message ?: "Invalid CSS keyframe", element) }
+                }
+                keyframes[name] = Keyframes(frames.toList())
+            } catch (e: IllegalArgumentException) { report(e.message ?: "Invalid CSS keyframes", element) }
         }
     }
 
     companion object {
         private val compound = Regex("(?:\\*|[a-zA-Z_][\\w-]*)?(?:[.#][a-zA-Z_][\\w-]*)*")
         private val comments = Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL)
-        private val blocks = Regex("([^{}]+)\\{([^{}]*)}")
         private val whitespace = Regex("\\s+")
         private val selectorTokens = Regex("([.#])([\\w-]+)")
         private val importantSuffix = Regex("\\s*!important\\s*$", RegexOption.IGNORE_CASE)
@@ -130,7 +157,9 @@ internal class SvgStyleSheet private constructor(
 
         private fun parseDeclarations(text: String): ParsedDeclarations {
             val issues = mutableListOf<String>()
-            val values = comments.replace(text, "").split(';').mapNotNull { declaration ->
+            val declarations = try { SvgCssSyntax.split(SvgCssSyntax.withoutComments(text), ';') }
+                catch (e: IllegalArgumentException) { return ParsedDeclarations(emptyList(), listOf(e.message ?: "Malformed CSS declaration")) }
+            val values = declarations.mapNotNull { declaration ->
                 if (declaration.isBlank()) return@mapNotNull null
                 val colon = declaration.indexOf(':')
                 if (colon < 1) {

@@ -43,6 +43,7 @@ internal class SvgMarkerSpec(
         require(width >= 0 && height >= 0) { "Negative marker size" }
         contentViewport.width = box?.width ?: width
         contentViewport.height = box?.height ?: height
+        contentViewport.x = box?.x ?: 0.0; contentViewport.y = box?.y ?: 0.0
         val mapping = box?.transform(width, height, element["preserveAspectRatio"]) ?: Affine()
         fun reference(name: String, axis: Double): Double {
             val value = element[name] ?: "0"

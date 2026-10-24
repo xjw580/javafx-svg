@@ -1,5 +1,7 @@
 package club.xiaojiawei.svg
 
+import javafx.geometry.BoundingBox
+import javafx.scene.Node
 import javafx.scene.paint.Color
 import javafx.scene.transform.Affine
 import java.util.IdentityHashMap
@@ -7,16 +9,18 @@ import java.util.IdentityHashMap
 /** Per-renderer animation instances. Shared documents never retain clocks or JavaFX objects. */
 internal class SvgAnimations(
     private val document: SvgDocument,
-    private val report: (String, SvgElement?) -> Unit
+    private val report: (String, SvgElement?) -> Unit,
+    private val requestLayout: () -> Unit
 ) {
-    private data class Binding(val specs: List<SvgAnimation>, val refresh: () -> Unit)
+    private data class Binding(val end: Double?, val transform: Boolean = false, val refresh: () -> Unit)
     private val index = IdentityHashMap<SvgElement, MutableList<SvgAnimation>>()
     private val bindings = mutableListOf<Binding>()
+    private var cssPointsRemaining = document.options.maxElements
     var time = 0.0
         private set
     val size: Int get() = bindings.size
-    val hasAnimations: Boolean get() = bindings.any { it.specs.isNotEmpty() }
-    val duration: Double get() = bindings.flatMap { it.specs }.maxOfOrNull { it.end.coerceAtLeast(0.0) } ?: 0.0
+    val hasAnimations: Boolean get() = bindings.any { it.end != null }
+    val duration: Double get() = bindings.mapNotNull { it.end }.maxOfOrNull { it.coerceAtLeast(0.0) } ?: 0.0
 
     init {
         var order = 0
@@ -55,7 +59,11 @@ internal class SvgAnimations(
     ): Map<String, String> {
         val local = specs(element).filter { it.transformType == null && it.attribute !in SvgAnimation.GEOMETRY }
         val inheritedAnimated = (parent as? SvgAnimatedStyle)?.affected?.intersect(inherited) ?: emptySet()
-        if (local.isEmpty() && inheritedAnimated.isEmpty()) return base
+        val css = SvgCssAnimations.create(document.styleSheet, base, element, specs(element).map { it.attribute }.toSet(), document.lengths, { points ->
+            require(points <= cssPointsRemaining) { "CSS expanded keyframe limit exceeded" }
+            cssPointsRemaining -= points
+        }, report)
+        if (local.isEmpty() && inheritedAnimated.isEmpty() && css == null) return base
         val accepted = mutableListOf<Pair<SvgAnimation, SvgAnimation.Curve>>()
         val colour = try { Color.web(base.getValue("color")) } catch (_: IllegalArgumentException) { null }
         local.forEach { spec ->
@@ -66,8 +74,9 @@ internal class SvgAnimations(
                 accepted += spec to curve
             } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid SVG animation values", spec.element) }
         }
-        if (accepted.isNotEmpty()) bindings += Binding(accepted.map { it.first }) {}
-        return SvgAnimatedStyle(base, parent as? SvgAnimatedStyle, inherited, accepted, this, document.lengths)
+        if (accepted.isNotEmpty()) bindings += Binding(accepted.maxOf { it.first.end }) {}
+        if (css != null) bindings += Binding(css.duration) {}
+        return SvgAnimatedStyle(base, parent as? SvgAnimatedStyle, inherited, accepted, this, document.lengths, css)
     }
 
     fun geometry(element: SvgElement, viewport: SvgViewport): SvgAnimatedGeometry {
@@ -81,11 +90,11 @@ internal class SvgAnimations(
                 accepted += spec to curve
             } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid geometry animation", spec.element) }
         }
-        if (accepted.isNotEmpty()) bindings += Binding(accepted.map { it.first }) {}
+        if (accepted.isNotEmpty()) bindings += Binding(accepted.maxOf { it.first.end }) {}
         return SvgAnimatedGeometry(element, accepted, this, viewport, document.lengths)
     }
 
-    fun transform(element: SvgElement, source: Affine) {
+    fun transform(element: SvgElement, source: Affine, style: Map<String, String>, viewport: SvgViewport, node: Node, isRoot: Boolean) {
         val accepted = mutableListOf<Pair<SvgAnimation, SvgAnimation.Curve>>()
         specs(element).filter { it.transformType != null }.forEach { spec ->
             try {
@@ -94,11 +103,31 @@ internal class SvgAnimations(
                 accepted += spec to curve
             } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid transform animation", spec.element) }
         }
-        if (accepted.isEmpty()) return
+        val css = (style as? SvgAnimatedStyle)?.css
+        val info = style as? SvgStyleInfo
+        var cssEnabled = info?.cssTransform == true || css?.hasTransform == true || "transform-origin" in (info?.specified ?: emptySet())
+        var cssBase = SvgCssTransform.fromAffine(source)
+        var origin = SvgCssTransform.Origin("0 0")
+        try {
+            if (info?.cssTransform == true) cssBase = SvgCssTransform.parse(style.getValue("transform"))
+            origin = SvgCssTransform.Origin(if (isRoot && "transform-origin" !in (info?.specified ?: emptySet())) "50% 50%" else style.getValue("transform-origin"))
+            require(style.getValue("transform-box") in setOf("view-box", "fill-box")) { "Unsupported CSS transform-box" }
+            css?.validateTransformBase(cssBase)
+        } catch (failure: IllegalArgumentException) {
+            report(failure.message ?: "Invalid CSS transform", element)
+            cssEnabled = false
+        }
+        if (accepted.isEmpty() && !cssEnabled) return
         accepted.sortWith(compareBy({ it.first.begin }, { it.first.order }))
         val base = Affine(source)
+        if (cssEnabled && !isRoot && style.getValue("transform-box") == "fill-box") {
+            node.boundsInLocalProperty().addListener { _, _, _ -> requestLayout() }
+        }
         val refresh = {
-            val result = Affine(base)
+            val box = if (!isRoot && style.getValue("transform-box") == "fill-box") svgGeometryBounds(node)
+                else BoundingBox(viewport.x, viewport.y, viewport.width, viewport.height)
+            val pivot = origin.point(box)
+            val result = if (cssEnabled) css?.transform(time, cssBase, box, pivot) ?: cssBase.affine(box, pivot) else Affine(base)
             accepted.forEach { (spec, curve) ->
                 spec.progress(time)?.let { progress ->
                     if (!spec.additive) result.setToIdentity()
@@ -107,7 +136,7 @@ internal class SvgAnimations(
             }
             source.setToTransform(result)
         }
-        bindings += Binding(accepted.map { it.first }) {
+        bindings += Binding(accepted.maxOfOrNull { it.first.end }, transform = true) {
             try { refresh() } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid animated transform", element) }
         }
         refresh()
@@ -115,7 +144,10 @@ internal class SvgAnimations(
 
     fun seek(seconds: Double) {
         time = seconds
-        bindings.forEach { it.refresh() }
+    }
+
+    fun refreshTransforms() {
+        bindings.forEach { if (it.transform) it.refresh() }
     }
 
     fun discardFrom(checkpoint: Int) {
@@ -130,10 +162,15 @@ internal class SvgAnimatedStyle(
     private val inherited: Set<String>,
     private val curves: List<Pair<SvgAnimation, SvgAnimation.Curve>>,
     private val clock: SvgAnimations,
-    private val lengths: SvgLengthCache
-) : Map<String, String> by base {
+    private val lengths: SvgLengthCache,
+    val css: SvgCssAnimations? = null
+) : Map<String, String> by base, SvgStyleInfo {
+    override val important: Set<String> get() = (base as? SvgStyleInfo)?.important ?: emptySet()
+    override val specified: Set<String> get() = (base as? SvgStyleInfo)?.specified ?: emptySet()
+    override val cssTransform: Boolean get() = (base as? SvgStyleInfo)?.cssTransform == true
     val affected: Set<String> = curves.mapTo(mutableSetOf()) { it.first.attribute }.apply {
         parent?.affected?.filterTo(this) { it in inherited }
+        css?.affected?.let(::addAll)
     }
 
     private val byAttribute = curves.groupBy { it.first.attribute }.mapValues { (_, values) ->
@@ -142,9 +179,12 @@ internal class SvgAnimatedStyle(
 
     fun value(name: String, reference: Double): SvgAnimation.Value? {
         val inheritedValue = if (name in inherited) parent?.value(name, reference) else null
-        val winner = byAttribute[name]?.firstOrNull { it.first.progress(clock.time) != null } ?: return inheritedValue
-        val baseValue = if (winner.first.needsBase) inheritedValue ?: baseValue(base, name, reference, lengths) else null
-        return winner.second.sample(checkNotNull(winner.first.progress(clock.time)), reference, baseValue)
+        val winner = byAttribute[name]?.firstOrNull { it.first.progress(clock.time) != null }
+        val smilBase = if (winner?.first?.needsBase == true) inheritedValue ?: baseValue(base, name, reference, lengths) else null
+        val value = winner?.let { it.second.sample(checkNotNull(it.first.progress(clock.time)), reference, smilBase) } ?: inheritedValue
+        if (css == null || name !in css.affected || name == "transform") return value
+        return css.value(name, clock.time, reference, value ?: baseValue(base, name, reference, lengths),
+            base.getValue("color-interpolation") == "linearRGB") ?: value
     }
 
     companion object {

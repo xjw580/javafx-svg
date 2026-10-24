@@ -25,7 +25,7 @@ class SvgStylesTest {
     }
 
     @Test fun diagnosesUnsupportedSelectorsAndProperties() {
-        val doc = SvgLoader.parse("""<svg><style>path:hover { fill: blue } path { mask: url(#mask) }</style><path/></svg>""")
+        val doc = SvgLoader.parse("""<svg><style>path:hover { fill: blue } path { marker-start: url(#marker) }</style><path/></svg>""")
         val issues = mutableListOf<String>()
         SvgStyles(doc) { message, _ -> issues += message }
         assertEquals(2, issues.size)

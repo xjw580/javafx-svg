@@ -35,6 +35,9 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private var themeReady = false
     private val activeReferences = linkedSetOf<String>()
     private var clipping = false
+    private var masking = false
+    private val maskBudget = SvgMaskBudget(document.options.maxMaskPixels)
+    private val masks = mutableListOf<SvgMask>()
     private var renderedElements = 0
     private val box = document.root["viewBox"]?.let(SvgBox::parse)
     val intrinsicWidth = document.root["width"]?.let { document.lengths.resolve(it, box?.width ?: 300.0) } ?: box?.width ?: 300.0
@@ -87,6 +90,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     ): Node? {
         val updateCheckpoint = updates.size
         val styleCheckpoint = shapeStyles.size
+        val maskCheckpoint = masks.size
         return try {
             require(ancestors.size < document.options.maxDepth) { "SVG reference depth limit exceeded" }
             require(++renderedElements <= document.options.maxElements) { "SVG expanded element limit exceeded" }
@@ -94,6 +98,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         } catch (e: IllegalArgumentException) {
             while (updates.size > updateCheckpoint) updates.removeAt(updates.lastIndex)
             shapeStyles.discardFrom(styleCheckpoint)
+            while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
             report(e.message ?: "Invalid SVG element", element)
             null
         }
@@ -105,15 +110,16 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     ): Node? {
         if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop", "filter")) return null
         if (element.name == "symbol" && !referenced) return null
-        if (element.name == "clipPath" && !referenced) return null
-        val style = styles.compute(element, ancestors, parentStyle)
+        if (element.name in setOf("clipPath", "mask") && !referenced) return null
+        val computed = styles.compute(element, ancestors, parentStyle)
+        val style = if (element.name == "mask") computed + mapOf("display" to "inline", "opacity" to "1", "filter" to "none") else computed
         if (style.getValue("display") == "none") return null
         if (element.name in setOf("path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "image", "use")) {
             element.children.filter { it.name !in setOf("title", "desc", "metadata") }.forEach {
                 report("Unsupported child ${it.name} inside ${element.name}", it)
             }
         }
-        for (attribute in listOf("mask", "marker-start", "marker-mid", "marker-end", "vector-effect", "paint-order")) {
+        for (attribute in listOf("marker-start", "marker-mid", "marker-end", "vector-effect", "paint-order")) {
             if (element[attribute] != null) report("Unsupported SVG attribute: $attribute", element)
         }
         fun length(name: String, axis: Double, default: String = "0") = document.lengths.resolve(element[name] ?: default, axis)
@@ -191,6 +197,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 val href = element["href"] ?: element["xlink:href"] ?: throw SvgException("Missing use href")
                 require(href.startsWith('#') && href.length > 1) { "Only local use references are supported: $href" }
                 val target = document.elementsById[href.drop(1)] ?: throw SvgException("Missing use target: $href")
+                require(target.name != "mask") { "use cannot reference a mask element" }
                 require(activeReferences.add(href)) { "Circular use reference: $href" }
                 try {
                     val instance = if (target.name in setOf("svg", "symbol")) {
@@ -207,7 +214,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     group
                 } finally { activeReferences.remove(href) }
             }
-            "svg", "g", "a", "symbol", "clipPath" -> {
+            "svg", "g", "a", "symbol", "clipPath", "mask" -> {
                 val group = Group()
                 if (element.name in setOf("svg", "symbol") && !isRoot) {
                     val inner = Group()
@@ -288,7 +295,43 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
         val result = if (!clipping && style.getValue("filter") != "none") applyFilter(node, style.getValue("filter"), viewport, element) else node
         if (style.getValue("clip-path") != "none") applyClip(result, style.getValue("clip-path"), viewport, element)
-        return result
+        return if (!clipping && style.getValue("mask") != "none") applyMask(result, style.getValue("mask"), viewport, element) else result
+    }
+
+    private fun applyMask(node: Node, value: String, viewport: SvgViewport, owner: SvgElement): Node {
+        val updateCheckpoint = updates.size
+        val maskCheckpoint = masks.size
+        try {
+            val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)").matchEntire(value)?.groupValues?.get(1)
+                ?: throw SvgException("Only local mask references are supported")
+            val target = document.elementsById[id] ?: throw SvgException("Missing mask: #$id")
+            require(target.name == "mask") { "Mask reference is not a mask: #$id" }
+            require(target["href"] == null && target["xlink:href"] == null) { "Mask templates are unsupported" }
+            require(paints.styleOf(target).getValue("mask-type") == "alpha") { "Only mask-type=alpha is currently supported" }
+            require(activeReferences.add("mask:$id")) { "Circular mask reference: #$id" }
+            val previousMasking = masking
+            try {
+                require(activeReferences.size <= document.options.maxDepth) { "Mask reference depth limit exceeded" }
+                masking = true
+                val maskViewport = if (target["maskContentUnits"] == "objectBoundingBox") SvgViewport(1.0, 1.0) else viewport
+                val content = render(target, paints.ancestorsOf(target), paints.parentStyleOf(target), maskViewport, referenced = true) ?: Group()
+                return SvgMask(node, content, target, viewport, document.lengths, maskBudget,
+                    { if (themeReady) root.parent?.requestLayout() }) { report(it, owner) }.also {
+                    masks += it
+                    updates += { it.refresh() }
+                }
+            } finally {
+                masking = previousMasking
+                activeReferences.remove("mask:$id")
+            }
+        } catch (failure: IllegalArgumentException) {
+            while (updates.size > updateCheckpoint) updates.removeAt(updates.lastIndex)
+            while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
+            report(failure.message ?: "Invalid mask", owner)
+            // Invalid or unavailable masks must not expose the unmasked source.
+            node.clip = Rectangle()
+            return node
+        }
     }
 
     private fun applyFilter(node: Node, value: String, viewport: SvgViewport, owner: SvgElement): Node {
@@ -367,12 +410,16 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
 
     private fun applyShapeStyle(shape: Shape, style: Map<String, String>, viewport: SvgViewport, element: SvgElement, geometry: Node = shape) {
-        val entry = shapeStyles.register(shape)
+        val entry = if (masking) null else shapeStyles.register(shape)
         update(element, viewport) {
-            entry.setBase(
-                paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport),
-                paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport),
-                document.lengths.resolve(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) })
+            val fill = paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport)
+            val stroke = paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport)
+            val width = document.lengths.resolve(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) }
+            if (entry != null) entry.setBase(fill, stroke, width) else {
+                setSvgBaseStyle(shape.fillProperty(), fill)
+                setSvgBaseStyle(shape.strokeProperty(), stroke)
+                setSvgBaseStyle(shape.strokeWidthProperty(), width)
+            }
             setSvgBaseStyle(shape.strokeDashOffsetProperty(), document.lengths.resolve(style.getValue("stroke-dashoffset"), viewport.diagonal))
         }
         shape.strokeType = StrokeType.CENTERED

@@ -82,11 +82,11 @@ internal class SvgStyles(
             "stroke-linecap" to "butt", "stroke-linejoin" to "miter", "stroke-miterlimit" to "4",
             "stroke-dasharray" to "none", "stroke-dashoffset" to "0",
             "display" to "inline", "visibility" to "visible",
-            "clip-path" to "none", "filter" to "none", "color-interpolation-filters" to "linearRGB",
+            "clip-path" to "none", "mask" to "none", "mask-type" to "luminance", "filter" to "none", "color-interpolation-filters" to "linearRGB",
             "stop-color" to "black", "stop-opacity" to "1",
             "font-family" to "sans-serif", "font-size" to "16", "font-weight" to "normal",
             "font-style" to "normal", "text-anchor" to "start"
         )
-        private val inherited = defaults.keys - setOf("opacity", "display", "clip-path", "filter", "stop-color", "stop-opacity")
+        private val inherited = defaults.keys - setOf("opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity")
     }
 }

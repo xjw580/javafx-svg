@@ -45,14 +45,14 @@ class SvgStyleCacheTest {
 
     @Test fun replaysDiagnosticsForEveryViewAndEveryStrictAttempt() = FxTest.run {
         val xml = """<svg><style id="sheet">path:hover { fill: red }</style>
-            <path id="p" d="M0 0L1 1" style="mask: none; fill: green"/>
+            <path id="p" d="M0 0L1 1" style="marker-start: none; fill: green"/>
             <defs><path id="unused" style="unsupported: value"/></defs></svg>"""
         val doc = SvgLoader.parse(xml)
         val first = SvgView(doc)
         val second = SvgView(doc)
         assertEquals(first.diagnostics, second.diagnostics)
         assertEquals<List<String?>>(listOf("sheet", "p"), first.diagnostics.map { it.elementId })
-        for (strictXml in listOf(xml, """<svg><path d="M0 0L1 1" style="mask: none"/></svg>""")) {
+        for (strictXml in listOf(xml, """<svg><path d="M0 0L1 1" style="marker-start: none"/></svg>""")) {
             val strictDoc = SvgLoader.parse(strictXml, SvgOptions(strict = true))
             repeat(2) { assertFailsWith<SvgException> { SvgView(strictDoc) } }
         }
@@ -62,8 +62,8 @@ class SvgStyleCacheTest {
     }
 
     @Test fun reportsSharedInlineErrorsAgainstTheCurrentElement() {
-        val doc = SvgLoader.parse("""<svg><path id="a" style="mask: none; fill: green"/>
-            <path id="b" style="mask: none; fill: green"/></svg>""")
+        val doc = SvgLoader.parse("""<svg><path id="a" style="marker-start: none; fill: green"/>
+            <path id="b" style="marker-start: none; fill: green"/></svg>""")
         repeat(2) {
             val ids = mutableListOf<String?>()
             val engine = SvgStyles(doc) { _, element -> ids += element?.id }

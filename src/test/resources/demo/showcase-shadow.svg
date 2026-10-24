@@ -1,8 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 160">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 160">
 <defs>
 <filter id="soft" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="5" stdDeviation="3" flood-color="#2563eb" flood-opacity=".4"/></filter>
 <filter id="hard" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feDropShadow dx="6" dy="6" stdDeviation="0" flood-color="#7c3aed" flood-opacity=".5"/></filter>
+<filter id="offset" filterUnits="userSpaceOnUse" x="320" y="0" width="160" height="160"><feOffset dx="12" dy="8"/></filter>
 </defs>
 <rect x="20" y="28" width="118" height="86" rx="14" fill="#2563eb" filter="url(#soft)"/>
 <rect x="178" y="28" width="118" height="86" rx="14" fill="#059669" filter="url(#hard)"/>
+<rect x="338" y="28" width="118" height="86" rx="14" fill="none" stroke="#94a3b8" stroke-dasharray="4 4"/>
+<rect x="338" y="28" width="118" height="86" rx="14" fill="#ea580c" filter="url(#offset)"/>
+<text x="345" y="145" font-size="12" fill="#64748b">FILTER OFFSET</text>
 <text x="32" y="145" font-size="12" fill="#64748b">SOFT SHADOW</text><text x="181" y="145" font-size="12" fill="#64748b">OFFSET SHADOW</text></svg>

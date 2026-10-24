@@ -134,26 +134,8 @@ internal class SvgGaussianFilter(
         return effect
     }
 
-    private fun region(element: SvgElement, proportional: Boolean, bounds: Bounds, fallback: Bounds?): Bounds {
-        fun value(name: String, horizontal: Boolean, position: Boolean): Double {
-            val raw = element[name]
-            if (raw == null && fallback != null) return when (name) {
-                "x" -> fallback.minX; "y" -> fallback.minY; "width" -> fallback.width; else -> fallback.height
-            }
-            val reference = if (horizontal) viewport.width else viewport.height
-            val amount = lengths.resolve(raw ?: if (position) "-10%" else "120%", if (proportional) 1.0 else reference)
-            val extent = if (horizontal) bounds.width else bounds.height
-            val origin = if (horizontal) bounds.minX else bounds.minY
-            return if (proportional) amount * extent + if (position) origin else 0.0 else amount
-        }
-        val x = value("x", true, true)
-        val y = value("y", false, true)
-        val width = value("width", true, false)
-        val height = value("height", false, false)
-        require(listOf(x, y, width, height).all { it.isFinite() }) { "Non-finite filter region" }
-        require(width >= 0 && height >= 0) { "Negative filter region" }
-        return BoundingBox(x, y, width, height)
-    }
+    private fun region(element: SvgElement, proportional: Boolean, bounds: Bounds, fallback: Bounds?): Bounds =
+        svgFilterRegion(element, proportional, bounds, fallback, viewport, lengths)
 
     private fun observe(node: Node) {
         node.boundsInLocalProperty().addListener { _ -> requestLayout() }

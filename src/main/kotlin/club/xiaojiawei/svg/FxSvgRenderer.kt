@@ -729,12 +729,16 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 "Filter templates and filterRes are unsupported"
             }
             val primitives = filter.children.filter { it.name !in setOf("title", "desc", "metadata") }
-            require(primitives.size == 1 && primitives.single().name in setOf("feGaussianBlur", "feDropShadow")) {
-                "Only a single feGaussianBlur or feDropShadow primitive is supported"
+            require(primitives.size == 1 && primitives.single().name in setOf("feGaussianBlur", "feDropShadow", "feOffset")) {
+                "Only a single feGaussianBlur, feDropShadow or feOffset primitive is supported"
             }
             val primitive = primitives.single()
             require(primitive.children.all { it.name in setOf("title", "desc", "metadata") }) {
-                "Animated Gaussian filters are unsupported"
+                "Animated filter primitives are unsupported"
+            }
+            if (primitive.name == "feOffset") {
+                return SvgOffsetFilter(node, filter, primitive, viewport, document.lengths) { report(it, owner) }
+                    .also { shifted -> update(owner) { shifted.refresh() } }
             }
             val primitiveStyle = paints.styleOf(primitive)
             val flood = Color.web(primitiveStyle.getValue("flood-color").let { if (it == "currentColor") primitiveStyle.getValue("color") else it })

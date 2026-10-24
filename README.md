@@ -510,7 +510,7 @@ spacing 模式当前支持单行水平的拉丁、汉字等非上下文文字；
 
 基础高斯模糊通过 JavaFX 原生效果实现，支持 SVG 属性、内联 style 和样式表中的 `filter: url(#id)`。`stdDeviation` 可为一个或两个数值；0 关闭对应方向的模糊，负值使该原语退回输入图像。滤镜坐标先于元素变换计算，滤镜输入按 filter 区域裁剪，输出再按原语子区域和 clipPath 裁剪。应用 CSS 修改填充或字体后会更新效果。
 
-支持 `edgeMode="none"` 和单个 `feGaussianBlur` 或 `feDropShadow`，暂不支持其他滤镜原语、滤镜链、模板引用、filterRes 和 duplicate/wrap 边缘扩展。sRGB/auto 支持多色输入；默认 linearRGB 仅支持单色或 SourceAlpha 输入，多色线性 RGB 合成会报告诊断并在宽松模式下保留未滤镜处理的原图。较大的标准差通过分解方差执行多轮模糊，最多 16 轮，超限会报告诊断而不会静默截断。
+支持 `edgeMode="none"` 和单个 `feGaussianBlur`、`feDropShadow` 或 `feOffset`，暂不支持其他滤镜原语、滤镜链、模板引用、filterRes 和 duplicate/wrap 边缘扩展。sRGB/auto 支持多色输入；默认 linearRGB 仅支持单色或 SourceAlpha 输入，多色线性 RGB 合成会报告诊断并在宽松模式下保留未滤镜处理的原图。较大的标准差通过分解方差执行多轮模糊，最多 16 轮，超限会报告诊断而不会静默截断。
 
 Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，可在严格模式下渲染；测试使用固定资源，不依赖网络或 GitHub 版本变化。
 
@@ -547,6 +547,8 @@ mvn dependency:tree "-Dincludes=org.openjfx"
 
 
 feDropShadow 支持 dx/dy、一个或两个 stdDeviation、flood-color/currentColor/flood-opacity，以及两种区域坐标单位。使用原生 Gaussian DropShadow；每轴标准差最多 127/3，超限报告诊断。sRGB/auto 支持多色源；默认 linearRGB 目前要求源与阴影颜色相同（SourceAlpha 要求黑色阴影），避免把 sRGB 合成冒充线性 RGB。暂不支持滤镜链及阴影原语属性动画。
+
+`feOffset` 支持 SourceGraphic（默认）和 SourceAlpha 输入、dx/dy（默认 0）、两种坐标单位及原语子区域。先裁剪输入，再偏移，最后裁剪输出；元素变换与 clipPath 作用于最终结果。使用原生 Group/Translate，保留原节点的 id、class 和 JavaFX CSS 更新。当前限单个原语，尚不支持命名结果引用、滤镜链及原语属性动画；无效参数在严格模式抛出异常，宽松模式报告诊断并保留源图。
 
 
 animateMotion 支持 path、优先的本地 mpath、values/from-to 坐标、默认 paced 弧长匀速，以及 linear/discrete/spline、keyPoints/keyTimes、rotate 数值/auto/auto-reverse、additive replace/sum。共用自动播放、延迟、重复、freeze 和 seek 控制；运动变换追加在基础及 animateTransform 之后。路径测量按文档复用，曲线有界细分；测量线段总数受 maxElements 限制，不共享节点或时钟。暂不支持百分比运动坐标、by、累积、变换后的 mpath；检测到时报告诊断。

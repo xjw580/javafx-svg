@@ -61,7 +61,7 @@ public final class SvgLibraryComparison extends Application {
     private WritableImage bestProbeFrame;
     private int probeChanges;
     private static final List<String> FEATURES = List.of("path", "gradient", "clip", "mask-alpha", "blur", "tspan",
-        "marker", "non-scaling-stroke", "css-style", "smil-transform", "smil-geometry", "smil-ms", "smil-decimal", "css-animation", "pattern", "drop-shadow", "text-path", "animate-motion");
+        "marker", "non-scaling-stroke", "css-style", "smil-transform", "smil-geometry", "smil-ms", "smil-decimal", "css-animation", "pattern", "drop-shadow", "text-path", "animate-motion", "offset", "offset-alpha");
     private final com.sun.management.ThreadMXBean threads = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
     private final com.sun.management.OperatingSystemMXBean os = (com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     record Counters(long wall, long cpu, long fxCpu, long allocated, long fxAllocated, long gcCount, long gcMillis) {}
@@ -316,6 +316,8 @@ public final class SvgLibraryComparison extends Application {
             case "tspan" -> colourCount(b, true) > 10 && colourCount(b, false) > 10;
             case "pattern" -> p.getColor(4, 32).getBlue() > .7 && p.getColor(12, 32).getOpacity() < .1;
             case "drop-shadow" -> p.getColor(20, 32).getRed() > .8 && p.getColor(40, 32).getBlue() > .6 && p.getColor(40, 32).getOpacity() > .5;
+            case "offset" -> p.getColor(32, 20).getBlue() > .7 && p.getColor(12, 12).getOpacity() < .1;
+            case "offset-alpha" -> p.getColor(32, 20).getOpacity() > .8 && p.getColor(32, 20).getBlue() < .1 && p.getColor(12, 12).getOpacity() < .1;
             case "text-path" -> colourCount(b, true) > 20 && p.getColor(32, 60).getOpacity() < .1;
             default -> false;
         };
@@ -373,6 +375,7 @@ public final class SvgLibraryComparison extends Application {
             case "smil-decimal" -> "<circle cx=\"32\" cy=\"32\" r=\"4\" fill=\"blue\"><animate attributeName=\"r\" from=\"4\" to=\"24\" dur=\"1.5s\" repeatCount=\"indefinite\"/></circle>";
             case "pattern" -> "<defs><pattern id=\"p\" patternUnits=\"userSpaceOnUse\" width=\"16\" height=\"16\"><rect width=\"8\" height=\"16\" fill=\"blue\"/></pattern></defs><rect width=\"64\" height=\"64\" fill=\"url(#p)\"/>";
             case "drop-shadow" -> "<defs><filter id=\"f\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\" color-interpolation-filters=\"sRGB\"><feDropShadow dx=\"10\" dy=\"0\" stdDeviation=\"1\" flood-color=\"blue\"/></filter></defs><rect x=\"12\" y=\"20\" width=\"20\" height=\"24\" fill=\"red\" filter=\"url(#f)\"/>";
+            case "offset", "offset-alpha" -> "<defs><filter id=\"f\" filterUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"64\" height=\"64\"><feOffset in=\"" + (kind.equals("offset-alpha") ? "SourceAlpha" : "SourceGraphic") + "\" dx=\"20\" dy=\"8\"/></filter></defs><rect x=\"8\" y=\"8\" width=\"16\" height=\"16\" fill=\"blue\" filter=\"url(#f)\"/>";
             case "text-path" -> "<defs><path id=\"p\" d=\"M4 40H60\"/></defs><text font-size=\"24\" fill=\"blue\"><textPath href=\"#p\">SVG</textPath></text>";
             case "animate-motion" -> "<circle r=\"5\" fill=\"blue\"><animateMotion path=\"M12 32H52\" dur=\"2s\" repeatCount=\"indefinite\"/></circle>";
             case "css-animation" -> "<style>@keyframes k {from {fill:blue} to {fill:red}} rect {animation:k 1500ms linear infinite alternate}</style><rect x=\"8\" y=\"8\" width=\"48\" height=\"48\"/>";

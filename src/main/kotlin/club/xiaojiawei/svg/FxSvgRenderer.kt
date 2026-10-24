@@ -38,8 +38,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private var clipping = false
     private var renderedElements = 0
     private val box = document.root["viewBox"]?.let(SvgBox::parse)
-    val intrinsicWidth = document.root["width"]?.let { SvgNumbers.length(it, box?.width ?: 300.0) } ?: box?.width ?: 300.0
-    val intrinsicHeight = document.root["height"]?.let { SvgNumbers.length(it, box?.height ?: 150.0) } ?: box?.height ?: 150.0
+    val intrinsicWidth = document.root["width"]?.let { document.lengths.resolve(it, box?.width ?: 300.0) } ?: box?.width ?: 300.0
+    val intrinsicHeight = document.root["height"]?.let { document.lengths.resolve(it, box?.height ?: 150.0) } ?: box?.height ?: 150.0
     private val viewport = SvgViewport(box?.width ?: intrinsicWidth, box?.height ?: intrinsicHeight)
     private val content: Node
     val root: Group
@@ -111,7 +111,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         for (attribute in listOf("mask", "marker-start", "marker-mid", "marker-end", "vector-effect", "paint-order")) {
             if (element[attribute] != null) report("Unsupported SVG attribute: $attribute", element)
         }
-        fun length(name: String, axis: Double, default: String = "0") = SvgNumbers.length(element[name] ?: default, axis)
+        fun length(name: String, axis: Double, default: String = "0") = document.lengths.resolve(element[name] ?: default, axis)
         fun positive(value: Double): Double = value.also { require(it >= 0) { "Negative SVG size" } }
         val node: Node = when (element.name) {
             "text" -> {
@@ -236,8 +236,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 update(element, viewport) {
                     shape.x = length("x", viewport.width); shape.y = length("y", viewport.height)
                     shape.width = positive(length("width", viewport.width)); shape.height = positive(length("height", viewport.height))
-                    val rx = positive(SvgNumbers.length(element["rx"] ?: element["ry"] ?: "0", viewport.width))
-                    val ry = positive(SvgNumbers.length(element["ry"] ?: element["rx"] ?: "0", viewport.height))
+                    val rx = positive(document.lengths.resolve(element["rx"] ?: element["ry"] ?: "0", viewport.width))
+                    val ry = positive(document.lengths.resolve(element["ry"] ?: element["rx"] ?: "0", viewport.height))
                     shape.arcWidth = 2 * min(rx, shape.width / 2)
                     shape.arcHeight = 2 * min(ry, shape.height / 2)
                 }
@@ -303,7 +303,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             require(primitive.children.all { it.name in setOf("title", "desc", "metadata") }) {
                 "Animated Gaussian filters are unsupported"
             }
-            SvgGaussianFilter(node, filter, primitive, viewport, paints.styleOf(primitive).getValue("color-interpolation-filters")) {
+            SvgGaussianFilter(node, filter, primitive, viewport, document.lengths, paints.styleOf(primitive).getValue("color-interpolation-filters")) {
                 report(it, owner)
             }.also { filtered -> update(owner) { filtered.refresh() } }
         } catch (e: IllegalArgumentException) {
@@ -365,8 +365,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         update(element, viewport) {
             setBase(shape.fillProperty(), paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport))
             setBase(shape.strokeProperty(), paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport))
-            setBase(shape.strokeWidthProperty(), SvgNumbers.length(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) })
-            setBase(shape.strokeDashOffsetProperty(), SvgNumbers.length(style.getValue("stroke-dashoffset"), viewport.diagonal))
+            setBase(shape.strokeWidthProperty(), document.lengths.resolve(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) })
+            setBase(shape.strokeDashOffsetProperty(), document.lengths.resolve(style.getValue("stroke-dashoffset"), viewport.diagonal))
         }
         shape.strokeType = StrokeType.CENTERED
         shape.strokeLineCap = when (style.getValue("stroke-linecap")) {
@@ -381,7 +381,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val dash = style.getValue("stroke-dasharray")
         if (dash != "none") {
             val values = dash.trim().split(Regex("[,\\s]+")).map {
-                SvgNumbers.length(it, viewport.diagonal).also { n -> require(n >= 0) }
+                document.lengths.resolve(it, viewport.diagonal).also { n -> require(n >= 0) }
             }
             if (values.any { it > 0 }) shape.strokeDashArray.setAll(if (values.size % 2 == 0) values else values + values)
         }

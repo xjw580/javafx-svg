@@ -27,19 +27,12 @@ internal object SvgNumbers {
         return value.trim().toDouble().also { require(it.isFinite()) }
     }
 
-    fun length(value: String, reference: Double): Double {
+    fun length(value: String, reference: Double): Double = parseLength(value).resolve(reference)
+
+    fun parseLength(value: String): SvgLength {
         val match = lengthPattern.matchEntire(value.trim()) ?: throw SvgException("Unsupported length: $value")
-        val n = scalar(match.groupValues[1])
-        return when (match.groupValues[2].lowercase()) {
-            "%" -> n * reference / 100
-            "in" -> n * 96
-            "cm" -> n * 96 / 2.54
-            "mm" -> n * 96 / 25.4
-            "q" -> n * 96 / 101.6
-            "pt" -> n * 96 / 72
-            "pc" -> n * 16
-            else -> n
-        }.also { require(it.isFinite()) }
+        val amount = match.groupValues[1].toDouble().also { require(it.isFinite()) }
+        return SvgLength(amount, match.groupValues[2].lowercase())
     }
 
     fun fraction(value: String): Double =

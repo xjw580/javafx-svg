@@ -23,6 +23,7 @@ internal class SvgGaussianFilter(
     private val filter: SvgElement,
     private val primitive: SvgElement,
     private val viewport: SvgViewport,
+    private val lengths: SvgLengthCache,
     private val interpolation: String,
     private val report: (String) -> Unit
 ) : Group() {
@@ -117,7 +118,7 @@ internal class SvgGaussianFilter(
                 "x" -> fallback.minX; "y" -> fallback.minY; "width" -> fallback.width; else -> fallback.height
             }
             val reference = if (horizontal) viewport.width else viewport.height
-            val amount = SvgNumbers.length(raw ?: if (position) "-10%" else "120%", if (proportional) 1.0 else reference)
+            val amount = lengths.resolve(raw ?: if (position) "-10%" else "120%", if (proportional) 1.0 else reference)
             val extent = if (horizontal) bounds.width else bounds.height
             val origin = if (horizontal) bounds.minX else bounds.minY
             return if (proportional) amount * extent + if (position) origin else 0.0 else amount

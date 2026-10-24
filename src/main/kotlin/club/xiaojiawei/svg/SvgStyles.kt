@@ -10,6 +10,7 @@ internal class SvgStyles(
     private val report: (String, SvgElement?) -> Unit
 ) {
     private val sheet = document.styleSheet
+    private val lengths = document.lengths
     private data class Winner(val value: String, val important: Boolean, val specificity: Int, val order: Int)
     private val elementClasses = IdentityHashMap<SvgElement, Set<String>>()
 
@@ -47,7 +48,7 @@ internal class SvgStyles(
         val fontSize = result.getValue("font-size")
         val parentFontSize = parent["font-size"]?.toDoubleOrNull() ?: 16.0
         result["font-size"] = (if (fontSize.endsWith("em")) SvgNumbers.scalar(fontSize.dropLast(2)) * parentFontSize
-            else SvgNumbers.length(fontSize, parentFontSize)).also { require(it >= 0) { "Negative font size" } }.toString()
+            else lengths.resolve(fontSize, parentFontSize)).also { require(it >= 0) { "Negative font size" } }.toString()
         return result
     }
 

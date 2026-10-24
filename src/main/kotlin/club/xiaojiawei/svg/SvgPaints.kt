@@ -70,7 +70,7 @@ internal class SvgPaints(private val document: SvgDocument, private val styles: 
             else -> throw SvgException("Invalid spreadMethod")
         }
         fun coordinate(key: String, fallback: String, reference: Double): Double =
-            SvgNumbers.length(attrs[key] ?: fallback, if (proportional) 1.0 else reference)
+            document.lengths.resolve(attrs[key] ?: fallback, if (proportional) 1.0 else reference)
         val transform = SvgTransforms.parse(attrs["gradientTransform"])
         if (chain.first().name == "linearGradient") {
             val x1 = coordinate("x1", "0%", viewport.width)
@@ -92,7 +92,7 @@ internal class SvgPaints(private val document: SvgDocument, private val styles: 
             return LinearGradient(start.x, start.y, start.x + nx / normalSquared, start.y + ny / normalSquared, false, cycle, stops)
         }
         require(transform.isIdentity) { "radialGradient gradientTransform is unsupported" }
-        require(attrs["fr"] == null || SvgNumbers.length(attrs.getValue("fr"), 1.0) == 0.0) { "Radial focal radius is unsupported" }
+        require(attrs["fr"] == null || document.lengths.resolve(attrs.getValue("fr"), 1.0) == 0.0) { "Radial focal radius is unsupported" }
         val cx = coordinate("cx", "50%", viewport.width)
         val cy = coordinate("cy", "50%", viewport.height)
         val radius = coordinate("r", "50%", viewport.diagonal)

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 112">
+<defs>
+  <marker id="arrow" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+    <path d="M0 0L8 4L0 8Z" fill="context-stroke" stroke="none"/>
+  </marker>
+  <marker id="dot" markerUnits="userSpaceOnUse" markerWidth="6" markerHeight="6" refX="3" refY="3">
+    <circle cx="3" cy="3" r="2.5" fill="#f59e0b" stroke="none"/>
+  </marker>
+</defs>
+<g font-size="10" fill="#63758c">
+  <text x="14" y="13">Auto-start-reverse</text>
+  <text x="14" y="48">Curves and vertices</text>
+  <text x="14" y="88">Non-scaling arrow and stroke</text>
+</g>
+<g fill="none" stroke="#2563eb" stroke-width="3" stroke-linejoin="round">
+  <path id="bidirectional" d="M30 26H270" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <path d="M30 67C80 40 120 90 170 66L270 66" marker-mid="url(#dot)" marker-end="url(#arrow)"/>
+  <path d="M30 101H270" vector-effect="non-scaling-stroke" marker-end="url(#arrow)"/>
+</g>
+</svg>

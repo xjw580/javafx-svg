@@ -18,6 +18,7 @@ mvn -Pdemo test-compile exec:java
 | Theme & path CSS | 根主题属性、独立路径 CSS、悬停状态 |
 | Shapes & strokes | 基本图形、曲线、端点、连接、虚线 |
 | Non-scaling stroke | 普通描边与固定 3 逻辑像素描边；切换 Preview 比较缩放 |
+| Arrows & markers | 双向箭头、曲线顶点标记、固定尺寸箭头；Theme 同步线条和箭头颜色 |
 | Linear & radial | 线性、径向、reflect 渐变 |
 | Geometric clipping | 圆形裁剪和 even-odd 镂空 |
 | Text, tspan & length | 嵌套文字片段、颜色/斜体、基线偏移、间距调整、横向字形缩放 |

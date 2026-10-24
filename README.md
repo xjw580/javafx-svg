@@ -12,7 +12,7 @@ mvn install
 mvn -Pdemo test-compile exec:java
 ```
 
-示例提供 13 项特性画廊，涵盖图形/描边、渐变、裁剪、文字、引用、Alpha/亮度遮罩、模糊、视口适配、资源缓存和 FXML。支持三种主题、80%/100%/120% 预览缩放及悬停换色。窗口缩小时自动换列，可用滚轮或 Page Up/Down、Home/End 滚动；Tab 和 Enter/Space 操作按钮。默认全部离线，点击 Load network 才加载网络徽章并显示异步状态。详见 [Demo 使用说明](demo/README.md)。示例代码和资源位于 `src/test`，不进入库 JAR。
+示例提供 14 项特性画廊，涵盖图形/描边、渐变、裁剪、文字、引用、Alpha/亮度遮罩、模糊、视口适配、资源缓存和 FXML。支持三种主题、80%/100%/120% 预览缩放及悬停换色。窗口缩小时自动换列，可用滚轮或 Page Up/Down、Home/End 滚动；Tab 和 Enter/Space 操作按钮。默认全部离线，点击 Load network 才加载网络徽章并显示异步状态。详见 [Demo 使用说明](demo/README.md)。示例代码和资源位于 `src/test`，不进入库 JAR。
 
 可见窗口交互基准（运行约 90 秒，完成后自动关闭窗口）：
 
@@ -292,6 +292,7 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
 | 样式 | 属性、style 属性、style 元素；类型/class/id/复合/后代/逗号选择器；继承、优先级、!important、currentColor |
 | 描边 | 颜色、宽度、透明度、端点、连接、miterlimit、虚线、non-scaling-stroke |
 | 引用 | 本文档内 defs/use/symbol、href/xlink:href；独立实例、循环和展开数量限制 |
+| 标记 | marker-start/mid/end、marker 简写；自动定向、两类坐标单位、上下文颜色/线性渐变 |
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
 | 遮罩 | alpha/luminance（默认）；区域、两种坐标单位、嵌套遮罩、CSS 与引用 |
@@ -348,6 +349,27 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
 
 当前片段排版支持单行水平的拉丁、汉字等非上下文文字；可用绝对坐标和偏移组织多行。暂不支持 `tspan` 与 `textLength/lengthAdjust` 组合、逐字位置列表、旋转、双向或跨片段连写排版，以及片段自身的 transform/filter/mask/clip-path；整段 text 仍支持变换、滤镜、遮罩和裁剪。上述已检测到的不支持内容在严格模式抛出异常，宽松模式报告诊断并保留自然文字排版。规则参考 [SVG 文本](https://www.w3.org/TR/SVG11/text.html)。
 
+`marker-start/marker-mid/marker-end` 支持本文档内的 `marker` 引用，适用于 path、line、polyline、polygon 和基本图形；也可使用 `marker` 简写或 SVG CSS 继承。起点和终点标记分别作用于整条路径的第一个和最后一个顶点，中间标记覆盖其余顶点（包含多子路径边界）。曲线按端点切线定向，拐点按夹角平分线定向，零长度线段使用邻近有效方向。
+
+```xml
+<defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5"
+            markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+        <path d="M0 0L10 5L0 10Z" fill="context-stroke"/>
+    </marker>
+</defs>
+<path d="M20 30H120" fill="none" stroke="#2563eb" stroke-width="3"
+      marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+```
+
+支持 `markerUnits="strokeWidth"`（默认）和 `userSpaceOnUse`、markerWidth/markerHeight、refX/refY、viewBox/preserveAspectRatio；orient 支持角度（deg/rad/grad/turn）、auto 和 auto-start-reverse。标记视口默认裁剪，marker 上可用 `overflow="visible"` 或 SVG CSS 关闭裁剪。marker 定义本身不直接显示，display=none 不影响引用；内容从定义所在位置继承 SVG 样式。
+
+`context-stroke/context-fill` 读取引用图形当前有效的描边/填充 Paint，响应根主题、应用 CSS 和属性绑定；标记内容保持自己的描边宽度与固定颜色，应用 CSS 仍可用 `.svg-marker .svg-shape` 或源 id/class 设置。上下文 Paint 目前支持颜色及线性渐变，线性渐变与引用图形保持连续；上下文径向渐变、ImagePattern 会报告诊断。marker 内容可直接使用库已支持的渐变。标记节点不接收鼠标交互。
+
+默认按填充、描边、标记的顺序绘制，元素透明度、裁剪、遮罩和滤镜作用于组合结果；objectBoundingBox 仍使用不含标记的源几何边界。strokeWidth 单位的标记跟随当前线宽；引用图形使用 non-scaling-stroke 时，这类标记在 SVG 视口缩放和任意二维变换下也保持尺寸，userSpaceOnUse 单位仍按源坐标变换。
+
+每个顶点实例独立创建节点，引用循环、深度、顶点数和节点展开均受 `SvgOptions` 限制。几何更新复用实例；应用直接修改 SVGPath.content 并改变顶点数量时会报告诊断并隐藏旧标记，重新设置 document/source 可重新创建。当前只支持本地定义，不支持 marker 模板 href、外部引用和 paint-order。规则参考 [SVG Markers](https://www.w3.org/TR/SVG2/painting.html#Markers)。
+
 `vector-effect="non-scaling-stroke"` 支持 path、基本图形与文字（含 tspan/textLength），也可在源 SVG 的内联 style、内部样式表中设置。线宽、虚线及端点/连接在最外层 SVG 视口坐标系中计算，支持 viewBox 缩放、嵌套 SVG、引用图形、旋转、非等比缩放、倾斜和镜像。
 
 ```xml
@@ -374,7 +396,7 @@ Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，
 当前不支持完整 SVG 规范。限制包括：
 
 - 不执行脚本、事件处理器、SMIL/CSS 动画，不渲染 foreignObject。
-- 不支持完整 filter 管线、pattern、marker、radialGradient 的 gradientTransform 和非零 fr；vector-effect 目前只支持 none/non-scaling-stroke。
+- 不支持完整 filter 管线、pattern、radialGradient 的 gradientTransform 和非零 fr；vector-effect 目前只支持 none/non-scaling-stroke。
 - SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量、at-rule、外部样式表；应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
 - 不支持 textPath、逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
 - 不自动加载 image/use/gradient/clipPath 中的外部文件或网络引用；load(URL) 仅打开调用方明确提供的顶层地址。

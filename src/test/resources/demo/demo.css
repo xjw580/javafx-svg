@@ -27,3 +27,6 @@
 .svg-view.theme-preview:hover { -svg-stroke: #e67700; }
 .svg-view.cache-blue { -svg-fill: #2563eb; -svg-stroke: #2563eb; -svg-stroke-width: 2.5; }
 .svg-view.cache-green { -svg-fill: #059669; -svg-stroke: #059669; -svg-stroke-width: 2.5; }
+
+.svg-view.marker-preview { -svg-stroke: -demo-accent; }
+.svg-view.marker-preview .svg-text { -fx-stroke: null; }

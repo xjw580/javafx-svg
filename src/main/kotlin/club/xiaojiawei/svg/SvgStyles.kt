@@ -22,6 +22,10 @@ internal class SvgStyles(
         val winners = mutableMapOf<String, Winner>()
         var order = 0
         fun add(d: Declaration, specificity: Int) {
+            if (d.name == "marker") {
+                listOf("marker-start", "marker-mid", "marker-end").forEach { add(d.copy(name = it), specificity) }
+                return
+            }
             val next = Winner(d.value, d.important, specificity, order++)
             val old = winners[d.name]
             if (old == null || compareValuesBy(next, old, { it.important }, { it.specificity }, { it.order }) >= 0) {
@@ -35,7 +39,8 @@ internal class SvgStyles(
             }
         }
         sheet.inline(element, report).forEach { d -> add(d, 1_000_000) }
-        val result = defaults.mapValues { (key, initial) ->
+        val result = defaults.mapValues { (key, default) ->
+            val initial = if (key == "overflow" && element.name == "marker") "hidden" else default
             val value = winners[key]?.value ?: if (key in inherited) parent[key] ?: initial else initial
             when (value) {
                 "inherit" -> parent[key] ?: initial
@@ -85,12 +90,13 @@ internal class SvgStyles(
             "fill-rule" to "nonzero", "clip-rule" to "nonzero",
             "stroke-linecap" to "butt", "stroke-linejoin" to "miter", "stroke-miterlimit" to "4",
             "stroke-dasharray" to "none", "stroke-dashoffset" to "0", "vector-effect" to "none",
-            "display" to "inline", "visibility" to "visible",
+            "display" to "inline", "visibility" to "visible", "overflow" to "visible",
+            "marker" to "none", "marker-start" to "none", "marker-mid" to "none", "marker-end" to "none",
             "clip-path" to "none", "mask" to "none", "mask-type" to "luminance", "filter" to "none", "color-interpolation-filters" to "linearRGB",
             "stop-color" to "black", "stop-opacity" to "1",
             "font-family" to "sans-serif", "font-size" to "16", "font-weight" to "normal",
             "font-style" to "normal", "text-anchor" to "start"
         )
-        private val inherited = defaults.keys - setOf("opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity", "vector-effect")
+        private val inherited = defaults.keys - setOf("opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity", "vector-effect", "overflow")
     }
 }

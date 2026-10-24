@@ -36,6 +36,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private val activeReferences = linkedSetOf<String>()
     private var clipping = false
     private var masking = false
+    private var paintContext: SvgMarkerContext? = null
     private val maskBudget = SvgMaskBudget(document.options.maxMaskPixels)
     private val masks = mutableListOf<SvgMask>()
     private var renderedElements = 0
@@ -110,16 +111,20 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     ): Node? {
         if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop", "filter")) return null
         if (element.name == "symbol" && !referenced) return null
-        if (element.name in setOf("clipPath", "mask") && !referenced) return null
+        if (element.name in setOf("clipPath", "mask", "marker") && !referenced) return null
         val computed = styles.compute(element, ancestors, parentStyle)
-        val style = if (element.name == "mask") computed + mapOf("display" to "inline", "opacity" to "1", "filter" to "none") else computed
+        val style = when (element.name) {
+            "mask" -> computed + mapOf("display" to "inline", "opacity" to "1", "filter" to "none")
+            "marker" -> computed + ("display" to "inline")
+            else -> computed
+        }
         if (style.getValue("display") == "none") return null
         if (element.name in setOf("path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "image", "use")) {
-            element.children.filter { it.name !in setOf("title", "desc", "metadata") }.forEach {
+            element.children.filter { it.name !in setOf("title", "desc", "metadata", "marker") }.forEach {
                 report("Unsupported child ${it.name} inside ${element.name}", it)
             }
         }
-        for (attribute in listOf("marker-start", "marker-mid", "marker-end", "paint-order")) {
+        for (attribute in listOf("paint-order")) {
             if (element[attribute] != null) report("Unsupported SVG attribute: $attribute", element)
         }
         fun length(name: String, axis: Double, default: String = "0") = document.lengths.resolve(element[name] ?: default, axis)
@@ -186,6 +191,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 require(href.startsWith('#') && href.length > 1) { "Only local use references are supported: $href" }
                 val target = document.elementsById[href.drop(1)] ?: throw SvgException("Missing use target: $href")
                 require(target.name != "mask") { "use cannot reference a mask element" }
+                require(target.name != "marker") { "use cannot reference a marker element" }
                 require(activeReferences.add(href)) { "Circular use reference: $href" }
                 try {
                     val instance = if (target.name in setOf("svg", "symbol")) {
@@ -202,7 +208,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     group
                 } finally { activeReferences.remove(href) }
             }
-            "svg", "g", "a", "symbol", "clipPath", "mask" -> {
+            "svg", "g", "a", "symbol", "clipPath", "mask", "marker" -> {
                 val group = Group()
                 if (element.name in setOf("svg", "symbol") && !isRoot) {
                     val inner = Group()
@@ -288,9 +294,82 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 if (element.name == "use") report("Place non-scaling-stroke on the referenced shapes, not on use", element)
             }
         } else node
-        val result = if (!clipping && style.getValue("filter") != "none") applyFilter(painted, style.getValue("filter"), viewport, element) else painted
+        val marked = if (!clipping && styleNode is Shape && element.name in setOf("path", "line", "polyline", "polygon", "rect", "circle", "ellipse"))
+            applyMarkers(painted, styleNode, style, viewport, element) else painted
+        val result = if (!clipping && style.getValue("filter") != "none") applyFilter(marked, style.getValue("filter"), viewport, element) else marked
         if (style.getValue("clip-path") != "none") applyClip(result, style.getValue("clip-path"), viewport, element)
         return if (!clipping && style.getValue("mask") != "none") applyMask(result, style.getValue("mask"), viewport, element) else result
+    }
+
+    private fun applyMarkers(source: Node, shape: Shape, style: Map<String, String>, viewport: SvgViewport, owner: SvgElement): Node {
+        val references = linkedMapOf<String, SvgMarkerSpec>()
+        for (kind in listOf("start", "mid", "end")) {
+            val value = style.getValue("marker-$kind")
+            if (value == "none") continue
+            try {
+                val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)").matchEntire(value)?.groupValues?.get(1)
+                    ?: throw SvgException("Only local marker references are supported")
+                require("marker:$id" !in activeReferences) { "Circular marker reference: #$id" }
+                val target = document.elementsById[id] ?: throw SvgException("Missing marker: #$id")
+                require(target.name == "marker") { "Marker reference is not a marker: #$id" }
+                require(target["href"] == null && target["xlink:href"] == null) { "Marker templates are unsupported" }
+                val spec = SvgMarkerSpec(target, document.lengths, paints.styleOf(target))
+                spec.frame(viewport, SvgViewport(0.0, 0.0))
+                references[kind] = spec
+            } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid marker reference", owner) }
+        }
+        if (references.isEmpty()) return source
+        val updateCheckpoint = updates.size
+        val styleCheckpoint = shapeStyles.size
+        val maskCheckpoint = masks.size
+        val layer: SvgMarkers
+        try {
+            val nodes = if (source === shape) 2 else 1
+            require(document.options.maxElements - renderedElements >= nodes) { "SVG expanded marker node limit exceeded" }
+            renderedElements += nodes
+            layer = SvgMarkers(shape, viewport, style.getValue("vector-effect") == "non-scaling-stroke", owner.name != "path",
+                document.options.maxElements, { if (themeReady) root else null },
+                { if (themeReady) root.parent?.requestLayout() }, { report(it, owner) })
+            if (layer.vertexCount == 0) return source
+            // Placement and marker viewports update before their content and context paints.
+            update(owner) { layer.refresh() }
+            for ((kind, spec) in references) {
+                val indices = when (kind) {
+                    "start" -> listOf(0)
+                    "end" -> listOf(layer.vertexCount - 1)
+                    else -> (1 until layer.vertexCount - 1).toList()
+                }
+                for (index in indices) {
+                    require(document.options.maxElements - renderedElements >= 3) { "SVG expanded marker node limit exceeded" }
+                    renderedElements += 3
+                    val instance = SvgMarkerInstance(spec, viewport)
+                    val context = SvgMarkerContext(shape, layer, ::report)
+                    instance.context = context
+                    layer.add(index, kind == "start", instance)
+                    val id = "marker:" + checkNotNull(spec.element.id)
+                    require(activeReferences.add(id)) { "Circular marker reference: $id" }
+                    val previous = paintContext
+                    try {
+                        require(activeReferences.size < document.options.maxDepth) { "Marker reference depth limit exceeded" }
+                        paintContext = context
+                        render(spec.element, paints.ancestorsOf(spec.element), paints.parentStyleOf(spec.element),
+                            instance.contentViewport, referenced = true)?.let { instance.mapped.children += it }
+                    } finally {
+                        paintContext = previous
+                        activeReferences.remove(id)
+                    }
+                }
+            }
+        } catch (failure: IllegalArgumentException) {
+            while (updates.size > updateCheckpoint) updates.removeAt(updates.lastIndex)
+            shapeStyles.discardFrom(styleCheckpoint)
+            while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
+            report(failure.message ?: "Invalid SVG marker", owner)
+            return source
+        }
+        layer.attachSource(source)
+        layer.refresh()
+        return layer
     }
 
     private fun nonScalingStroke(shape: Shape, owner: SvgElement): SvgNonScalingStroke {
@@ -575,10 +654,11 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         shape: Shape, style: Map<String, String>, viewport: SvgViewport, element: SvgElement,
         geometry: Node = shape, dynamicGeometry: Boolean = false
     ) {
-        val entry = if (masking) null else shapeStyles.register(shape)
-        update(element, if (dynamicGeometry) null else viewport) {
-            val fill = paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport)
-            val stroke = paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport)
+        val context = paintContext
+        val entry = if (masking || context != null) null else shapeStyles.register(shape)
+        val action = {
+            val fill = paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport, context)
+            val stroke = paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport, context)
             val width = document.lengths.resolve(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) }
             if (entry != null) entry.setBase(fill, stroke, width) else {
                 setSvgBaseStyle(shape.fillProperty(), fill)
@@ -587,6 +667,10 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             }
             setSvgBaseStyle(shape.strokeDashOffsetProperty(), document.lengths.resolve(style.getValue("stroke-dashoffset"), viewport.diagonal))
         }
+        if (context != null && (style.getValue("fill").startsWith("context-") || style.getValue("stroke").startsWith("context-"))) {
+            action()
+            context.updates += { try { action() } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid marker paint", element) } }
+        } else update(element, if (dynamicGeometry) null else viewport) { action() }
         shape.strokeType = StrokeType.CENTERED
         shape.strokeLineCap = when (style.getValue("stroke-linecap")) {
             "butt" -> StrokeLineCap.BUTT; "round" -> StrokeLineCap.ROUND; "square" -> StrokeLineCap.SQUARE
@@ -606,8 +690,12 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
     }
 
-    private fun paint(value: String, style: Map<String, String>, opacity: Double, element: SvgElement, shape: Node, viewport: SvgViewport): Paint? {
+    private fun paint(
+        value: String, style: Map<String, String>, opacity: Double, element: SvgElement, shape: Node,
+        viewport: SvgViewport, context: SvgMarkerContext? = null
+    ): Paint? {
         if (value == "none") return null
+        if (value in setOf("context-fill", "context-stroke")) return context?.paint(value, opacity, shape, element)
         if (value.startsWith("url(")) {
             val match = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)\\s*(.*)").matchEntire(value)
                 ?: throw SvgException("Only local paint references are supported: $value")
@@ -617,7 +705,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 report(e.message ?: "Invalid paint server", element)
                 val fallback = match.groupValues[2].ifBlank { "none" }
                 require(!fallback.startsWith("url(")) { "Invalid paint fallback" }
-                paint(fallback, style, opacity, element, shape, viewport)
+                paint(fallback, style, opacity, element, shape, viewport, context)
             }
         }
         val color = Color.web(if (value == "currentColor") style.getValue("color") else value)

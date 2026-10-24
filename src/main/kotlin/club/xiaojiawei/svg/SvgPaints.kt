@@ -31,7 +31,23 @@ internal class SvgPaints(private val document: SvgDocument, private val styles: 
     fun styleOf(element: SvgElement): Map<String, String> = computed(element)
     fun parentStyleOf(element: SvgElement): Map<String, String> = ancestors[element]?.lastOrNull()?.let(::computed) ?: emptyMap()
 
-    fun gradient(id: String, opacity: Double, viewport: SvgViewport, bounds: Bounds): Paint {
+    private data class GradientStop(val offset: Double, val color: Color, val opacity: Double)
+    private class GradientDefinition(val attrs: Map<String, String>, val linear: Boolean, val sourceStops: List<GradientStop>) {
+        val transform by lazy { SvgTransforms.parse(attrs["gradientTransform"]) }
+        private var previousOpacity = Double.NaN
+        private var resolvedStops = emptyList<Stop>()
+
+        fun stops(opacity: Double): List<Stop> {
+            if (opacity != previousOpacity) {
+                resolvedStops = sourceStops.map { Stop(it.offset, it.color.deriveColor(0.0, 1.0, 1.0, opacity * it.opacity)) }
+                previousOpacity = opacity
+            }
+            return resolvedStops
+        }
+    }
+    private val gradients = mutableMapOf<String, GradientDefinition>()
+
+    private fun gradientDefinition(id: String): GradientDefinition {
         val chain = mutableListOf<SvgElement>()
         val seen = mutableSetOf<String>()
         var next: String? = id
@@ -53,8 +69,15 @@ internal class SvgPaints(private val document: SvgDocument, private val styles: 
             val offset = max(previous, SvgNumbers.fraction(stop["offset"] ?: "0"))
             previous = offset
             val color = Color.web(style.getValue("stop-color").let { if (it == "currentColor") style.getValue("color") else it })
-            Stop(offset, color.deriveColor(0.0, 1.0, 1.0, opacity * SvgNumbers.fraction(style.getValue("stop-opacity"))))
+            GradientStop(offset, color, SvgNumbers.fraction(style.getValue("stop-opacity")))
         }.orEmpty()
+        return GradientDefinition(attrs, chain.first().name == "linearGradient", stops)
+    }
+
+    fun gradient(id: String, opacity: Double, viewport: SvgViewport, bounds: Bounds): Paint {
+        val definition = gradients.getOrPut(id) { gradientDefinition(id) }
+        val attrs = definition.attrs
+        val stops = definition.stops(opacity)
         if (stops.isEmpty()) return Color.TRANSPARENT
         if (stops.size == 1) return stops[0].color
         val proportional = when (attrs["gradientUnits"] ?: "objectBoundingBox") {
@@ -71,8 +94,8 @@ internal class SvgPaints(private val document: SvgDocument, private val styles: 
         }
         fun coordinate(key: String, fallback: String, reference: Double): Double =
             document.lengths.resolve(attrs[key] ?: fallback, if (proportional) 1.0 else reference)
-        val transform = SvgTransforms.parse(attrs["gradientTransform"])
-        if (chain.first().name == "linearGradient") {
+        val transform = definition.transform
+        if (definition.linear) {
             val x1 = coordinate("x1", "0%", viewport.width)
             val y1 = coordinate("y1", "0%", viewport.height)
             val x2 = coordinate("x2", "100%", viewport.width)

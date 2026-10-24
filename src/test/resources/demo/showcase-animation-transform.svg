@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="180" viewBox="0 0 420 180">
+  <path d="M28 76H142" fill="none" stroke="#dbe7fb" stroke-width="2" stroke-dasharray="3 4"/>
+  <circle cx="28" cy="76" r="9" fill="#2563eb">
+    <animateTransform attributeName="transform" type="translate" values="0;112;0" dur="3s" repeatCount="indefinite" calcMode="spline" keySplines=".42 0 .58 1;.42 0 .58 1"/>
+  </circle>
+  <g transform="translate(220 76)">
+    <rect x="-23" y="-23" width="46" height="46" rx="9" fill="#059669">
+      <animateTransform attributeName="transform" type="rotate" values="0;180;360" dur="4s" repeatCount="indefinite"/>
+      <animateTransform attributeName="transform" type="scale" values=".7;1.1;.7" dur="2s" repeatCount="indefinite" additive="sum"/>
+    </rect>
+  </g>
+  <g transform="translate(346 76)">
+    <rect x="-24" y="-24" width="48" height="48" rx="9" fill="#7c3aed">
+      <animateTransform attributeName="transform" type="skewX" values="-18;18;-18" dur="2s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+  <g font-family="sans-serif" font-size="12" text-anchor="middle" fill="#64748b">
+    <text x="84" y="144">TRANSLATE + EASE</text><text x="220" y="144">ROTATE + SCALE</text><text x="346" y="144">SKEW</text>
+  </g>
+</svg>

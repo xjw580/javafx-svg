@@ -1,46 +1,60 @@
-# SVG 特性演示
+# SVG 交互实验室
 
-启动交互画廊：
+启动：
 
 ```shell
 mvn -Pdemo test-compile exec:java
 ```
 
-入口为 `club.xiaojiawei.svg.demo.SvgDemoKt`。默认使用本地资源，只有点击 **Load network** 才请求网络徽章。窗口可缩放，画廊会换列；鼠标滚轮、方向键、Page Up/Down、Home/End 用于滚动。Tab 移动焦点，Enter/Space 激活按钮。
+入口为 `club.xiaojiawei.svg.demo.SvgDemoKt`。演示仅使用 javafx-graphics 和已有 javafx-fxml 测试依赖，界面与素材全部离线；只有「加载网络徽章」会请求远程资源。
 
-- **Theme**：切换蓝、绿、紫主题。主题图标使用 `-svg-fill/-svg-stroke/-svg-stroke-width`；紫色勾选由路径自己的 `-fx-stroke` 保留。悬停时轮廓改为橙色。
-- **Preview**：以 80%、100%、120% 调整 SVG 视口。**Reset** 恢复蓝色、100% 和本地徽章，并返回页首。
-- **Resource loading**：展示后台加载、成功、失败保留旧内容、清空，以及回到本地资源的状态。重新加载相同网络 URL 会请求新结果。
+界面包含分类目录、大尺寸实时预览、源图对比、源码面板和动画时间轴。宽屏并列展示预览与源码，较窄窗口将源码移到下方。鼠标滚轮与 Page Up/Down 滚动，Tab 切换焦点，Enter/Space 操作按钮；源码区支持独立滚动。
 
-| 卡片 | 观察内容 |
-| --- | --- |
-| Original SVG | 原始渐变与路径；与主题卡片共享文档 |
-| Theme & path CSS | 根主题属性、独立路径 CSS、悬停状态 |
-| Shapes & strokes | 基本图形、曲线、端点、连接、虚线 |
-| Non-scaling stroke | 普通描边与固定 3 逻辑像素描边；切换 Preview 比较缩放 |
-| Arrows & markers | 双向箭头、曲线顶点标记、固定尺寸箭头；Theme 同步线条和箭头颜色 |
-| Linear & radial | 线性、径向、reflect 渐变 |
-| Geometric clipping | 圆形裁剪和 even-odd 镂空 |
-| Text, tspan & length | 嵌套文字片段、颜色/斜体、基线偏移、间距调整、横向字形缩放 |
-| Reusable symbols | use/symbol、currentColor、组合变换 |
-| Alpha & luminance | 同一组黑灰白颜色在两种遮罩中的差别 |
-| Gaussian blur | 原始图形与 sRGB 高斯模糊 |
-| Viewport fitting | 嵌套 SVG 的 meet、slice、none |
-| Shared resource | 相同 source 共享文档，各自保持节点和样式 |
-| Loaded from FXML | 直接加载现有 icon.fxml 及其相对资源 |
+- **界面主题**：蓝、绿、紫三种强调色。「统一换色」决定是否将主题用于当前 SVG；关闭后恢复当前源样式或动画值。
+- **视口缩放**：80% / 100% / 120%，配合「保持比例」比较视口适配。
+- **源图对比**：两个视图共享文档并保留独立节点；动画对比会同步时间和播放状态。
+- **背景**：网格用于观察透明区域，深色背景方便查看浅色图形。
+- **播放控制**：播放、暂停、回到起点；可用鼠标拖动时间轴，或用左右方向键、Home/End 定位。无限动画以六秒窗口展示时间轴，当前文档时间仍持续累加。
+- **查看与复用**：展示实际 SVG/FXML、JavaFX CSS 和 Kotlin 调用示例，支持复制当前源码。CSS 页的统一主题需通过「统一换色」启用。
+- **资源加载**：选择「本地与网络资源」，观察后台加载、失败保留旧内容、清空和恢复本地资源。「恢复默认」返回蓝色、100%、网格背景及首个动画示例。
 
-离线快照与交互状态检查：
+| 分类 | 示例 | 可观察内容 |
+| --- | --- | --- |
+| 动画 | 加载与等待 | 圆弧旋转、错峰透明度、轨道运动与负 begin |
+| 动画 | 呼吸与颜色过渡 | 缩放、透明度、颜色、线宽与 spline 缓动 |
+| 动画 | 路径描边与进度 | 曲线绘制、环形进度、成功勾选及 keyTimes |
+| 动画 | 变换与缓动 | 平移、旋转、缩放叠加、倾斜 |
+| 图形 | 源 SVG | 文件中的原始填充、描边、渐变和 use |
+| 图形 | 图形与描边 | 基本图形、曲线、圆角、端点、连接和虚线 |
+| 图形 | 固定描边 | 普通描边与固定 3 个逻辑像素描边的缩放对比 |
+| 图形 | 箭头与顶点标记 | 双向箭头、曲线顶点、固定尺寸及 context-stroke |
+| 颜色与效果 | 主题与路径 CSS | 主题覆盖、独立路径 CSS、悬停状态及源图对比 |
+| 颜色与效果 | 线性与径向渐变 | 渐变停止点、透明度及 reflect |
+| 颜色与效果 | 几何裁剪 | 圆形裁剪及 even-odd 镂空 |
+| 颜色与效果 | 透明与亮度遮罩 | 同一组颜色在 Alpha / luminance 中的差别 |
+| 颜色与效果 | 高斯模糊 | 原图与 sRGB 模糊 |
+| 文本与布局 | 文字、片段与定长 | 嵌套 tspan、样式、基线、间距及字形缩放 |
+| 文本与布局 | 符号复用 | use/symbol、currentColor、组合变换 |
+| 文本与布局 | 视口适配 | 嵌套 meet、slice、none |
+| 资源 | 共享文档与独立样式 | 相同 source 共享文档，蓝/绿实例各自接受 CSS |
+| 资源 | 直接从 FXML 使用 | 实际 icon.fxml、相对资源与样式表 |
+| 资源 | 本地与网络资源 | 异步状态、失败回退、清空与本地缓存复用 |
+
+默认动画随窗口显示自动播放。暂停、切换示例、隐藏窗口或关闭窗口后，相应时钟停止推进。示例切换会停止旧视图的动画。
+
+离线快照和交互状态检查：
 
 ```shell
 mvn -Pdemo test-compile exec:java "-Dexec.args=--smoke"
 ```
 
-不会显示窗口，也不会访问网络。生成：
+不显示窗口，也不访问网络。生成：
 
-- `target/demo-preview.png`：蓝色、100%、宽屏布局。
-- `target/demo-preview-themed.png`：绿色、120%、宽屏布局。
-- `target/demo-preview-compact.png`：紫色、80%、780px 紧凑布局。
+- `target/demo-preview.png`：蓝色、100%、1440px 宽屏，加载动画与源码并列。
+- `target/demo-preview-themed.png`：绿色、120%，源图与路径 CSS 对比。
+- `target/demo-preview-compact.png`：紫色、80%、960px 布局，深色背景与下方源码。
+- `target/demo-cases/*.png`：全部 19 个示例的预览画布。
 
-检查会验证共享文档但独立节点、路径 CSS 优先、主题与尺寸切换、横向边界、滚动及资源清空/恢复；静态样本需没有渲染诊断。需要 JavaFX 图形环境。Linux 无显示器时可使用 `xvfb-run`。
+检查覆盖全部素材的零诊断、独立节点、共享文档、动画帧变化、主题与路径 CSS、源码页、横向边界、滚动和本地资源清空/恢复。需要 JavaFX 图形环境，Linux 无显示器环境可使用 xvfb-run。PNG 导出使用 Java2D，仅存在于测试示例中。
 
-示例仅使用 javafx-graphics 与已有测试依赖 javafx-fxml，不新增 javafx-controls。PNG 导出使用 Java2D，仅存在于测试示例中。原有 `--benchmark` 和 `--cache-visual-check` 入口保持可用。
+`--benchmark` 和 `--cache-visual-check` 入口继续使用原有参数；参见主 README 中的基准和缓存对照说明。

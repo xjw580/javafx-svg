@@ -1,32 +1,64 @@
-.showcase { -demo-accent: #2563eb; -demo-soft: #eff6ff; -fx-background-color: #eef3f9; -fx-font-family: "System"; }
+.showcase {
+    -demo-accent: #2563eb; -demo-soft: #eff6ff;
+    -fx-background-color: #f1f5fb; -fx-font-family: "Microsoft YaHei";
+}
 .showcase.green { -demo-accent: #059669; -demo-soft: #ecfdf5; }
 .showcase.violet { -demo-accent: #7c3aed; -demo-soft: #f5f3ff; }
-.eyebrow { -fx-fill: -demo-accent; -fx-font-size: 11; -fx-font-weight: bold; }
-.page-title { -fx-fill: #172b4d; -fx-font-size: 29; -fx-font-weight: bold; }
-.subtitle { -fx-fill: #53657d; -fx-font-size: 13; }
-.hint { -fx-fill: #63758c; -fx-font-size: 11; }
-.toolbar-label { -fx-fill: #334761; -fx-font-size: 12; -fx-font-weight: bold; }
-.demo-action { -fx-background-color: white; -fx-background-radius: 7; -fx-border-color: #ced8e5; -fx-border-radius: 7; -fx-border-width: 1; }
+.page-viewport { -fx-background-color: #f1f5fb; }
+.eyebrow { -fx-fill: -demo-accent; -fx-font-family: "Consolas"; -fx-font-size: 11; -fx-font-weight: bold; }
+.page-title { -fx-fill: #14233e; -fx-font-size: 31; -fx-font-weight: bold; }
+.subtitle { -fx-fill: #687993; -fx-font-size: 13; }
+.ready { -fx-fill: #059669; -fx-font-size: 12; -fx-font-weight: bold; }
+.hint { -fx-fill: #8492a8; -fx-font-size: 11; -fx-line-spacing: 4; }
+.toolbar-label { -fx-fill: #5c6e87; -fx-font-size: 11; }
+.section-label { -fx-fill: #7e8ca2; -fx-font-size: 11; -fx-font-weight: bold; }
+.panel, .sidebar {
+    -fx-background-color: white; -fx-background-radius: 14;
+    -fx-border-color: #e1e8f2; -fx-border-radius: 14; -fx-border-width: 1;
+}
+.panel { -fx-effect: dropshadow(gaussian, rgba(28,48,80,.035), 12, 0, 0, 3); }
+.separator { -fx-background-color: #eaf0f7; }
+.demo-action {
+    -fx-background-color: white; -fx-background-radius: 7;
+    -fx-border-color: #dce4ef; -fx-border-radius: 7; -fx-border-width: 1;
+}
 .demo-action:hover { -fx-background-color: -demo-soft; -fx-border-color: -demo-accent; }
-.demo-action:focused { -fx-border-color: -demo-accent; -fx-border-width: 2; -fx-padding: 7 11 7 11; }
-.demo-action:selected { -fx-background-color: -demo-accent; -fx-border-color: -demo-accent; }
-.action-label { -fx-fill: #3e526d; -fx-font-size: 12; }
-.demo-action:selected .action-label { -fx-fill: white; }
-.demo-card, .resource-panel { -fx-background-color: white; -fx-background-radius: 12; -fx-border-color: #dce5ef; -fx-border-radius: 12; }
-.card-title { -fx-fill: #172b4d; -fx-font-size: 16; -fx-font-weight: bold; }
-.card-tag { -fx-fill: -demo-accent; -fx-font-size: 9; -fx-font-weight: bold; }
-.card-detail { -fx-fill: #53657d; -fx-font-size: 12; }
-.preview-canvas { -fx-background-color: #f5f8fc; -fx-background-radius: 8; }
-.resource-status { -fx-fill: #334761; -fx-font-size: 12; }
-.resource-status.loading { -fx-fill: #a86508; }
-.resource-status.error { -fx-fill: #b42318; }
-.svg-view.theme-preview { -svg-fill: -demo-accent; -svg-stroke: -demo-accent; -svg-stroke-width: 3; }
-.svg-view.theme-preview .tile { -fx-fill: -demo-soft; -fx-stroke: null; }
+.demo-action:focused { -fx-border-color: -demo-accent; -fx-effect: dropshadow(gaussian, rgba(37,99,235,.18), 6, 0, 0, 0); }
+.demo-action:selected { -fx-background-color: -demo-soft; -fx-border-color: -demo-accent; }
+.demo-action:disabled { -fx-opacity: .35; }
+.action-label { -fx-fill: #52647e; -fx-font-size: 11; }
+.demo-action:selected .action-label { -fx-fill: -demo-accent; -fx-font-weight: bold; }
+.primary-action { -fx-background-color: -demo-accent; -fx-border-color: -demo-accent; }
+.primary-action .action-label { -fx-fill: white; -fx-font-weight: bold; }
+.primary-action:hover { -fx-background-color: derive(-demo-accent,-10%); }
+.category-action { -fx-background-color: transparent; -fx-border-color: transparent; -fx-alignment: center-left; }
+.category-action:selected { -fx-background-color: -demo-soft; -fx-border-color: transparent; }
+.nav-item { -fx-background-color: #f8faff; -fx-border-color: transparent; }
+.nav-item:selected { -fx-background-color: -demo-soft; -fx-border-color: -demo-accent; }
+.nav-title { -fx-fill: #314664; -fx-font-size: 12; }
+.nav-tag { -fx-fill: #8a99af; -fx-font-family: "Consolas"; -fx-font-size: 8; }
+.nav-item:selected .nav-title { -fx-fill: -demo-accent; -fx-font-weight: bold; }
+.sample-title { -fx-fill: #172b49; -fx-font-size: 23; -fx-font-weight: bold; }
+.description { -fx-fill: #6a7b93; -fx-font-size: 12; -fx-line-spacing: 3; }
+.tip { -fx-fill: #7d8da5; -fx-font-size: 11; -fx-line-spacing: 3; }
+.demo-board { -fx-border-color: #e7edf6; -fx-border-radius: 8; -fx-background-radius: 8; }
+.canvas-label { -fx-fill: #8b9bb3; -fx-font-family: "Consolas"; -fx-font-size: 10; }
+.playback-status { -fx-fill: -demo-accent; -fx-font-size: 10; }
+.time-label { -fx-fill: #6c7e98; -fx-font-family: "Consolas"; -fx-font-size: 11; }
+.timeline-fill, .timeline-thumb { -fx-fill: -demo-accent; }
+.demo-timeline:focused .timeline-thumb { -fx-stroke: #a5b4fc; -fx-stroke-width: 3; }
+.demo-timeline:disabled { -fx-opacity: .4; }
+.metrics { -fx-fill: #687d9b; -fx-font-size: 11; }
+.code-filename { -fx-fill: #8191a8; -fx-font-family: "Consolas"; -fx-font-size: 10; }
+.code-viewport { -fx-background-color: #122039; -fx-background-radius: 8; }
+.code-text { -fx-fill: #c9dbf6; -fx-font-family: "Consolas"; -fx-font-size: 11; -fx-line-spacing: 4; }
+.resource-status { -fx-fill: #5c6f8a; -fx-font-size: 12; }
+.footer { -fx-fill: #95a4b9; -fx-font-family: "Consolas"; -fx-font-size: 10; }
+.svg-view.theme-target { -svg-fill: -demo-accent; -svg-stroke: -demo-accent; -svg-stroke-width: 3; }
+.svg-view.theme-preview.theme-target .tile { -fx-fill: -demo-soft; -fx-stroke: null; }
 .svg-view.theme-preview #check { -fx-stroke: #7c3aed; -fx-stroke-width: 5; }
 .svg-view.theme-preview .svg-use .svg-path { -fx-stroke: null; }
-.svg-view.theme-preview:hover { -svg-stroke: #e67700; }
+.svg-view.theme-preview.theme-target:hover { -svg-stroke: #e67700; }
 .svg-view.cache-blue { -svg-fill: #2563eb; -svg-stroke: #2563eb; -svg-stroke-width: 2.5; }
 .svg-view.cache-green { -svg-fill: #059669; -svg-stroke: #059669; -svg-stroke-width: 2.5; }
-
-.svg-view.marker-preview { -svg-stroke: -demo-accent; }
-.svg-view.marker-preview .svg-text { -fx-stroke: null; }
+.svg-view.marker-preview .svg-text, .svg-view.animation-preview .svg-text { -fx-stroke: null; -fx-fill: #64748b; }

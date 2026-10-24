@@ -44,6 +44,8 @@ class SvgDemo : Application() {
         Sample("motion", "变换与缓动", "动画", "showcase-animation-transform.svg", "TRANSFORM · ADDITIVE", "平移缓动、旋转与缩放叠加，以及倾斜。整个过程复用原生节点。", "多个 animateTransform 可通过 additive=sum 组合。"),
         Sample("geometry", "跳动圆点与半径", "动画", "showcase-animation-geometry.svg", "POSITION · RADIUS", "圆点同时改变半径和纵坐标，脉冲圆环与椭圆直接修改几何尺寸。", "所有图形复用原生节点；拖动时间轴查看位置与尺寸的同步变化。"),
         Sample("bars", "音量柱与尺寸变化", "动画", "showcase-animation-bars.svg", "HEIGHT · WIDTH · RX", "音量柱保持底部对齐，进度条从零宽恢复，矩形圆角连续变化。", "柱子的 y 与 height 共用时间参数，始终保持 y + height = 112。"),
+        Sample("css", "CSS 关键帧动画", "动画", "showcase-css-animation.svg", "CSS @KEYFRAMES", "纯 CSS 驱动旋转、呼吸和描边进度。支持关键帧、往返播放和立方贝塞尔缓动。", "SVG 页可查看内嵌 style 源码；这些示例没有 animate 元素。"),
+        Sample("css-timing", "CSS 时序与叠加", "动画", "showcase-css-animation-timing.svg", "STEPS · ANIMATION LIST", "负延迟、反向往返、步进旋转，以及两个动画同时控制颜色和缩放。", "旋转中心按 fill-box 计算，拖动时间轴比较不同动画的相位。"),
         Sample("original", "源 SVG", "图形", "sample.svg", "PATH · USE", "保留文件中的填充、描边和渐变。右侧可以直接查看对应源文件。", "对比视图共享 SvgDocument，每个视图独立创建节点。"),
         Sample("shapes", "图形与描边", "图形", "showcase-shapes.svg", "GEOMETRY", "基本图形、贝塞尔曲线、圆角、虚线，以及不同端点和连接方式。", "调整缩放与背景，观察轮廓细节及透明区域。"),
         Sample("fixed", "固定描边", "图形", "showcase-fixed-stroke.svg", "VECTOR EFFECT", "蓝色描边随视口缩放，绿色描边保持 3 个逻辑像素。", "切换 80% / 100% / 120%，比较两种线宽的变化。"),
@@ -448,6 +450,11 @@ icon.loadingProperty().addListener { _, _, loading ->
             layoutPage()
             check(active.diagnostics.isEmpty() && reference.diagnostics.isEmpty()) { sample.key + ": " + active.diagnostics }
             check(active.hasAnimations == (sample.group == "动画")) { sample.key }
+            if (sample.key == "css") check(kotlin.math.abs(active.lookup("#css-spin").transforms.first().mxx) < 1e-8)
+            if (sample.key == "css-timing") {
+                check(kotlin.math.abs(active.lookup("#css-step").transforms.first().mxx) < 1e-8)
+                check((active.lookup("#css-mix") as Shape).fill != Color.web("#7c3aed"))
+            }
             if (sample.key == "geometry") check((active.lookup("#ring") as javafx.scene.shape.Circle).radius > 8.0)
             if (sample.key == "bars") {
                 val bar = active.lookup("#audio-bar") as javafx.scene.shape.Rectangle
@@ -494,6 +501,8 @@ icon.loadingProperty().addListener { _, _, loading ->
         selectTheme(0); selectZoom(1.0); board.dark = false; darkButton.selected = false
         viewport.resize(1440.0, 980.0); seek(.75)
         savePreview("demo-preview-geometry.png")
+        selectSample(samples.first { it.key == "css" }); seek(.75)
+        savePreview("demo-preview-css.png")
         println("SVG lab smoke passed: " + samples.size + " examples, independent nodes, animation frames, themes, source tabs, responsive layout and local loading.")
         Platform.exit()
     }

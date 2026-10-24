@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="180" viewBox="0 0 420 180">
+  <style>
+    .arc { fill: none; stroke: #2563eb; stroke-width: 6; stroke-linecap: round; }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .css-spin { animation: spin 1s linear infinite; transform-origin: 0 0; }
+    @keyframes breathe {
+      from { opacity: .35; transform: scale(.75); fill: #059669; }
+      to { opacity: 1; transform: scale(1.1); fill: #10b981; }
+    }
+    .breath {
+      animation: breathe 1.6s ease-in-out infinite alternate;
+      transform-origin: center; transform-box: fill-box;
+    }
+    @keyframes draw {
+      0%, 100% { stroke-dashoffset: 176; }
+      70% { stroke-dashoffset: 0; }
+    }
+    .progress {
+      fill: none; stroke: #7c3aed; stroke-width: 6; stroke-linecap: round;
+      stroke-dasharray: 176; stroke-dashoffset: 176;
+      transform: rotate(-90deg); transform-origin: 340px 76px;
+      animation: draw 2.4s cubic-bezier(.42, 0, .58, 1) infinite;
+    }
+  </style>
+  <g transform="translate(72 76)">
+    <circle r="30" fill="none" stroke="#dbe7fb" stroke-width="6"/>
+    <g id="css-spin" class="css-spin"><path class="arc" d="M0-30A30 30 0 0 1 30 0"/></g>
+  </g>
+  <rect class="breath" x="178" y="44" width="64" height="64" rx="16" fill="#059669"/>
+  <circle cx="340" cy="76" r="28" fill="none" stroke="#ede9fe" stroke-width="6"/>
+  <circle class="progress" cx="340" cy="76" r="28"/>
+  <g font-family="sans-serif" font-size="12" text-anchor="middle" fill="#64748b">
+    <text x="72" y="144">CSS ROTATE</text><text x="210" y="144">ALTERNATE</text><text x="340" y="144">DASH + EASING</text>
+  </g>
+</svg>

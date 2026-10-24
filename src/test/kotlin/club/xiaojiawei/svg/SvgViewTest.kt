@@ -119,11 +119,11 @@ class SvgViewTest {
         assertSame(path, view.lookup("#p"))
     }
 
-    @Test fun rootTransformIsAppliedOutsideViewBoxAndAnimationsAreReported() = FxTest.run {
+    @Test fun rootTransformIsAppliedOutsideViewBoxAndInvalidAnimationsAreReported() = FxTest.run {
         val view = SvgView.parse("""<svg viewBox="0 0 10 10" transform="translate(5 0)"><path id="p" d="M0 0L10 10">
             <animate attributeName="fill" values="red;blue"/></path></svg>""")
         view.resize(20.0, 20.0); view.layout()
         assertEquals(5.0, view.lookup("#p").localToScene(0.0, 0.0).x)
-        assertTrue(view.diagnostics.any { it.message.contains("animate") })
+        assertTrue(view.diagnostics.any { it.message.contains("finite dur") })
     }
 }

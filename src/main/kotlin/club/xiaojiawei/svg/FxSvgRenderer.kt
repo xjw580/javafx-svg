@@ -30,6 +30,19 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
     private val styles = SvgStyles(document, ::report)
     private val paints = SvgPaints(document, styles)
+    private val animations = SvgAnimations(document, ::report)
+    val hasAnimations: Boolean get() = animations.hasAnimations
+    val animationDuration: Double get() = animations.duration
+    fun seekAnimations(seconds: Double) {
+        animations.seek(seconds)
+        if (themeReady) root.parent?.requestLayout()
+    }
+
+    private fun computedStyle(element: SvgElement, ancestors: List<SvgElement>, parent: Map<String, String>, viewport: SvgViewport): Map<String, String> {
+        val inherited = mutableSetOf<String>()
+        val base = styles.compute(element, ancestors, parent, inherited)
+        return animations.style(element, base, parent, inherited, viewport)
+    }
     private val updates = mutableListOf<() -> Unit>()
     private val shapeStyles = SvgShapeStyles { if (themeReady) root.parent?.requestLayout() }
     private var themeReady = false
@@ -92,12 +105,14 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val updateCheckpoint = updates.size
         val styleCheckpoint = shapeStyles.size
         val maskCheckpoint = masks.size
+        val animationCheckpoint = animations.size
         return try {
             require(ancestors.size < document.options.maxDepth) { "SVG reference depth limit exceeded" }
             require(++renderedElements <= document.options.maxElements) { "SVG expanded element limit exceeded" }
             renderElement(element, ancestors, parentStyle, viewport, isRoot, referenced)
         } catch (e: IllegalArgumentException) {
             while (updates.size > updateCheckpoint) updates.removeAt(updates.lastIndex)
+            animations.discardFrom(animationCheckpoint)
             shapeStyles.discardFrom(styleCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
             report(e.message ?: "Invalid SVG element", element)
@@ -109,10 +124,11 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         element: SvgElement, ancestors: List<SvgElement>, parentStyle: Map<String, String>,
         viewport: SvgViewport, isRoot: Boolean, referenced: Boolean
     ): Node? {
+        if (element.name in SvgAnimation.NAMES) return null
         if (element.name in setOf("defs", "style", "title", "desc", "metadata", "linearGradient", "radialGradient", "stop", "filter")) return null
         if (element.name == "symbol" && !referenced) return null
         if (element.name in setOf("clipPath", "mask", "marker") && !referenced) return null
-        val computed = styles.compute(element, ancestors, parentStyle)
+        val computed = computedStyle(element, ancestors, parentStyle, viewport)
         val style = when (element.name) {
             "mask" -> computed + mapOf("display" to "inline", "opacity" to "1", "filter" to "none")
             "marker" -> computed + ("display" to "inline")
@@ -120,7 +136,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
         if (style.getValue("display") == "none") return null
         if (element.name in setOf("path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "image", "use")) {
-            element.children.filter { it.name !in setOf("title", "desc", "metadata", "marker") }.forEach {
+            element.children.filter { it.name !in setOf("title", "desc", "metadata", "marker") + SvgAnimation.NAMES }.forEach {
                 report("Unsupported child ${it.name} inside ${element.name}", it)
             }
         }
@@ -134,7 +150,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 renderTextSpans(element, ancestors, style, viewport)
             } else {
                 val text = Text()
-                element.children.forEach { report("Unsupported text child: ${it.name}", it) }
+                element.children.filter { it.name !in SvgAnimation.NAMES }.forEach { report("Unsupported text child: ${it.name}", it) }
                 listOf("rotate", "dominant-baseline", "writing-mode").forEach {
                     if (element[it] != null) report("Unsupported text attribute: $it", element)
                 }
@@ -275,8 +291,13 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             styleNode.styleClass += "svg-${element.name}"
             element["class"]?.split(Regex("\\s+"))?.filter { it.isNotBlank() }?.let { styleNode.styleClass.addAll(it) }
         }
-        node.transforms += SvgTransforms.parse(element["transform"])
-        styleNode.opacity = if (clipping) 1.0 else SvgNumbers.fraction(style.getValue("opacity"))
+        val sourceTransform = SvgTransforms.parse(element["transform"])
+        node.transforms += sourceTransform
+        animations.transform(element, sourceTransform)
+        if (clipping) styleNode.opacity = 1.0
+        else if (style is SvgAnimatedStyle && "opacity" in style.affected) update(element) {
+            setSvgBaseStyle(styleNode.opacityProperty(), svgStyleNumber(style, "opacity", 1.0, document.lengths).coerceIn(0.0, 1.0))
+        } else styleNode.opacity = SvgNumbers.fraction(style.getValue("opacity"))
         if (node !is Group || element.name in setOf("image", "text") && node !is SvgTextLayout) node.isVisible = style.getValue("visibility") == "visible"
         if (styleNode is Shape) {
             if (clipping) {
@@ -322,6 +343,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val updateCheckpoint = updates.size
         val styleCheckpoint = shapeStyles.size
         val maskCheckpoint = masks.size
+        val animationCheckpoint = animations.size
         val layer: SvgMarkers
         try {
             val nodes = if (source === shape) 2 else 1
@@ -362,6 +384,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             }
         } catch (failure: IllegalArgumentException) {
             while (updates.size > updateCheckpoint) updates.removeAt(updates.lastIndex)
+            animations.discardFrom(animationCheckpoint)
             shapeStyles.discardFrom(styleCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
             report(failure.message ?: "Invalid SVG marker", owner)
@@ -418,7 +441,9 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     group.styleClass += "svg-tspan"
                     owner["class"]?.split(Regex("\\s+"))?.filter { it.isNotBlank() }?.let { group.styleClass.addAll(it) }
                 }
-                group.opacity = if (clipping) 1.0 else SvgNumbers.fraction(computed.getValue("opacity"))
+                if (!clipping && computed is SvgAnimatedStyle && "opacity" in computed.affected) update(owner) {
+                    setSvgBaseStyle(group.opacityProperty(), svgStyleNumber(computed, "opacity", 1.0, document.lengths).coerceIn(0.0, 1.0))
+                } else group.opacity = if (clipping) 1.0 else SvgNumbers.fraction(computed.getValue("opacity"))
             }
             val coordinates = linkedMapOf<String, String>()
             for (name in listOf("x", "y", "dx", "dy")) {
@@ -448,13 +473,13 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                         val child = part.element
                         if (child.name == "tspan") {
                             require(++renderedElements <= document.options.maxElements) { "SVG expanded element limit exceeded" }
-                            val childStyle = styles.compute(child, lineage + owner, computed)
+                            val childStyle = computedStyle(child, lineage + owner, computed, viewport)
                             if (childStyle.getValue("display") != "none") {
                                 val childGroup = Group()
                                 children += { childGroup }
                                 build(child, lineage + owner, childStyle, childGroup, scopes, preserve)
                             }
-                        } else if (child.name !in setOf("title", "desc", "metadata")) {
+                        } else if (child.name !in setOf("title", "desc", "metadata") + SvgAnimation.NAMES) {
                             report("Unsupported text child: ${child.name}", child)
                         }
                     }
@@ -538,6 +563,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private fun applyMask(node: Node, value: String, viewport: SvgViewport, owner: SvgElement): Node {
         val updateCheckpoint = updates.size
         val maskCheckpoint = masks.size
+        val animationCheckpoint = animations.size
         try {
             val id = Regex("url\\(\\s*['\"]?#([^'\")\\s]+)['\"]?\\s*\\)").matchEntire(value)?.groupValues?.get(1)
                 ?: throw SvgException("Only local mask references are supported")
@@ -567,6 +593,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             }
         } catch (failure: IllegalArgumentException) {
             while (updates.size > updateCheckpoint) updates.removeAt(updates.lastIndex)
+            animations.discardFrom(animationCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
             report(failure.message ?: "Invalid mask", owner)
             // Invalid or unavailable masks must not expose the unmasked source.
@@ -657,20 +684,20 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val context = paintContext
         val entry = if (masking || context != null) null else shapeStyles.register(shape)
         val action = {
-            val fill = paint(style.getValue("fill"), style, SvgNumbers.fraction(style.getValue("fill-opacity")), element, geometry, viewport, context)
-            val stroke = paint(style.getValue("stroke"), style, SvgNumbers.fraction(style.getValue("stroke-opacity")), element, geometry, viewport, context)
-            val width = document.lengths.resolve(style.getValue("stroke-width"), viewport.diagonal).also { require(it >= 0) }
+            val fill = paint(style.getValue("fill"), style, svgStyleNumber(style, "fill-opacity", 1.0, document.lengths).coerceIn(0.0, 1.0), element, geometry, viewport, context, svgStyleColour(style, "fill"))
+            val stroke = paint(style.getValue("stroke"), style, svgStyleNumber(style, "stroke-opacity", 1.0, document.lengths).coerceIn(0.0, 1.0), element, geometry, viewport, context, svgStyleColour(style, "stroke"))
+            val width = svgStyleNumber(style, "stroke-width", viewport.diagonal, document.lengths).also { require(it >= 0) }
             if (entry != null) entry.setBase(fill, stroke, width) else {
                 setSvgBaseStyle(shape.fillProperty(), fill)
                 setSvgBaseStyle(shape.strokeProperty(), stroke)
                 setSvgBaseStyle(shape.strokeWidthProperty(), width)
             }
-            setSvgBaseStyle(shape.strokeDashOffsetProperty(), document.lengths.resolve(style.getValue("stroke-dashoffset"), viewport.diagonal))
+            setSvgBaseStyle(shape.strokeDashOffsetProperty(), svgStyleNumber(style, "stroke-dashoffset", viewport.diagonal, document.lengths))
         }
         if (context != null && (style.getValue("fill").startsWith("context-") || style.getValue("stroke").startsWith("context-"))) {
             action()
             context.updates += { try { action() } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid marker paint", element) } }
-        } else update(element, if (dynamicGeometry) null else viewport) { action() }
+        } else update(element, if (dynamicGeometry || style is SvgAnimatedStyle && style.affected.isNotEmpty()) null else viewport) { action() }
         shape.strokeType = StrokeType.CENTERED
         shape.strokeLineCap = when (style.getValue("stroke-linecap")) {
             "butt" -> StrokeLineCap.BUTT; "round" -> StrokeLineCap.ROUND; "square" -> StrokeLineCap.SQUARE
@@ -692,8 +719,9 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
 
     private fun paint(
         value: String, style: Map<String, String>, opacity: Double, element: SvgElement, shape: Node,
-        viewport: SvgViewport, context: SvgMarkerContext? = null
+        viewport: SvgViewport, context: SvgMarkerContext? = null, animatedColour: Color? = null
     ): Paint? {
+        if (animatedColour != null) return Color(animatedColour.red, animatedColour.green, animatedColour.blue, animatedColour.opacity * opacity)
         if (value == "none") return null
         if (value in setOf("context-fill", "context-stroke")) return context?.paint(value, opacity, shape, element)
         if (value.startsWith("url(")) {
@@ -708,7 +736,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 paint(fallback, style, opacity, element, shape, viewport, context)
             }
         }
-        val color = Color.web(if (value == "currentColor") style.getValue("color") else value)
+        val color = if (value == "currentColor") svgStyleColour(style, "color") ?: Color.web(style.getValue("color")) else Color.web(value)
         return Color(color.red, color.green, color.blue, color.opacity * opacity)
     }
 

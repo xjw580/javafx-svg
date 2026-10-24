@@ -18,7 +18,7 @@ internal class SvgStyles(
         sheet.reportDiagnostics(report)
     }
 
-    fun compute(element: SvgElement, ancestors: List<SvgElement>, parent: Map<String, String>): Map<String, String> {
+    fun compute(element: SvgElement, ancestors: List<SvgElement>, parent: Map<String, String>, inheritedKeys: MutableSet<String>? = null): Map<String, String> {
         val winners = mutableMapOf<String, Winner>()
         var order = 0
         fun add(d: Declaration, specificity: Int) {
@@ -42,6 +42,7 @@ internal class SvgStyles(
         val result = defaults.mapValues { (key, default) ->
             val initial = if (key == "overflow" && element.name == "marker") "hidden" else default
             val value = winners[key]?.value ?: if (key in inherited) parent[key] ?: initial else initial
+            if (value == "inherit" || (value == "unset" && key in inherited) || (winners[key] == null && key in inherited)) inheritedKeys?.add(key)
             when (value) {
                 "inherit" -> parent[key] ?: initial
                 "initial" -> initial

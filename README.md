@@ -282,6 +282,47 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
 
 线宽表示描边宽度，随节点变换一起缩放；无法直接改变填充路径自身的几何厚度。多色图标建议按 id/class 修改，避免对所有图形统一覆盖颜色。CSS 替换填充时提供的是新的完整 Paint，源 fill-opacity 不会额外乘到新颜色上，半透明覆盖可使用 rgba()。
 
+## SVG 动画
+
+支持常用的声明式动画子集，直接读取 SVG 文件内的动画元素：
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M12 3a9 9 0 0 1 9 9" fill="none"
+          stroke="#2563eb" stroke-width="2" stroke-linecap="round">
+        <animateTransform attributeName="transform" type="rotate"
+                          from="0 12 12" to="360 12 12"
+                          dur="1s" repeatCount="indefinite"/>
+    </path>
+</svg>
+```
+
+- `animateTransform`：rotate、translate、scale、skewX/skewY；默认替换源 transform，`additive="sum"` 可叠加源变换及其他变换动画。要求 values 或显式 from/to。
+- `animate`：opacity、fill-opacity、stroke-opacity、fill、stroke、color、stroke-width、stroke-dashoffset。颜色值要求纯色；values 内的 currentColor 按目标初始 SVG color 解析。数值支持 from/to、to-only、from/by、by-only；颜色支持 values、from/to 和有纯色基础值的 to-only。线宽/虚线偏移支持现有长度单位与百分比，随当前视口求值。
+- 支持 values、keyTimes，calcMode=linear/discrete/spline；spline 使用 keySplines。颜色按源 color-interpolation 在 sRGB（默认）或 linearRGB 中插值。
+- begin 支持单个时间偏移（允许负数），dur 为有限正时长；支持秒、毫秒、分钟、小时和时钟格式。repeatCount 支持正数（包括小数）及 indefinite。fill=remove（默认）恢复源值，freeze 保留最后采样值。
+- 动画默认作用于父元素，也可通过 href/xlink:href 指向本文档内的目标。组上的颜色/描边动画按 SVG 样式继承，子元素显式样式可阻断继承；重叠的替换动画按开始时间及文档顺序决定优先级。
+
+```kotlin
+val icon = SvgView(document)
+icon.animationAutoPlay = true // 默认值；窗口显示时自动播放
+icon.playAnimations()
+icon.pauseAnimations()
+icon.seekAnimations(javafx.util.Duration.seconds(0.5))
+icon.stopAnimations() // 停止并回到时间 0 的首帧
+
+icon.animationStatusProperty().addListener { _, _, status -> println(status) }
+println(icon.animationTime)     // 当前文档时间
+println(icon.animationDuration) // 包括延迟/循环；无限循环为 Duration.INDEFINITE
+println(icon.hasAnimations)
+```
+
+FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需要视图连接到显示中的窗口；窗口隐藏、视图移出场景或任意父节点隐藏时自动暂停时钟，恢复显示后继续。显式 pause/stop 后保持停止推进；更换 document/source 会重置时钟并采用当前 animationAutoPlay，失败的替换保留原内容和播放状态。停止回到首帧，不保证回到未动画的源样式；seek 接受有限非负时间，并限制在有限动画总时长内。所有播放控制在 FX 线程执行。
+
+动画沿用源 SVG 样式层：应用侧 JavaFX CSS、属性绑定及统一主题保持已有优先级，移除覆盖后显示当前动画值。变换通过原生 Affine 更新；固定描边、marker、clipPath、mask 和普通/片段/定长文字复用已有节点。每帧由 JavaFX pulse 推进，仅更新属性与必要布局，不重新解析 XML，不把插值结果写入共享文档缓存。每个视图有独立时钟，未播放时不运行计时器。
+
+首版不支持事件/同步链 begin、begin 时间列表、end/repeatDur、累积动画、数值/颜色的 additive=sum、paced、animateMotion、set、animateColor、路径/几何/渐变/滤镜属性动画，以及 CSS animation/transition/@keyframes。tspan 支持上述样式动画，自身的变换动画仍受 tspan 变换限制。已检测到的不支持内容在严格模式拒绝，在宽松模式报告诊断并保留可用的静态内容。规则参考 [SVG 1.1 Animation](https://www.w3.org/TR/SVG11/animate.html)。
+
 ## 支持范围
 
 | 类型 | 已实现 |
@@ -292,6 +333,7 @@ FXML 也可设置这些 JavaBean 属性，并继续由 JavaFX CSS 覆盖：
 | 样式 | 属性、style 属性、style 元素；类型/class/id/复合/后代/逗号选择器；继承、优先级、!important、currentColor |
 | 描边 | 颜色、宽度、透明度、端点、连接、miterlimit、虚线、non-scaling-stroke |
 | 引用 | 本文档内 defs/use/symbol、href/xlink:href；独立实例、循环和展开数量限制 |
+| 动画 | animateTransform、样式 animate；关键帧/缓动、延迟/循环、播放/暂停/停止/时间定位 |
 | 标记 | marker-start/mid/end、marker 简写；自动定向、两类坐标单位、上下文颜色/线性渐变 |
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
@@ -395,7 +437,7 @@ Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，
 
 当前不支持完整 SVG 规范。限制包括：
 
-- 不执行脚本、事件处理器、SMIL/CSS 动画，不渲染 foreignObject。
+- 不执行脚本和事件处理器，不渲染 foreignObject；声明式动画的支持范围见上文。
 - 不支持完整 filter 管线、pattern、radialGradient 的 gradientTransform 和非零 fr；vector-effect 目前只支持 none/non-scaling-stroke。
 - SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量、at-rule、外部样式表；应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
 - 不支持 textPath、逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。

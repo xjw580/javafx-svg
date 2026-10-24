@@ -31,6 +31,7 @@ import java.nio.file.Path
 /** A resizable native scene-graph SVG. Construct and modify on the JavaFX application thread. */
 class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region() {
     private var renderer: FxSvgRenderer? = null
+    private val animationPlayer = SvgAnimationPlayer(this)
     private val documentValue = ReadOnlyObjectWrapper<SvgDocument?>(this, "document")
     private val sourceValue = ReadOnlyStringWrapper(this, "source")
     private val loadingValue = ReadOnlyBooleanWrapper(this, "loading", false)
@@ -215,6 +216,9 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
         replacement?.setTheme(svgFill, svgStroke, svgStrokeWidth)
         renderer = replacement
         children.setAll(listOfNotNull(replacement?.root))
+        if (renderer !== replacement) return
+        animationPlayer.install(replacement)
+        if (renderer !== replacement) return
         requestLayout()
         documentValue.set(value)
     }
@@ -234,6 +238,26 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
         get() = preserveRatioValue.get()
         set(value) { preserveRatioValue.set(value) }
     fun preserveRatioProperty(): BooleanProperty = preserveRatioValue
+
+    /** Automatically play source animations while this view belongs to a showing window. */
+    var animationAutoPlay: Boolean
+        get() = animationPlayer.autoPlay.get()
+        set(value) { checkFxThread(); animationPlayer.autoPlay.set(value) }
+    fun animationAutoPlayProperty(): BooleanProperty = animationPlayer.autoPlay
+
+    val hasAnimations: Boolean get() = renderer?.hasAnimations == true
+    val animationStatus: javafx.animation.Animation.Status get() = animationPlayer.status.get()
+    fun animationStatusProperty(): ReadOnlyObjectProperty<javafx.animation.Animation.Status> = animationPlayer.status.readOnlyProperty
+    val animationTime: javafx.util.Duration get() = animationPlayer.currentTime.get()
+    fun animationTimeProperty(): ReadOnlyObjectProperty<javafx.util.Duration> = animationPlayer.currentTime.readOnlyProperty
+    val animationDuration: javafx.util.Duration get() = animationPlayer.duration.get()
+    fun animationDurationProperty(): ReadOnlyObjectProperty<javafx.util.Duration> = animationPlayer.duration.readOnlyProperty
+
+    fun playAnimations() { checkFxThread(); animationPlayer.play() }
+    fun pauseAnimations() { checkFxThread(); animationPlayer.pause() }
+    /** Stop and return to the animation's first frame. */
+    fun stopAnimations() { checkFxThread(); animationPlayer.stop() }
+    fun seekAnimations(time: javafx.util.Duration) { checkFxThread(); animationPlayer.seek(time) }
 
     val diagnostics: List<SvgDiagnostic> get() = renderer?.diagnostics ?: emptyList()
 

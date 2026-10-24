@@ -19,7 +19,9 @@ internal class SvgLength(private val amount: Double, private val unit: String) {
 /** Owned by one document; retains only parsed values, never viewports, nodes or resolved percentages. */
 internal class SvgLengthCache {
     private val values = ConcurrentHashMap<String, SvgLength>()
+    // Reuse the SAM adapter: a bound Kotlin method reference allocates even on cache hits.
+    private val parseLength = java.util.function.Function<String, SvgLength> { SvgNumbers.parseLength(it) }
 
     fun resolve(value: String, reference: Double): Double =
-        values.computeIfAbsent(value, SvgNumbers::parseLength).resolve(reference)
+        values.computeIfAbsent(value, parseLength).resolve(reference)
 }

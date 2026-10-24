@@ -28,6 +28,8 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--benchmark --count=200 --warmup-
 
 首次测量结果见 [2026-10-24 渲染基线](benchmarks/render-baseline-2026-10-24.md)。
 
+SVG 自带动画另有 [动画性能与生命周期报告](benchmarks/animation-2026-10-24.md)，覆盖 100/500 个 SMIL、CSS 及固定描边组合图标；运行 `--animation-benchmark`，用 `--animation-report=记录路径` 分析 JFR。
+
 缓存对照可以限制类型、动作和缓存策略，例如：
 
 ```shell

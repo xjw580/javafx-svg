@@ -2,7 +2,7 @@
 
 将 SVG 文档解析为 JavaFX 原生场景图的 Kotlin/JVM 库。使用 JavaFX 公共 API，不依赖 javafx-web、WebView、Swing 或 Batik。
 
-兼容 Inkscape/Sodipodi 等编辑器的外部命名空间元数据：保留解析限制，从渲染和样式编译中排除私有节点；严格模式仍诊断未知 SVG 绘图元素和 foreignObject。实际文件回归及边界见 [编辑器元数据兼容报告](benchmarks/editor-metadata-2026-10-24.md)。
+兼容 Inkscape/Sodipodi 等编辑器的外部命名空间元数据：保留解析限制，从渲染和样式编译中排除私有节点；严格模式仍诊断未知 SVG 绘图元素及 foreignObject 中超出已实现 XHTML 子集的内容。实际文件回归及边界见 [编辑器元数据兼容报告](benchmarks/editor-metadata-2026-10-24.md)。
 
 构建基线：JDK 21+、Maven 3.8.8+；Kotlin 2.2.0，JavaFX 21.0.8。生成的字节码目标为 Java 21。
 
@@ -418,10 +418,23 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
 | 遮罩 | alpha/luminance（默认）；区域、两种坐标单位、嵌套遮罩、CSS 与引用 |
-| 滤镜 | feFlood / feComposite / feMerge 与 feGaussianBlur / feDropShadow / feOffset 的滤镜链；命名/隐式输入、两类坐标单位、区域裁剪 |
+| 滤镜 | feFlood / feComposite / feMerge、feGaussianBlur / feDropShadow / feOffset、feTurbulence / feDisplacementMap / feMorphology 的滤镜链；命名/隐式输入、两类坐标单位、区域裁剪 |
 | 图案 | pattern 填充/描边、模板、坐标单位、viewBox 与二维变换 |
 | 文本 | 单段 textPath；text/嵌套 tspan、单值 x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space；单段文字支持 textLength/lengthAdjust；字号支持 em 和相对父字号的百分比；text-decoration、baseline-shift 见专项边界 |
 | 图片 | 内嵌 base64 PNG/JPEG；显式授权解析器提供的外部 PNG/JPEG；preserveAspectRatio、视口裁剪 |
+| 混合内容 | foreignObject 中有界的 XHTML div/span/br 与内联盒模型、字体和文字颜色；不使用 WebView，不等于完整浏览器 |
+
+### foreignObject：有界的原生 XHTML 子集
+
+`foreignObject` 使用 JavaFX 原生 Rectangle、Text/TextFlow 和容器节点渲染 XHTML 命名空间（`http://www.w3.org/1999/xhtml`）中的 `div`、`span`、`br`。支持 SVG 的 x/y/width/height、变换和视口裁剪，HTML 块顺序布局、文字换行和嵌套片段；HTML 自动高度由内容决定，不自动撑满 foreignObject 的定位矩形。节点数量及源文档深度仍受 `SvgOptions` 限制。
+
+内联 `style` 支持纯色背景、solid/none 边框、单值圆角、padding、width/height、box-sizing；color、font 简写及字体族/字号/字重/斜体、text-align、white-space、visibility/display 和 overflow 的已实现值。span 支持文字样式和 visibility/display，不实现独立的 CSS 盒模型。颜色和字体在片段间继承，`inherit/initial/unset` 与内联 `!important` 在这个子集中生效；字体实际外观仍依赖系统已安装字体。
+
+这不是浏览器布局引擎，也不加载 WebView。尚不支持其他 HTML 元素、外部/HTML 样式表、flex/grid、绝对定位、margin、CSS 变量/calc、背景图片、表单、链接和嵌入文档；不执行脚本或事件处理器，不发起 HTML 资源请求。未知元素/属性、未实现的 CSS 属性或取值会产生诊断，严格模式拒绝；宽松模式只保留可用内容，不能把无诊断视为完整 HTML/CSS 规范验证。
+
+`normal/pre-wrap` 中超过行宽且无合法断行点的长文本当前会报告兼容性诊断（严格模式报错）；可使用 `nowrap/pre` 显式保持不换行。SVG 源样式表不进入 XHTML 子树，XHTML 目前仅解释内联声明及从外层 SVG 继承的颜色/字体。 HTML 盒模型按这些声明排版；宿主 JavaFX CSS 直接覆盖 Text 字体时不保证自动重排，应修改 SVG 内联字号后重新加载。
+
+原样回归文件 `src/test/resources/svg/foreign-object.svg` 包含圆角背景和描边、居中粗体文字及两个独立颜色的 span。测试同时检查原生文字节点与实际快照像素，避免将空白 HTML 区域误认为成功。
 
 ### 遮罩
 
@@ -535,8 +548,8 @@ Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，
 
 当前不支持完整 SVG 规范。限制包括：
 
-- 不执行脚本和事件处理器，不渲染 foreignObject；声明式动画的支持范围见上文。
-- 不支持光照滤镜、feBlend/feColorMatrix 等未列出的滤镜原语、滤镜模板和 filterRes；radialGradient 的 gradientTransform 和非零 fr 仍未实现。vector-effect 目前只支持 none/non-scaling-stroke；SVG 逆向导出后置。
+- 不执行脚本和事件处理器；foreignObject 仅支持上述有界 XHTML 子集，不支持完整 HTML/CSS 或浏览器行为。声明式动画的支持范围见上文。
+- 不支持光照滤镜、feBlend/feColorMatrix/feConvolveMatrix 等未列出的滤镜原语、滤镜模板和 filterRes；radialGradient 的 gradientTransform 和非零 fr 仍未实现。vector-effect 目前只支持 none/non-scaling-stroke；SVG 逆向导出后置。
 - SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量和条件规则；支持 @keyframes、显式授权的无条件 @import。应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
 - 不支持逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
 - 默认不自动加载外部资源；image 与样式表可通过资源解析器显式启用。use/gradient/clipPath 的跨文档引用仍不支持。load(URL) 打开调用方明确提供的顶层地址。
@@ -589,7 +602,7 @@ renderCacheEnabled 默认 true，静态文档及仅旋转/平移/路径运动的
 
 ### 可组合滤镜与资源限制
 
-新增 `feFlood`、`feComposite`、`feMerge/feMergeNode`，可与 `feGaussianBlur`、`feOffset`、`feDropShadow` 任意按文档顺序组合。支持 `in/in2/result`、隐式前一结果、`SourceGraphic/SourceAlpha`；重复命名引用最近的前序结果，缺失或前向结果名按省略输入处理。空 filter/feMerge 输出透明。BackgroundImage/BackgroundAlpha/FillPaint/StrokePaint 会明确诊断，不以近似输入代替。
+`feFlood`、`feComposite`、`feMerge/feMergeNode`、`feTurbulence`、`feDisplacementMap`、`feMorphology` 可与 `feGaussianBlur`、`feOffset`、`feDropShadow` 按文档顺序组合。支持 `in/in2/result`、隐式前一结果、`SourceGraphic/SourceAlpha`；重复命名引用最近的前序结果，缺失或前向结果名按省略输入处理。空 filter/feMerge 输出透明。BackgroundImage/BackgroundAlpha/FillPaint/StrokePaint 会明确诊断，不以近似输入代替。
 
 ```xml
 <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -603,9 +616,15 @@ renderCacheEnabled 默认 true，静态文档及仅旋转/平移/路径运动的
 
 `feComposite` 实现 over/in/out/atop/xor/lighter/arithmetic；算术系数 k1–k4 默认 0，使用预乘 RGBA，限制输出到有效 alpha/颜色范围，不用 JavaFX MULTIPLY/EXCLUSION 冒充 Porter-Duff。按每个原语的 `color-interpolation-filters` 在线性 RGB（默认）或 sRGB 中计算，auto 按 sRGB；feOffset 保持输入颜色空间。SourceGraphic 快照仍沿用 JavaFX 的源绘制/渐变合成行为，不承诺整个 SVG 源画面的线性光绘制。
 
+`feTurbulence` 使用 SVG 规范的确定性、按 seed 初始化的梯度噪声，支持 turbulence/fractalNoise、一个或两个 baseFrequency、numOctaves、seed 和 stitch/noStitch；它产生真实噪声图像，不是用固定纹理代替。梯度初始化采用当前 Filter Effects 参考算法（拒绝零向量和单位圆外的向量），与旧 SVG 1.1 参考代码的随机序列不同，因此不承诺与采用旧算法的渲染器逐像素相同。`feDisplacementMap` 支持 R/G/B/A 通道选择、正/负 scale，按位移图的非预乘通道进行双线性取样，越界为透明黑；color-interpolation-filters 作用于位移图，源图保持其颜色空间。`feMorphology` 实现矩形 erode/dilate、单值或双值 radius，在预乘 RGBA 上执行可分离滑动极值处理，边界外为透明黑；非正半径按规范禁用该原语。
+
+原样回归文件 `src/test/resources/svg/advanced-filters.svg` 的噪声位移圆环与膨胀后模糊的紫色光晕直接走上述软件管线。回归要求严格模式、零诊断，并在 1×/1.25×/1.5×/2× 比例及重复缩放中检查实际变形轮廓和外部光晕；`regular-filters.svg` 的既有模糊/投影链也继续覆盖。支持的效果不再依赖「部分渲染」或保留未滤镜源图来通过验证。
+
 管线通过 JavaFX 公共快照 API 取样，保留源节点的 id/class、应用 CSS 与主题；正常场景缩放和窗口输出比例改变时重新采样，稳定画面复用结果。极高倍率离屏导出可能重采样缓存图。合成前后遵守 filter 区域和原语子区域裁剪、filterUnits/primitiveUnits；省略的原语子区域由引用输入的区域并集决定，标准输入及无输入原语默认使用完整 filter 区域。元素 opacity 在软件滤镜之后应用；直接绑定源 opacity 的组合目前明确报告不支持。
 
-每个视图共享 `maxFilterPixels`（默认 4,194,304 个中间像素槽），按每个管线 `(原语数 + 12) × 像素宽 × 像素高` 保守计费，覆盖保留结果及转换/模糊临时缓冲；不是字节级堆上限。每轴最多 4096，`maxFilterPrimitives` 默认 64。高斯使用截断到 3σ 的归一化可分离卷积，单轴半径最多 256 像素、每次模糊最多 1.5 亿像素分量采样；每个视图全部软件滤镜合计最多 2 亿估算分量操作。超限不悄悄降采样或截断：严格模式抛异常，宽松模式记录诊断并清空受影响滤镜输出，缩小后可恢复。未支持的图结构在创建时诊断并按现有宽松模式保留源图。
+每个视图共享 `maxFilterPixels`（默认 4,194,304 个中间像素槽），按同时存活的源、命名结果、转换/模糊临时缓冲及旧/新显示图像保守计费；不是字节级堆上限。命名结果最后一次使用后释放，完成的管线只保留显示图像的像素预算，工作量预算仍按整个视图累计。高斯跳过透明支撑区外的计算，对纯 alpha 输入只卷积 alpha 通道；仍使用同一归一化核，不改变分辨率或模糊算法。每轴最多 4096，`maxFilterPrimitives` 默认 64。高斯使用截断到 3σ 的归一化可分离卷积，单轴半径最多 256 像素、每次模糊最多 1.5 亿像素分量采样；每个视图全部软件滤镜合计最多 2 亿估算分量操作。超限不悄悄降采样或截断：严格模式抛异常，宽松模式记录诊断并清空受影响滤镜输出，缩小后可恢复。未支持的图结构在创建时诊断并按现有宽松模式保留源图。
+
+新增内核也受独立上限约束：feTurbulence 最多 16 个 octave、单次最多 4,000,000 像素及每轴 4096 像素，噪声格点坐标另有限幅；feMorphology 每轴半径最多 256 个采样像素；湍流、位移和形态学每次分别最多 1.5 亿估算分量采样/操作，并继续计入上述视图总工作量预算。半径和位移按当前采样比例与 primitiveUnits 换算，放大时可能触达限制；不因新增效果而提高默认预算或忽略超限错误。
 
 语义依据 [Filter Effects：输入与子区域](https://www.w3.org/TR/filter-effects-1/#FilterPrimitiveSubRegion)、[feComposite](https://www.w3.org/TR/filter-effects-1/#feCompositeElement) 和 [颜色空间](https://www.w3.org/TR/filter-effects-1/#color-interpolation-filters-property)。光照滤镜和 SVG 逆向导出不属于本轮实现。
 

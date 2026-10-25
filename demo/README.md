@@ -75,9 +75,15 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--smoke"
 
 - 左侧直接输入或粘贴完整 SVG，停止输入 300 ms 后自动刷新右侧预览。
 - XML 解析在后台执行，旧请求的结果不会覆盖新输入；图形节点在 FX 线程创建。
-- XML 错误显示行、列；渲染诊断显示原因。失败时保留上一次有效预览，修正代码后自动恢复。
+- XML 错误显示行、列；无效几何、安全限制及像素/工作量超限仍显示错误并保留上一次有效预览，修正代码后自动恢复。
+- `feTurbulence`、`feDisplacementMap`、`feMorphology` 实际渲染噪声、位移轮廓和膨胀/腐蚀效果；`advanced-filters.svg` 原样例的位移圆环与紫色光晕不再降级为未滤镜源图。
+- `foreignObject` 使用原生 JavaFX 节点渲染 XHTML div/span/br 的有界内联 CSS 子集，包含原样例的圆角背景、边框、居中粗体与彩色片段。不是 WebView 或完整浏览器；其他 HTML 元素、flex/grid、定位、margin、外部样式表、图片和脚本等仍未实现，详见主 README 的边界说明。
+- 尚未实现且明确允许降级的 `feConvolveMatrix` 和 XHTML `p` 会标记「部分渲染」，分别保留未滤镜源图或跳过不支持的 HTML 元素。该提示使用精确诊断白名单，不把其他解析、脚本/事件属性、资源或预算错误当成兼容性警告。
+- 像素及工作量预算仍生效：每视图默认 4,194,304 个滤镜中间像素槽、64 个原语、每轴 4096 像素及 2 亿估算分量操作；湍流最多 16 个 octave/4,000,000 像素，形态学半径最多 256 个采样像素，新增内核单次工作量最多 1.5 亿。放大可能触发这些限制，不会静默降采样。
 - Ctrl+Enter 或「立即刷新」跳过等待；支持恢复载入示例、清空代码、复制 SVG 和代码换行。
 - 保持比例、深色/网格背景、播放/暂停/回到起点均可直接操作。带动画的有效 SVG 默认自动播放。
 - 关闭窗口会取消待处理任务、停止动画并释放预览文档。
 
 编辑区使用标准 TextArea，支持选区、复制粘贴、撤销重做和输入法。javafx-controls 仅为 Demo/test 依赖，不增加库运行时依赖。
+
+原样输入回归保留 `src/test/resources/svg/{advanced-filters,foreign-object,regular-filters}.svg`。测试检查高级效果在 1×/1.25×/1.5× 的严格模式像素结果、真实编辑器的零诊断状态、反复编辑和窗口调整、错误保留上一帧及修正后的恢复；输出 `target/advanced-filters-preview.png`、`target/foreign-object-preview.png` 和 `target/regular-filters-preview.png`，截图包含编辑器状态文字。

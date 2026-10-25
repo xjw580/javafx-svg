@@ -72,7 +72,7 @@ internal class SvgPattern(
                 node.strokeWidthProperty().addListener(changed)
             }
             if (node is Text) node.fontProperty().addListener(changed)
-            if (node is Group) node.children.forEach(::visit)
+            if (node is javafx.scene.Parent) node.childrenUnmodifiable.forEach(::visit)
         }
         visit(content)
     }

@@ -372,6 +372,19 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 }
                 group
             }
+            "foreignObject" -> {
+                hasTextLayout = true
+                SvgForeignObject(element, style, { count ->
+                    require(document.options.maxElements - renderedElements >= count) { "SVG expanded foreignObject node limit exceeded" }
+                    renderedElements += count
+                }, ::report).also { foreign ->
+                    updateGeometry {
+                        foreign.position(length("x", viewport.width), length("y", viewport.height),
+                            positive(length("width", viewport.width)), positive(length("height", viewport.height)),
+                            style.getValue("overflow"))
+                    }
+                }
+            }
             "path" -> SVGPath().apply {
                 content = document.geometry.path(element["d"] ?: "")
                 fillRule = fillRule(style.getValue(if (clipping) "clip-rule" else "fill-rule"))
@@ -422,7 +435,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         else if (style is SvgAnimatedStyle && "opacity" in style.affected) update(element) {
             setSvgBaseStyle(styleNode.opacityProperty(), svgStyleNumber(style, "opacity", 1.0, document.lengths).coerceIn(0.0, 1.0))
         } else styleNode.opacity = SvgNumbers.fraction(style.getValue("opacity"))
-        if (node !is Group || element.name in setOf("image", "text", "textPath") && node !is SvgTextLayout) node.isVisible = style.getValue("visibility") == "visible"
+        if (node !is SvgForeignObject && (node !is Group || element.name in setOf("image", "text", "textPath") && node !is SvgTextLayout)) node.isVisible = style.getValue("visibility") == "visible"
         if (styleNode is Shape) {
             if (clipping) {
                 styleNode.fill = Color.BLACK
@@ -458,6 +471,16 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                         else -> true
                     }
                 }
+            }
+        } else if (node is SvgForeignObject) {
+            // SVG geometry includes the positioning rectangle's x/y. Keep the Region's layout
+            // translation inside a neutral local coordinate system, like a positioned shape,
+            // so raster filters and objectBoundingBox effects do not lose it during snapshots.
+            require(++renderedElements <= document.options.maxElements) { "SVG expanded foreignObject node limit exceeded" }
+            Group(marked).apply {
+                isAutoSizeChildren = false
+                transforms.setAll(marked.transforms)
+                marked.transforms.clear()
             }
         } else marked
         val result = if (!clipping && style.getValue("filter") != "none") applyFilter(sized, style.getValue("filter"), viewport, element, styleNode) else sized
@@ -879,7 +902,13 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             }
             val primitives = filter.children.filter { !it.name.startsWith('{') && it.name !in setOf("title", "desc", "metadata") }
             require(primitives.size <= document.options.maxFilterPrimitives) { "SVG filter exceeds maxFilterPrimitives" }
-            if (primitives.size != 1 || primitives.single().name !in setOf("feGaussianBlur", "feDropShadow", "feOffset")) {
+            fun containsForeignObject(current: Node): Boolean = current is SvgForeignObject ||
+                (current is javafx.scene.Parent && current.childrenUnmodifiable.any(::containsForeignObject))
+            // Native blur cannot classify/layout arbitrary HTML parents for linearRGB. Keep their
+            // real multicolour pixels in the bounded software path, rather than declaring them monochrome.
+            val nativePrimitive = primitives.singleOrNull()?.name
+            if (primitives.size != 1 || nativePrimitive !in setOf("feGaussianBlur", "feDropShadow", "feOffset") ||
+                (nativePrimitive in setOf("feGaussianBlur", "feDropShadow") && containsForeignObject(node))) {
                 return SvgFilterChain(node, opacityNode, filter, primitives, viewport, document.lengths, filterBudget,
                     paints::styleOf, { if (themeReady) root.parent?.requestLayout() }, { report(it, owner) })
                     .also { chain -> filterChains += chain; update(owner) { chain.refresh() } }

@@ -234,7 +234,7 @@ internal class SvgMask(
         }
         if (node is Text) node.fontProperty().addListener(changed)
         if (node is ImageView) node.imageProperty().addListener(changed)
-        if (node is Group) node.children.forEach(::observe)
+        if (node is javafx.scene.Parent) node.childrenUnmodifiable.forEach(::observe)
     }
 
     companion object {

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420">
+<rect width="900" height="420" fill="#f1f5f9"/>
+<text x="30" y="42" font-size="26" fill="#0f172a" font-weight="bold">JavaFX SVG compatibility</text>
+<text x="30" y="82" font-size="24" text-decoration="underline" fill="#2563eb">Decorated <tspan fill="#9333ea" font-size="18">nested text</tspan></text>
+<text x="410" y="82" font-size="24" fill="#0f172a">x<tspan baseline-shift="super" font-size="15">2</tspan> + H<tspan baseline-shift="sub" font-size="15">2</tspan>O</text>
+<text x="660" y="82" font-size="24" text-decoration="overline line-through" fill="#0f766e">over / strike</text>
+<defs>
+<filter id="over" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="95" color-interpolation-filters="sRGB"><feFlood flood-color="#2563eb" x="35" y="25" width="50" height="50" result="back"/><feComposite in="SourceGraphic" in2="back" operator="over" /></filter>
+<filter id="in" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="95" color-interpolation-filters="sRGB"><feFlood flood-color="#2563eb" x="35" y="25" width="50" height="50" result="back"/><feComposite in="SourceGraphic" in2="back" operator="in" /></filter>
+<filter id="out" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="95" color-interpolation-filters="sRGB"><feFlood flood-color="#2563eb" x="35" y="25" width="50" height="50" result="back"/><feComposite in="SourceGraphic" in2="back" operator="out" /></filter>
+<filter id="atop" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="95" color-interpolation-filters="sRGB"><feFlood flood-color="#2563eb" x="35" y="25" width="50" height="50" result="back"/><feComposite in="SourceGraphic" in2="back" operator="atop" /></filter>
+<filter id="xor" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="95" color-interpolation-filters="sRGB"><feFlood flood-color="#2563eb" x="35" y="25" width="50" height="50" result="back"/><feComposite in="SourceGraphic" in2="back" operator="xor" /></filter>
+<filter id="lighter" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="95" color-interpolation-filters="sRGB"><feFlood flood-color="#2563eb" x="35" y="25" width="50" height="50" result="back"/><feComposite in="SourceGraphic" in2="back" operator="lighter" /></filter>
+<filter id="arithmetic" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="95" color-interpolation-filters="sRGB"><feFlood flood-color="#2563eb" x="35" y="25" width="50" height="50" result="back"/><feComposite in="SourceGraphic" in2="back" operator="arithmetic" k2=".6" k3=".6"/></filter>
+<filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feFlood flood-color="#6366f1" result="ink"/><feComposite in="ink" in2="SourceAlpha" operator="in"/><feGaussianBlur stdDeviation="3"/><feOffset dx="9" dy="7" result="s"/><feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<g transform="translate(26 120)"><rect width="115" height="130" rx="10" fill="white"/><circle cx="40" cy="45" r="26" fill="#e11d48" filter="url(#over)"/><text x="57" y="117" text-anchor="middle" font-size="14" fill="#334155">over</text></g>
+<g transform="translate(151 120)"><rect width="115" height="130" rx="10" fill="white"/><circle cx="40" cy="45" r="26" fill="#e11d48" filter="url(#in)"/><text x="57" y="117" text-anchor="middle" font-size="14" fill="#334155">in</text></g>
+<g transform="translate(276 120)"><rect width="115" height="130" rx="10" fill="white"/><circle cx="40" cy="45" r="26" fill="#e11d48" filter="url(#out)"/><text x="57" y="117" text-anchor="middle" font-size="14" fill="#334155">out</text></g>
+<g transform="translate(401 120)"><rect width="115" height="130" rx="10" fill="white"/><circle cx="40" cy="45" r="26" fill="#e11d48" filter="url(#atop)"/><text x="57" y="117" text-anchor="middle" font-size="14" fill="#334155">atop</text></g>
+<g transform="translate(526 120)"><rect width="115" height="130" rx="10" fill="white"/><circle cx="40" cy="45" r="26" fill="#e11d48" filter="url(#xor)"/><text x="57" y="117" text-anchor="middle" font-size="14" fill="#334155">xor</text></g>
+<g transform="translate(651 120)"><rect width="115" height="130" rx="10" fill="white"/><circle cx="40" cy="45" r="26" fill="#e11d48" filter="url(#lighter)"/><text x="57" y="117" text-anchor="middle" font-size="14" fill="#334155">lighter</text></g>
+<g transform="translate(776 120)"><rect width="115" height="130" rx="10" fill="white"/><circle cx="40" cy="45" r="26" fill="#e11d48" filter="url(#arithmetic)"/><text x="57" y="117" text-anchor="middle" font-size="14" fill="#334155">arithmetic</text></g>
+<g transform="translate(40 295)"><rect width="200" height="65" rx="15" fill="#0f172a" filter="url(#shadow)"/><text x="100" y="40" text-anchor="middle" font-size="20" fill="white">filter chain</text></g>
+<text x="290" y="318" font-size="17" fill="#334155">feFlood → feComposite → blur → offset → merge</text>
+<text x="290" y="349" font-size="16" fill="#64748b">Named inputs · premultiplied alpha · bounded raster work</text>
+<text x="30" y="397" font-size="14" fill="#64748b">Rendered with JavaFX software pipeline; no WebView, Swing or Batik.</text>
+</svg>

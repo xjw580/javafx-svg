@@ -31,11 +31,20 @@ internal class SvgStyles(
                 try { SvgCssTiming.validate(d.name, d.value) }
                 catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid CSS animation property", element); return }
             }
+            if (d.name in setOf("text-decoration", "baseline-shift") && d.value.trim().lowercase() !in setOf("inherit", "initial", "unset")) {
+                try {
+                    if (d.name == "text-decoration") SvgTextStyles.decoration(d.value)
+                    else SvgTextStyles.validateShift(d.value)
+                } catch (failure: IllegalArgumentException) {
+                    report(failure.message ?: "Invalid text property", element)
+                    return
+                }
+            }
             if (d.name == "marker") {
                 listOf("marker-start", "marker-mid", "marker-end").forEach { add(d.copy(name = it), specificity) }
                 return
             }
-            val next = Winner(d.value, d.important, specificity, order++)
+            val next = Winner(if (d.name in setOf("text-decoration", "baseline-shift")) d.value.trim().lowercase() else d.value, d.important, specificity, order++)
             val old = winners[d.name]
             if (old == null || compareValuesBy(next, old, { it.important }, { it.specificity }, { it.order }) >= 0) {
                 winners[d.name] = next
@@ -65,6 +74,13 @@ internal class SvgStyles(
         val parentFontSize = parent["font-size"]?.toDoubleOrNull() ?: 16.0
         result["font-size"] = (if (fontSize.endsWith("em")) SvgNumbers.scalar(fontSize.dropLast(2)) * parentFontSize
             else lengths.resolve(fontSize, parentFontSize)).also { require(it >= 0) { "Negative font size" } }.toString()
+        result["text-decoration"] = result.getValue("text-decoration").lowercase()
+        val baselineShift = result.getValue("baseline-shift")
+        if (baselineShift.endsWith("ex", ignoreCase = true)) {
+            report("baseline-shift in ex uses a half-em fallback because JavaFX exposes no x-height", element)
+        }
+        result["baseline-shift"] = SvgTextStyles.computeShift(baselineShift,
+            result.getValue("font-size").toDouble(), if (element.name == "text") result.getValue("font-size").toDouble() else parentFontSize, lengths)
         if (result.getValue("vector-effect") != "none" && result.getValue("vector-effect") != "non-scaling-stroke") {
             report("Unsupported vector-effect: ${result.getValue("vector-effect")}", element)
             result["vector-effect"] = "none"
@@ -107,10 +123,10 @@ internal class SvgStyles(
             "clip-path" to "none", "mask" to "none", "mask-type" to "luminance", "filter" to "none", "color-interpolation-filters" to "linearRGB",
             "stop-color" to "black", "stop-opacity" to "1", "flood-color" to "black", "flood-opacity" to "1",
             "font-family" to "sans-serif", "font-size" to "16", "font-weight" to "normal",
-            "font-style" to "normal", "text-anchor" to "start",
+            "font-style" to "normal", "text-anchor" to "start", "text-decoration" to "none", "baseline-shift" to "baseline",
             "transform" to "none", "transform-origin" to "0 0", "transform-box" to "view-box", "animation" to "none"
         ) + SvgCssTiming.defaults
-        private val inherited = defaults.keys - setOf("opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity", "flood-color", "flood-opacity", "vector-effect", "overflow", "transform", "transform-origin", "transform-box", "animation") - SvgCssTiming.defaults.keys
+        private val inherited = defaults.keys - setOf("text-decoration", "baseline-shift", "opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity", "flood-color", "flood-opacity", "vector-effect", "overflow", "transform", "transform-origin", "transform-box", "animation") - SvgCssTiming.defaults.keys
     }
 }
 

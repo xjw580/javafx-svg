@@ -113,12 +113,16 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
     var resourceCache: SvgResourceCache? = SvgResourceCache.shared
         set(value) { checkFxThread(); field = value }
 
+    /** Captured on source assignment; changing options does not reload the current document. */
+    var sourceOptions: SvgOptions = SvgOptions()
+        set(value) { checkFxThread(); field = value }
+
     /**
-     * Absolute URL loaded using default [SvgOptions]. Network I/O and parsing run in background;
-     * file and jar:file resources load synchronously. Nodes are always created on the FX thread.
+     * Absolute URL loaded using [sourceOptions]. Network I/O and parsing run in background;
+     * file and jar:file resources load synchronously unless a resolver is configured. Nodes are always created on the FX thread.
      * In FXML, use `source="@icon.svg"` to resolve relative to the FXML location.
      * Null/blank clears the view and cancels pending work. Async failures preserve the old document
-     * and nodes, retain the requested source and report [loadException]. Local failures throw.
+     * and nodes, retain the requested source and report [loadException]. Synchronous local failures throw.
      * Assigning [document] directly clears source; [sourceProperty] is for observation only.
      */
     var source: String?
@@ -132,8 +136,9 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
             }
             val url = try { URI(location).toURL() }
                 catch (e: Exception) { throw sourceException(location, e) }
-            if (url.protocol == "file" || (url.protocol == "jar" && url.path.startsWith("file:"))) {
-                val loaded = try { resourceCache?.load(url) ?: SvgLoader.load(url) }
+            if (sourceOptions.resourceResolver == null &&
+                (url.protocol == "file" || (url.protocol == "jar" && url.path.startsWith("file:")))) {
+                val loaded = try { resourceCache?.load(url, sourceOptions) ?: SvgLoader.load(url, sourceOptions) }
                     catch (e: Exception) { throw sourceException(location, e) }
                 replaceDocument(loaded, location)
             } else {
@@ -142,7 +147,7 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
         }
     fun sourceProperty(): ReadOnlyStringProperty = sourceValue.readOnlyProperty
 
-    /** True while the current remote source is being downloaded, parsed or installed. */
+    /** True while the current asynchronous source is being downloaded, parsed or installed. */
     val isLoading: Boolean get() = loadingValue.get()
     fun loadingProperty(): ReadOnlyBooleanProperty = loadingValue.readOnlyProperty
 
@@ -161,8 +166,9 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
     private fun loadInBackground(location: String, url: URL) {
         val generation = cancelPendingLoad()
         val cache = resourceCache
+        val options = sourceOptions
         val task = object : Task<SvgDocument>() {
-            override fun call(): SvgDocument = cache?.load(url) ?: SvgLoader.load(url)
+            override fun call(): SvgDocument = cache?.load(url, options) ?: SvgLoader.load(url, options)
         }
         pendingLoad = task
         task.setOnSucceeded {
@@ -334,10 +340,16 @@ class SvgView @JvmOverloads constructor(document: SvgDocument? = null) : Region(
         @JvmStatic @JvmOverloads
         fun parse(xml: String, options: SvgOptions = SvgOptions()): SvgView = SvgView(SvgLoader.parse(xml, options))
         @JvmStatic @JvmOverloads
+        fun parse(xml: String, baseUri: URI, options: SvgOptions = SvgOptions()): SvgView =
+            SvgView(SvgLoader.parse(xml, baseUri, options))
+        @JvmStatic @JvmOverloads
         fun load(path: Path, options: SvgOptions = SvgOptions()): SvgView = SvgView(SvgLoader.load(path, options))
         @JvmStatic @JvmOverloads
         fun load(url: URL, options: SvgOptions = SvgOptions()): SvgView = SvgView(SvgLoader.load(url, options))
         @JvmStatic @JvmOverloads
         fun load(input: InputStream, options: SvgOptions = SvgOptions()): SvgView = SvgView(SvgLoader.load(input, options))
+        @JvmStatic @JvmOverloads
+        fun load(input: InputStream, baseUri: URI, options: SvgOptions = SvgOptions()): SvgView =
+            SvgView(SvgLoader.load(input, baseUri, options))
     }
 }

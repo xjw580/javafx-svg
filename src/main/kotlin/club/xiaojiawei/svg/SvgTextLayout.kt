@@ -7,7 +7,10 @@ import java.util.IdentityHashMap
 
 /** Horizontal text flow. Absolute coordinates start independently anchored chunks. */
 internal class SvgTextLayout(private val lengths: SvgLengthCache, private val viewport: SvgViewport) : Group() {
-    class Scope(val coordinates: Map<String, String>, val geometry: SvgAnimatedGeometry? = null)
+    class Scope(
+        val coordinates: Map<String, String>, val geometry: SvgAnimatedGeometry? = null,
+        val baselineShift: String = "baseline", val parentFontSize: Double = 16.0
+    )
     class Run(val text: Text, val scopes: List<Scope>, val anchor: Double)
     val runs = mutableListOf<Run>()
 
@@ -45,7 +48,7 @@ internal class SvgTextLayout(private val lengths: SvgLengthCache, private val vi
                 chunkAnchor = run.anchor
             }
             run.text.x = x
-            run.text.y = y
+            run.text.y = y - run.scopes.sumOf { SvgTextStyles.shift(it.baselineShift, it.parentFontSize) }
             x += run.text.layoutBounds.width
             require(x.isFinite() && y.isFinite()) { "Non-finite text position" }
         }

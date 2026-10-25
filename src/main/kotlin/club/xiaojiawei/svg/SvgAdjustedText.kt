@@ -17,19 +17,22 @@ internal class SvgAdjustedText(
     private val adjustGlyphs: Boolean,
     private val anchor: Double,
     maxGlyphs: Int,
-    private val path: SvgPathMeasure? = null
+    private val path: SvgPathMeasure? = null,
+    private val overline: Boolean = false
 ) : Group() {
     private val starts = mutableListOf<Int>()
     private val runs = mutableListOf<Text>()
     private val content = Group()
+    private val continuous = if (!adjustGlyphs && path == null) SvgContinuousTextDecorations(styleText, overline) else null
     private var x = 0.0
     private var y = 0.0
     private var targetLength = 0.0
     private var ready = false
-    val glyphCount: Int get() = runs.size
+    val glyphCount: Int get() = runs.size * (if (overline && continuous == null) 3 else 1) + if (continuous != null) 3 else 0
 
     init {
         val value = styleText.text
+        require(maxGlyphs >= if (continuous != null) 3 else 0) { "SVG expanded text node limit exceeded" }
         require('\n' !in value && '\r' !in value && '\t' !in value) { "textLength requires a single unwrapped text line" }
         if (adjustGlyphs) {
             if (value.isNotEmpty()) addRun(value, 0, maxGlyphs)
@@ -53,14 +56,15 @@ internal class SvgAdjustedText(
         styleClass += "svg-text-layout"
         styleText.isVisible = false
         styleText.isManaged = false
-        content.children.setAll(runs)
-        children.setAll(styleText, content)
+        content.children.setAll(runs.map { if (overline && continuous == null) SvgOverlinedText(it) else it })
+        if (continuous == null) children.setAll(styleText, content)
+        else children.setAll(styleText, continuous.underline, continuous.over, content, continuous.strike)
         opacityProperty().bind(styleText.opacityProperty())
         styleText.fontProperty().addListener { _, _, _ -> if (ready) positionRuns() }
     }
 
     private fun addRun(value: String, start: Int, limit: Int) {
-        require(runs.size < limit) { "SVG expanded text node limit exceeded" }
+        require((runs.size + 1) * (if (overline && continuous == null) 3L else 1L) + (if (continuous != null) 3 else 0) <= limit) { "SVG expanded text node limit exceeded" }
         starts += start
         runs += Text(value).apply {
             styleClass += "svg-text-glyph"
@@ -74,8 +78,10 @@ internal class SvgAdjustedText(
             strokeMiterLimitProperty().bind(styleText.strokeMiterLimitProperty())
             strokeDashOffsetProperty().bind(styleText.strokeDashOffsetProperty())
             Bindings.bindContent(strokeDashArray, styleText.strokeDashArray)
-            underlineProperty().bind(styleText.underlineProperty())
-            strikethroughProperty().bind(styleText.strikethroughProperty())
+            if (continuous == null) {
+                underlineProperty().bind(styleText.underlineProperty())
+                strikethroughProperty().bind(styleText.strikethroughProperty())
+            }
             fontSmoothingTypeProperty().bind(styleText.fontSmoothingTypeProperty())
         }
     }
@@ -112,12 +118,19 @@ internal class SvgAdjustedText(
         } else {
             val advance = if (runs.size > 1) targetLength else natural
             val gap = if (runs.size > 1) (targetLength - natural) / (runs.size - 1) else 0.0
+            continuous?.position(x - anchor * advance, y, advance)
             runs.forEachIndexed { index, run ->
                 val caret = styleText.caretShape(starts[index], true).filterIsInstance<MoveTo>().firstOrNull()?.x ?: 0.0
                 run.x = x - anchor * advance + caret + index * gap
                 run.y = y
             }
         }
+    }
+
+    fun decorateRuns(wrap: (Text, javafx.scene.Node) -> javafx.scene.Node) {
+        val old = content.children.toList()
+        content.children.clear()
+        content.children.setAll(runs.mapIndexed { index, text -> wrap(text, old[index]) })
     }
 
     fun wrapRuns(wrap: (Text) -> javafx.scene.Node) {

@@ -6,6 +6,7 @@ import org.xml.sax.SAXParseException
 import org.xml.sax.helpers.DefaultHandler
 import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.net.URI
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
@@ -17,14 +18,20 @@ object SvgLoader {
     @JvmStatic
     @JvmOverloads
     fun parse(xml: String, options: SvgOptions = SvgOptions()): SvgDocument =
-        loadBytes(xml.toByteArray(Charsets.UTF_8), options)
+        loadBytes(xml.toByteArray(Charsets.UTF_8), options, null)
+
+    /** Parse with an explicit origin. External resources still require an opt-in resolver. */
+    @JvmStatic
+    @JvmOverloads
+    fun parse(xml: String, baseUri: URI, options: SvgOptions = SvgOptions()): SvgDocument =
+        loadBytes(xml.toByteArray(Charsets.UTF_8), options, baseUri)
 
     @JvmStatic
     @JvmOverloads
     fun load(path: Path, options: SvgOptions = SvgOptions()): SvgDocument =
-        Files.newInputStream(path).use { load(it, options) }
+        Files.newInputStream(path).use { load(it, path.toAbsolutePath().normalize().toUri(), options) }
 
-    /** Opening this URL is explicit; references inside the document never trigger network access. */
+    /** Opening this URL is explicit; references are denied unless [SvgOptions.resourceResolver] allows them. */
     @JvmStatic
     @JvmOverloads
     fun load(url: URL, options: SvgOptions = SvgOptions()): SvgDocument {
@@ -33,19 +40,29 @@ object SvgLoader {
             connectTimeout = 5_000
             readTimeout = 10_000
         }
-        return connection.getInputStream().use { load(it, options) }
+        return connection.getInputStream().use { load(it, connection.url.toURI(), options) }
     }
 
     @JvmStatic
     @JvmOverloads
     fun load(input: InputStream, options: SvgOptions = SvgOptions()): SvgDocument =
-        try { loadBytes(input.readNBytes(options.maxBytes + 1), options) }
+        loadStream(input, options, null)
+
+    /** The caller owns the SVG stream; resolver-created resource streams are closed after reading. */
+    @JvmStatic
+    @JvmOverloads
+    fun load(input: InputStream, baseUri: URI, options: SvgOptions = SvgOptions()): SvgDocument =
+        loadStream(input, options, baseUri)
+
+    private fun loadStream(input: InputStream, options: SvgOptions, baseUri: URI?): SvgDocument =
+        try { loadBytes(input.readNBytes(options.maxBytes + 1), options, baseUri) }
         catch (e: SvgException) { throw e }
         catch (e: Exception) { throw SvgException("Cannot parse SVG: ${e.message}", e) }
 
-    private fun loadBytes(bytes: ByteArray, options: SvgOptions): SvgDocument {
+    private fun loadBytes(bytes: ByteArray, options: SvgOptions, baseUri: URI?): SvgDocument {
         try {
             if (bytes.size > options.maxBytes) throw SvgException("SVG exceeds maxBytes")
+            require(baseUri == null || baseUri.isAbsolute) { "SVG base URI must be absolute" }
             val dom = parseDom(bytes, options.maxDepth)
             val root = dom.documentElement ?: throw SvgException("Missing SVG root")
             if (root.localName != "svg" || root.namespaceURI !in listOf(null, "", SVG_NS)) {
@@ -53,6 +70,10 @@ object SvgLoader {
             }
             val ids = linkedMapOf<String, SvgElement>()
             val diagnostics = mutableListOf<SvgDiagnostic>()
+            fun report(message: String, element: SvgElement? = null) {
+                if (options.strict) throw SvgException(message)
+                diagnostics += SvgDiagnostic(message, element?.id)
+            }
             var count = 0
             fun read(element: Element, depth: Int): SvgElement {
                 if (depth > options.maxDepth || ++count > options.maxElements) {
@@ -86,6 +107,7 @@ object SvgLoader {
                             children += parsed
                             content += SvgContent.Child(parsed)
                         }
+                        Node.PROCESSING_INSTRUCTION_NODE -> report("XML processing instructions inside SVG elements are unsupported")
                         Node.TEXT_NODE, Node.CDATA_SECTION_NODE -> {
                             text.append(child.nodeValue)
                             pending.append(child.nodeValue)
@@ -102,21 +124,48 @@ object SvgLoader {
                 }
                 return result
             }
+            val processingInstructions = mutableListOf<Map<String, String>>()
+            var inProlog = true
+            var stylesheetInstructions = 0
             for (i in 0 until dom.childNodes.length) {
-                if (dom.childNodes.item(i).nodeType == Node.PROCESSING_INSTRUCTION_NODE) {
-                    val message = "XML processing instructions are unsupported"
-                    if (options.strict) throw SvgException(message)
-                    diagnostics += SvgDiagnostic(message)
+                val child = dom.childNodes.item(i)
+                if (child.nodeType == Node.ELEMENT_NODE) inProlog = false
+                if (child.nodeType == Node.PROCESSING_INSTRUCTION_NODE) {
+                    if (inProlog && child.nodeName == "xml-stylesheet") {
+                        // Bound pseudo-attribute parsing too, rather than just the eventual I/O.
+                        if (++stylesheetInstructions > options.maxResourceRequests) {
+                            if (stylesheetInstructions == options.maxResourceRequests + 1) report("SVG exceeds stylesheet reference limit")
+                            continue
+                        }
+                        try { processingInstructions += stylesheetAttributes(child.nodeValue) }
+                        catch (failure: Exception) { report(failure.message ?: "Malformed xml-stylesheet") }
+                    } else report("XML processing instructions outside stylesheet prolog are unsupported")
                 }
             }
-            return SvgDocument(read(root, 1), Collections.unmodifiableMap(ids),
-                Collections.unmodifiableList(diagnostics), options, bytes.size)
+            val parsedRoot = read(root, 1)
+            val resources = SvgResourceSession(options, baseUri, ::report).prepare(parsedRoot, processingInstructions)
+            return SvgDocument(parsedRoot, Collections.unmodifiableMap(ids),
+                Collections.unmodifiableList(diagnostics), options, bytes.size, baseUri, resources)
         } catch (e: SvgException) {
             throw e
         } catch (e: Exception) {
             throw SvgException("Cannot parse SVG: ${e.message}", e)
         }
     }
+
+
+    private fun stylesheetAttributes(text: String): Map<String, String> {
+        // Match the complete pseudo-attribute grammar before using the hardened XML parser for
+        // character/entity decoding and duplicate-attribute validation. Never parse arbitrary markup.
+        require(PI_ATTRIBUTES.matches(text)) { "Malformed xml-stylesheet pseudo-attributes" }
+        val element = parseDom(("<svg " + text + "/>").toByteArray(Charsets.UTF_8), 1).documentElement
+        return (0 until element.attributes.length).associate { index ->
+            val attr = element.attributes.item(index)
+            attr.nodeName to attr.nodeValue
+        }
+    }
+
+    private val PI_ATTRIBUTES = Regex("""\s*(?:[A-Za-z_:][\w:.-]*\s*=\s*(?:"[^"<]*"|'[^'<]*')(?:\s+|$))*""")
 
 
     private class Parser(val depth: Int, val builder: javax.xml.parsers.DocumentBuilder, var uses: Int = 0, var bytes: Int = 0)

@@ -4,7 +4,7 @@
 
 兼容 Inkscape/Sodipodi 等编辑器的外部命名空间元数据：保留解析限制，从渲染和样式编译中排除私有节点；严格模式仍诊断未知 SVG 绘图元素和 foreignObject。实际文件回归及边界见 [编辑器元数据兼容报告](benchmarks/editor-metadata-2026-10-24.md)。
 
-构建基线：JDK 21+、Maven 3.8.8+；Kotlin 2.4.20，JavaFX 21.0.8。生成的字节码目标为 Java 21。
+构建基线：JDK 21+、Maven 3.8.8+；Kotlin 2.2.0，JavaFX 21.0.8。生成的字节码目标为 Java 21。
 
 ## 构建与示例
 
@@ -399,7 +399,7 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 
 布局按几何、绘制属性、变换、效果顺序刷新，固定描边、marker、clipPath、mask 和滤镜读取同一帧的结果。关键帧声明缓存随 SvgDocument 共享，曲线、时钟及节点逐视图独立；展开关键帧点另受 maxElements 上限约束。
 
-此能力处理 SVG 源文档中的 CSS；Scene.stylesheets 继续使用 JavaFX 自身的 CSS 规则。首版不支持 CSS 几何/字体/滤镜属性动画、transition、动画事件、CSS 变量/calc、转义或非 ASCII 动画名称，以及其他 CSS at-rule。未知 @media/@supports/@import 等规则会独立报告并跳过，保留其前后的可用普通规则；不会加载外部样式表。严格模式仍拒绝已报告的错误或不支持内容，宽松模式保留可用样式和属性轨道。
+此能力处理 SVG 源文档中的 CSS；Scene.stylesheets 继续使用 JavaFX 自身的 CSS 规则。首版不支持 CSS 几何/字体/滤镜属性动画、transition、动画事件、CSS 变量/calc、转义或非 ASCII 动画名称，以及其他 CSS at-rule。未知 @media/@supports 等规则会独立报告并跳过，保留其前后的可用普通规则；无条件 @import 与外部样式表仅在显式配置资源解析器后加载，见下文。严格模式仍拒绝已报告的错误或不支持内容，宽松模式保留可用样式和属性轨道。
 
 规则参考 [CSS Animations](https://www.w3.org/TR/css-animations-1/) 与 [CSS Transforms](https://www.w3.org/TR/css-transforms-1/)。
 
@@ -418,10 +418,10 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
 | 遮罩 | alpha/luminance（默认）；区域、两种坐标单位、嵌套遮罩、CSS 与引用 |
-| 滤镜 | 单个 feGaussianBlur / feDropShadow；独立 X/Y 标准差、SourceGraphic/SourceAlpha、filterUnits/primitiveUnits、输入区域及输出子区域裁剪 |
+| 滤镜 | feFlood / feComposite / feMerge 与 feGaussianBlur / feDropShadow / feOffset 的滤镜链；命名/隐式输入、两类坐标单位、区域裁剪 |
 | 图案 | pattern 填充/描边、模板、坐标单位、viewBox 与二维变换 |
-| 文本 | 单段 textPath；text/嵌套 tspan、单值 x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space；单段文字支持 textLength/lengthAdjust；字号支持 em 和相对父字号的百分比 |
-| 图片 | image 中的 base64 PNG/JPEG，preserveAspectRatio，视口裁剪 |
+| 文本 | 单段 textPath；text/嵌套 tspan、单值 x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space；单段文字支持 textLength/lengthAdjust；字号支持 em 和相对父字号的百分比；text-decoration、baseline-shift 见专项边界 |
+| 图片 | 内嵌 base64 PNG/JPEG；显式授权解析器提供的外部 PNG/JPEG；preserveAspectRatio、视口裁剪 |
 
 ### 遮罩
 
@@ -472,6 +472,23 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 
 当前片段排版支持单行水平的拉丁、汉字等非上下文文字；可用绝对坐标和偏移组织多行。暂不支持 `tspan` 与 `textLength/lengthAdjust` 组合、逐字位置列表、旋转、双向或跨片段连写排版，以及片段自身的 transform/filter/mask/clip-path；整段 text 仍支持变换、滤镜、遮罩和裁剪。上述已检测到的不支持内容在严格模式抛出异常，宽松模式报告诊断并保留自然文字排版。规则参考 [SVG 文本](https://www.w3.org/TR/SVG11/text.html)。
 
+### 文本装饰与基线偏移
+
+支持属性和 SVG CSS 中的 `text-decoration: none/underline/overline/line-through` 及组合。装饰线按祖先传播，后代 `none` 不擦除祖先的线；保留产生装饰的祖先字体、绘制属性和基线，后代重新声明某种装饰可建立自己的样式来源。应用侧 `-fx-underline/-fx-strikethrough` 可覆盖并在移除后恢复。`textLength` spacing 的装饰线连续跨过新增字间距，而不是每个字形各画一截。
+
+```xml
+<text x="20" y="40" font-size="24" text-decoration="underline" fill="#2563eb">
+  x<tspan baseline-shift="super" font-size="15" fill="#9333ea">2</tspan>
+  + H<tspan baseline-shift="sub" font-size="15">2</tspan>O
+</text>
+```
+
+`baseline-shift` 支持 text/tspan/textPath 的 baseline/0、正负长度、百分比、em、sub/super。嵌套偏移相加，但不会推动后续文字的排版笔位置；该属性不自动继承，显式 inherit 继承已计算值并再次偏移。百分比以父 SVG 字号为参考（根 text 使用自己的字号），em 使用当前 SVG 字号；这些相对长度在 SVG 样式层计算，不随应用侧 JavaFX 字体覆盖重新解释。sub/super 使用规范允许的字体指标缺失回退：下移 0.3 倍父字号、上移 0.6 倍父字号，不自动缩小字体。
+
+边界会明确诊断：blink；ex 使用半 em 回退（严格模式拒绝）；自定义装饰线与 non-scaling-stroke；自定义线的比例 radialGradient/ImagePattern 绘制（宽松模式省略该线的相应绘制）；弯曲或多线段 textPath 装饰目前为按字形切线分段的近似（严格模式拒绝）。直线 textPath 的继承下划线/删除线受支持。原有 tspan+textLength、混合 textPath 与复杂连写限制不变，不宣称完整 CSS Text Decoration 支持。
+
+语义参考 [SVG Text Decoration](https://www.w3.org/TR/SVG11/text.html#TextDecorationProperty)、[SVG Baseline Shift](https://www.w3.org/TR/SVG11/text.html#BaselineShiftProperty) 与 [CSS Inline baseline-shift](https://www.w3.org/TR/css-inline-3/#baseline-shift-property)。
+
 `marker-start/marker-mid/marker-end` 支持本文档内的 `marker` 引用，适用于 path、line、polyline、polygon 和基本图形；也可使用 `marker` 简写或 SVG CSS 继承。起点和终点标记分别作用于整条路径的第一个和最后一个顶点，中间标记覆盖其余顶点（包含多子路径边界）。曲线按端点切线定向，拐点按夹角平分线定向，零长度线段使用邻近有效方向。
 
 ```xml
@@ -512,17 +529,17 @@ spacing 模式当前支持单行水平的拉丁、汉字等非上下文文字；
 
 基础高斯模糊通过 JavaFX 原生效果实现，支持 SVG 属性、内联 style 和样式表中的 `filter: url(#id)`。`stdDeviation` 可为一个或两个数值；0 关闭对应方向的模糊，负值使该原语退回输入图像。滤镜坐标先于元素变换计算，滤镜输入按 filter 区域裁剪，输出再按原语子区域和 clipPath 裁剪。应用 CSS 修改填充或字体后会更新效果。
 
-支持 `edgeMode="none"` 和单个 `feGaussianBlur`、`feDropShadow` 或 `feOffset`，暂不支持其他滤镜原语、滤镜链、模板引用、filterRes 和 duplicate/wrap 边缘扩展。sRGB/auto 支持多色输入；默认 linearRGB 仅支持单色或 SourceAlpha 输入，多色线性 RGB 合成会报告诊断并在宽松模式下保留未滤镜处理的原图。较大的标准差通过分解方差执行多轮模糊，最多 16 轮，超限会报告诊断而不会静默截断。
+单个 `feGaussianBlur`、`feDropShadow` 或 `feOffset` 继续使用原生快速路径，支持 `edgeMode="none"`；暂不支持模板引用、filterRes 和 duplicate/wrap 边缘扩展。该原生快速路径的颜色限制如下；新增软件滤镜链见下一节。sRGB/auto 支持多色输入；默认 linearRGB 仅支持单色或 SourceAlpha 输入，多色线性 RGB 合成会报告诊断并在宽松模式下保留未滤镜处理的原图。较大的标准差通过分解方差执行多轮模糊，最多 16 轮，超限会报告诊断而不会静默截断。
 
 Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，可在严格模式下渲染；测试使用固定资源，不依赖网络或 GitHub 版本变化。
 
 当前不支持完整 SVG 规范。限制包括：
 
 - 不执行脚本和事件处理器，不渲染 foreignObject；声明式动画的支持范围见上文。
-- 不支持完整 filter 管线、radialGradient 的 gradientTransform 和非零 fr；vector-effect 目前只支持 none/non-scaling-stroke。
-- SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量、除 @keyframes 外的 at-rule、外部样式表；应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
+- 不支持光照滤镜、feBlend/feColorMatrix 等未列出的滤镜原语、滤镜模板和 filterRes；radialGradient 的 gradientTransform 和非零 fr 仍未实现。vector-effect 目前只支持 none/non-scaling-stroke；SVG 逆向导出后置。
+- SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量和条件规则；支持 @keyframes、显式授权的无条件 @import。应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
 - 不支持逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
-- 不自动加载 image/use/gradient/clipPath 中的外部文件或网络引用；load(URL) 仅打开调用方明确提供的顶层地址。
+- 默认不自动加载外部资源；image 与样式表可通过资源解析器显式启用。use/gradient/clipPath 的跨文档引用仍不支持。load(URL) 打开调用方明确提供的顶层地址。
 - 未实现的属性不构成完整的规范校验。严格模式用于拒绝已检测到的错误或不支持内容，不是 SVG 全规范验证器。
 
 ## 诊断与输入限制
@@ -532,9 +549,9 @@ val document = SvgLoader.parse(xml, SvgOptions(strict = true))
 val view = SvgView(document)
 ```
 
-默认宽松模式会跳过无法渲染的元素或使用指定的填充回退颜色，并通过 `view.diagnostics` 返回诊断。严格模式会抛出 `SvgException`。XML 格式错误、重复 ID、DTD 和超限输入始终拒绝。
+默认宽松模式会跳过无法渲染的元素或使用指定的填充回退颜色，并通过 `view.diagnostics` 返回诊断。严格模式会抛出 `SvgException`。XML 格式错误、重复 ID、DTD 和 XML 文档字节/元素/深度超限始终拒绝；资源或栅格预算超限的宽松模式行为见对应章节。
 
-默认最大文档 8 MiB、元素深度 128、元素数量 100,000；引用展开也受限制。遮罩另受 maxMaskPixels 像素预算约束。DTD、外部实体和 XML 外部资源访问已禁用。
+默认最大文档 8 MiB、元素深度 128、元素数量 100,000；引用展开也受限制。遮罩另受 maxMaskPixels 像素预算约束。DTD 和外部实体始终禁用；外部 CSS/图片默认禁用，显式启用后的独立预算见下文。
 
 ## 验证
 
@@ -543,14 +560,16 @@ val view = SvgView(document)
 ```shell
 mvn clean verify
 mvn dependency:tree "-Dincludes=org.openjfx"
+# Linux CI 无显示服务器：仅测试使用 Monocle，不改变库运行依赖
+mvn -Pheadless clean verify
 ```
 
 核心运行依赖仅为 Kotlin 标准库和 javafx-graphics（传递引入 javafx-base）；构建会禁止引入 javafx-web。FXML 集成测试使用的 javafx-fxml，以及测试及示例 PNG 导出使用的 JUnit/Java2D 不属于库运行接口。
 
 
-feDropShadow 支持 dx/dy、一个或两个 stdDeviation、flood-color/currentColor/flood-opacity，以及两种区域坐标单位。使用原生 Gaussian DropShadow；每轴标准差最多 127/3，超限报告诊断。sRGB/auto 支持多色源；默认 linearRGB 目前要求源与阴影颜色相同（SourceAlpha 要求黑色阴影），避免把 sRGB 合成冒充线性 RGB。暂不支持滤镜链及阴影原语属性动画。
+feDropShadow 支持 dx/dy、一个或两个 stdDeviation、flood-color/currentColor/flood-opacity，以及两种区域坐标单位。使用原生 Gaussian DropShadow；每轴标准差最多 127/3，超限报告诊断。sRGB/auto 支持多色源；默认 linearRGB 目前要求源与阴影颜色相同（SourceAlpha 要求黑色阴影），避免把 sRGB 合成冒充线性 RGB。可在下述软件滤镜链中组合；原语属性动画仍不支持。
 
-`feOffset` 支持 SourceGraphic（默认）和 SourceAlpha 输入、dx/dy（默认 0）、两种坐标单位及原语子区域。先裁剪输入，再偏移，最后裁剪输出；元素变换与 clipPath 作用于最终结果。使用原生 Group/Translate，保留原节点的 id、class 和 JavaFX CSS 更新。当前限单个原语，尚不支持命名结果引用、滤镜链及原语属性动画；无效参数在严格模式抛出异常，宽松模式报告诊断并保留源图。
+`feOffset` 支持 SourceGraphic（默认）和 SourceAlpha 输入、dx/dy（默认 0）、两种坐标单位及原语子区域。先裁剪输入，再偏移，最后裁剪输出；元素变换与 clipPath 作用于最终结果。使用原生 Group/Translate，保留原节点的 id、class 和 JavaFX CSS 更新。单个原语保留该原生快速路径；命名结果引用和滤镜链使用下述软件管线。原语属性动画仍不支持；原生快速路径的无效参数在严格模式抛出异常，宽松模式报告诊断并保留源图。
 
 
 animateMotion 支持 path、优先的本地 mpath、values/from-to 坐标、默认 paced 弧长匀速，以及 linear/discrete/spline、keyPoints/keyTimes、rotate 数值/auto/auto-reverse、additive replace/sum。共用自动播放、延迟、重复、freeze 和 seek 控制；运动变换追加在基础及 animateTransform 之后。路径测量按文档复用，曲线有界细分；测量线段总数受 maxElements 限制，不共享节点或时钟。暂不支持百分比运动坐标、by、累积、变换后的 mpath；检测到时报告诊断。
@@ -566,3 +585,53 @@ pattern 支持填充/描边、本地 href 模板、patternUnits/patternContentUn
 
 
 renderCacheEnabled 默认 true，静态文档及仅旋转/平移/路径运动的动画可复用内部 JavaFX 位图；内部缩放/斜切、绘制或几何动画保留向量绘制。设置 false（可绑定，支持 FXML）关闭内部缓存与逐帧缓存监听；SvgView 自身的 isCache/cacheHint 保持应用控制。采用 [CacheHint.ROTATE](https://openjfx.io/javadoc/18/javafx.graphics/javafx/scene/CacheHint.html)，缩放会重新栅格化，旋转的抗锯齿可能与直接矢量绘制略有不同。每视图按当前二维边界及输出比例估算，所有候选节点合计不超过 maxCachePixels（默认 65,536；0 关闭），单轴最多 4096；超过时回退向量，恢复尺寸后重新评估。这是估算像素预算，不是精确显存或进程内存上限。像素缓存、稳态分配与旋转收益须按场景权衡；测量记录见 [缺口修复报告](benchmarks/remediation-2026-10-24.md)。
+
+
+### 可组合滤镜与资源限制
+
+新增 `feFlood`、`feComposite`、`feMerge/feMergeNode`，可与 `feGaussianBlur`、`feOffset`、`feDropShadow` 任意按文档顺序组合。支持 `in/in2/result`、隐式前一结果、`SourceGraphic/SourceAlpha`；重复命名引用最近的前序结果，缺失或前向结果名按省略输入处理。空 filter/feMerge 输出透明。BackgroundImage/BackgroundAlpha/FillPaint/StrokePaint 会明确诊断，不以近似输入代替。
+
+```xml
+<filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+  <feFlood flood-color="#2563eb" result="ink"/>
+  <feComposite in="ink" in2="SourceAlpha" operator="in" result="silhouette"/>
+  <feGaussianBlur in="silhouette" stdDeviation="2"/>
+  <feOffset dx="4" dy="5" result="shadow"/>
+  <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+</filter>
+```
+
+`feComposite` 实现 over/in/out/atop/xor/lighter/arithmetic；算术系数 k1–k4 默认 0，使用预乘 RGBA，限制输出到有效 alpha/颜色范围，不用 JavaFX MULTIPLY/EXCLUSION 冒充 Porter-Duff。按每个原语的 `color-interpolation-filters` 在线性 RGB（默认）或 sRGB 中计算，auto 按 sRGB；feOffset 保持输入颜色空间。SourceGraphic 快照仍沿用 JavaFX 的源绘制/渐变合成行为，不承诺整个 SVG 源画面的线性光绘制。
+
+管线通过 JavaFX 公共快照 API 取样，保留源节点的 id/class、应用 CSS 与主题；正常场景缩放和窗口输出比例改变时重新采样，稳定画面复用结果。极高倍率离屏导出可能重采样缓存图。合成前后遵守 filter 区域和原语子区域裁剪、filterUnits/primitiveUnits；省略的原语子区域由引用输入的区域并集决定，标准输入及无输入原语默认使用完整 filter 区域。元素 opacity 在软件滤镜之后应用；直接绑定源 opacity 的组合目前明确报告不支持。
+
+每个视图共享 `maxFilterPixels`（默认 4,194,304 个中间像素槽），按每个管线 `(原语数 + 12) × 像素宽 × 像素高` 保守计费，覆盖保留结果及转换/模糊临时缓冲；不是字节级堆上限。每轴最多 4096，`maxFilterPrimitives` 默认 64。高斯使用截断到 3σ 的归一化可分离卷积，单轴半径最多 256 像素、每次模糊最多 1.5 亿像素分量采样；每个视图全部软件滤镜合计最多 2 亿估算分量操作。超限不悄悄降采样或截断：严格模式抛异常，宽松模式记录诊断并清空受影响滤镜输出，缩小后可恢复。未支持的图结构在创建时诊断并按现有宽松模式保留源图。
+
+语义依据 [Filter Effects：输入与子区域](https://www.w3.org/TR/filter-effects-1/#FilterPrimitiveSubRegion)、[feComposite](https://www.w3.org/TR/filter-effects-1/#feCompositeElement) 和 [颜色空间](https://www.w3.org/TR/filter-effects-1/#color-interpolation-filters-property)。光照滤镜和 SVG 逆向导出不属于本轮实现。
+
+### 外部样式表与图片：显式授权
+
+默认行为不变：文档内外部 URI 不会触发网络或文件访问。支持 SVG 前导 `xml-stylesheet`、style 内无条件 `@import`（以及导入链）、外部 PNG/JPEG；通过新接口由调用方决定允许读取什么：
+
+```kotlin
+val assets = Path.of("assets").toRealPath()
+val options = SvgOptions(
+    strict = true,
+    resourceResolver = SvgResourceResolvers.directory(assets)
+)
+val document = SvgLoader.load(assets.resolve("icon.svg"), options)
+val view = SvgView(document) // 在 JavaFX 线程创建
+
+// 字符串或流可显式提供来源 URI，仅提供 URI 不会授予访问权限。
+val parsed = SvgLoader.parse(xml, assets.resolve("icon.svg").toUri(), options)
+```
+
+Path/URL 加载自动记录来源，支持继承的 xml:base；每个外部 CSS 的相对 @import 以请求该 CSS 的 URI 为基准。自定义解析器返回流而不返回最终地址，因此 HTTP 重定向不会自动改变后续导入基准；解析器应拒绝这类重定向或保持原 URI 的语义。解析器在加载线程预取字节，渲染阶段不执行 I/O。`SvgView.sourceOptions` 在赋值 source 时捕获；配置了解析器后，即使 file 来源也在后台读取，失败保留旧文档。同步 `SvgLoader.load/parse` 仍由调用方选择后台线程。
+
+`SvgResourceResolver.open(SvgResourceRequest(uri, kind))` 返回 InputStream 或 null 拒绝，库读取后关闭流。内置 directory 解析器只允许指定真实目录内的普通文件，拒绝路径/符号链接逃逸、文件 authority 和所有网络协议；不用于被不可信进程并发改写的目录。没有默认网络解析器。自定义网络解析器必须在打开资源前自行限制域名/端口/IP、重定向、DNS 重绑定和连接/读取超时；库不能沙箱化调用方的代码。带凭据或片段的外部 URI 在调用解析器前拒绝。
+
+默认上限：64 次资源请求、8 层导入、单资源 4 MiB、总字节 16 MiB、每文档唯一图片合计 16,777,216 像素。对应 `maxResourceRequests/maxResourceDepth/maxResourceBytes/maxTotalResourceBytes/maxImagePixels`；重复资源按文档复用字节，重复 import 按出现顺序重新应用规则但仍受展开预算限制。图片头部尺寸在 JavaFX 解码之前校验。开启外部解析器的文档只共享正在进行的缓存请求，不持久保留依赖快照，避免 CSS/图片修改后读到过期缓存。
+
+当前仅支持 UTF-8 CSS（可带 BOM 或开头 UTF-8 @charset）、无条件/all import；media 条件、layer/supports、CSS URL 转义、命名/备用 xml-stylesheet、外部 SVG 图片会明确诊断。外部 use、字体、渐变、clipPath 及 CSS url() 跨文档绘制资源尚未实现。XML DTD/外部实体仍始终禁用，资源解析器不能开启它们。
+
+新增 SvgOptions 参数保持既有 Java 重载和 Kotlin 源码调用方式，但 Kotlin data class 的二进制构造/copy 描述符有变化；升级后请重新编译依赖本库的 Kotlin 调用方。

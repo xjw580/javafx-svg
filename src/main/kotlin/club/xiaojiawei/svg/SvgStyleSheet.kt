@@ -57,16 +57,11 @@ internal class SvgStyleSheet private constructor(
             issues += message to element
         }
 
-        fun compile(root: SvgElement): SvgStyleSheet {
+        fun compile(root: SvgElement, sources: List<SvgStyleSource>, resourceIssues: List<Pair<String, SvgElement>>): SvgStyleSheet {
+            issues.addAll(resourceIssues)
+            sources.forEach { parseSheet(it.text, it.element) }
             fun visit(element: SvgElement) {
                 if (element.name.startsWith('{')) return
-                if (element.name == "style") {
-                    if (element["type"] !in listOf(null, "", "text/css") || element["media"] !in listOf(null, "", "all")) {
-                        report("Only unconditional text/css stylesheets are supported", element)
-                    } else {
-                        parseSheet(element.text, element)
-                    }
-                }
                 // Parse now, but report inline errors only when this element is actually styled.
                 element["style"]?.let { text -> inlineDeclarations.getOrPut(text) { parseDeclarations(text) } }
                 element.children.forEach(::visit)
@@ -154,7 +149,8 @@ internal class SvgStyleSheet private constructor(
         private val selectorTokens = Regex("([.#])([\\w-]+)")
         private val importantSuffix = Regex("\\s*!important\\s*$", RegexOption.IGNORE_CASE)
 
-        fun compile(root: SvgElement): SvgStyleSheet = Compiler().compile(root)
+        fun compile(root: SvgElement, sources: List<SvgStyleSource>, resourceIssues: List<Pair<String, SvgElement>>): SvgStyleSheet =
+            Compiler().compile(root, sources, resourceIssues)
 
         private fun parseDeclarations(text: String): ParsedDeclarations {
             val issues = mutableListOf<String>()

@@ -47,8 +47,9 @@ class SvgDropShadowTest {
         assertEquals(0.0, pixel(expanded, 43, 32).opacity)
     }
 
-    @Test fun unsupportedChainsAndKernelOverflowAreDiagnosed() = FxTest.run {
-        assertFailsWith<SvgException> { view("""<feDropShadow/><feGaussianBlur/>""") }
+    @Test fun supportedChainsAndUnsupportedInputsAreDistinguished() = FxTest.run {
+        assertTrue(view("""<feDropShadow/><feGaussianBlur/>""").diagnostics.isEmpty())
+        assertFailsWith<SvgException> { view("""<feDropShadow/><feBlend/>""") }
         assertFailsWith<SvgException> { view("""<feDropShadow stdDeviation="1000"/>""") }
         assertFailsWith<SvgException> { view("""<feDropShadow in="unknown"/>""") }
         assertFailsWith<SvgException> { view("""<feDropShadow flood-color="blue"/>""",

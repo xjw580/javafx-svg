@@ -11,8 +11,6 @@ import javafx.scene.text.FontWeight
 import javafx.scene.text.FontPosture
 import javafx.scene.image.Image
 import javafx.scene.image.ImageView
-import java.io.ByteArrayInputStream
-import java.util.Base64
 import java.util.Collections
 import kotlin.math.hypot
 import kotlin.math.min
@@ -56,6 +54,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val base = styles.compute(element, ancestors, parent, inherited)
         return animations.style(element, base, parent, inherited ?: emptySet(), viewport)
     }
+    private val imageCache = java.util.IdentityHashMap<SvgImageResource, Image>()
     private val updates = mutableListOf<() -> Unit>()
     private val geometryUpdates = mutableListOf<() -> Unit>()
     private val paintUpdates = mutableListOf<() -> Unit>()
@@ -69,6 +68,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private var paintContext: SvgMarkerContext? = null
     private val maskBudget = SvgMaskBudget(document.options.maxMaskPixels)
     private val masks = mutableListOf<SvgMask>()
+    private val filterBudget = SvgFilterBudget(document.options.maxFilterPixels)
+    private val filterChains = mutableListOf<SvgFilterChain>()
     private val patternBudget = SvgPatternBudget(document.options.maxPatternPixels)
     private val patterns = mutableListOf<SvgPattern>()
     private val definitions = Group().apply { isManaged=false; opacity=0.0; clip=Rectangle() }
@@ -148,6 +149,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val paintCheckpoint = paintUpdates.size
         val styleCheckpoint = shapeStyles.size
         val maskCheckpoint = masks.size
+        val filterCheckpoint = filterChains.size
         val patternCheckpoint = patterns.size
         val animationCheckpoint = animations.size
         return try {
@@ -161,6 +163,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             animations.discardFrom(animationCheckpoint)
             shapeStyles.discardFrom(styleCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
+            while (filterChains.size > filterCheckpoint) filterChains.removeAt(filterChains.lastIndex).dispose()
             while (patterns.size > patternCheckpoint) patterns.removeAt(patterns.lastIndex).also { definitions.children.remove(it.hidden); it.dispose() }
             report(e.message ?: "Invalid SVG element", element)
             null
@@ -220,6 +223,14 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 val preserve = (element["xml:space"] ?: ancestors.asReversed().firstNotNullOfOrNull { it["xml:space"] }) == "preserve"
                 text.text = if (preserve) element.text else element.text.replace(Regex("\\s+"), " ").trim()
                 configureTextFont(text, style)
+                val decoration = textDecoration(style, if (element.name == "textPath") textDecoration(parentStyle) else emptyMap())
+                if ("blink" in decoration) report("Unsupported text-decoration: blink", element)
+                val nativeDecoration = if (element.name == "textPath") decoration.filterValues { it === style } else decoration
+                configureTextDecoration(text, nativeDecoration, style, element)
+                val baselineShift = SvgTextStyles.shift(style.getValue("baseline-shift"),
+                    if (element.name == "text") text.font.size else parentStyle["font-size"]?.toDoubleOrNull() ?: text.font.size) +
+                    if (element.name == "textPath") SvgTextStyles.shift(parentStyle["baseline-shift"] ?: "baseline",
+                        parentStyle["font-size"]?.toDoubleOrNull() ?: text.font.size) else 0.0
                 val anchor = textAnchor(style)
                 val lengthAdjust = element["lengthAdjust"] ?: "spacing"
                 require(lengthAdjust in setOf("spacing", "spacingAndGlyphs")) { "Invalid lengthAdjust" }
@@ -234,18 +245,47 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     require(element["textLength"] == null) { "textLength with textPath is unsupported" }
                     document.geometry.measure(target["d"] ?: "", target["transform"])
                 } else null
-                val adjusted = if (element["textLength"] != null || path != null) {
+                if (path != null && path.size > 1 && decoration.keys.any { it != "blink" }) {
+                    report("Text decorations on curved or multi-segment textPath use glyph-aligned segments", element)
+                }
+                if (element["textLength"] != null && lengthAdjust == "spacing" && decoration.isNotEmpty() && style["vector-effect"] == "non-scaling-stroke") {
+                    report("textLength spacing decorations with non-scaling-stroke are unsupported", element)
+                }
+                val adjusted = if (element["textLength"] != null || path != null || "overline" in decoration) {
                     try {
-                        SvgAdjustedText(text, lengthAdjust == "spacingAndGlyphs", anchor,
-                            document.options.maxElements - renderedElements, path).also { renderedElements += it.glyphCount }
+                        SvgAdjustedText(text, element["textLength"] == null && path == null || lengthAdjust == "spacingAndGlyphs", anchor,
+                            document.options.maxElements - renderedElements, path, "overline" in nativeDecoration && style["vector-effect"] != "non-scaling-stroke").also { renderedElements += it.glyphCount }
                     } catch (e: IllegalArgumentException) {
                         report(e.message ?: "Unsupported textLength layout", element)
                         null
                     }
                 } else null
+                if (adjusted != null && element.name == "textPath") {
+                    val propagated = decoration.filterValues { it !== style }.filterKeys { it != "blink" }
+                    if (propagated.isNotEmpty()) {
+                        require(style["vector-effect"] != "non-scaling-stroke") { "Propagated decoration with non-scaling-stroke on textPath is unsupported" }
+                        val sources = propagated.mapValues { (_, source) ->
+                            require(++renderedElements <= document.options.maxElements) { "SVG expanded text node limit exceeded" }
+                            Text(" ").also { model ->
+                                configureTextFont(model, source)
+                                if (clipping) { model.fill = Color.BLACK; model.stroke = null }
+                                else applyShapeStyle(model, source, viewport, ancestors.last(), adjusted, dynamicGeometry = true)
+                            }
+                        }
+                        sources.values.forEach { source -> update(element, phase = paintUpdates) { validateDecorationPaint(source, element) } }
+                        adjusted.decorateRuns { run, content ->
+                            require(document.options.maxElements - renderedElements >= sources.size + 1) { "SVG expanded text node limit exceeded" }
+                            renderedElements += sources.size + 1
+                            SvgPropagatedTextDecorations(run, content, sources, text) {
+                                run.y + SvgTextStyles.shift(style.getValue("baseline-shift"), parentStyle["font-size"]?.toDoubleOrNull() ?: text.font.size)
+                            }
+                        }
+                    }
+                }
                 update(element, phase = geometryUpdates) {
                     val x = length("x", viewport.width) + length("dx", viewport.width)
-                    val y = length("y", viewport.height) + length("dy", viewport.height)
+                    val y = length("y", viewport.height) + length("dy", viewport.height) - baselineShift
+                    refreshTextDecoration(text, nativeDecoration)
                     if (path != null && adjusted != null) {
                         val reference = document.elementsById[(element["href"] ?: element["xlink:href"])!!.drop(1)]!!
                         val declared = reference["pathLength"]?.let { SvgNumbers.scalar(it).also { n -> require(n > 0) { "Invalid pathLength" } } }
@@ -255,8 +295,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                         val parent = ancestors.lastOrNull { it.name == "text" }
                         val along = listOf("x","dx").sumOf { document.lengths.resolve(parent?.get(it) ?: "0", viewport.width) }
                         val normal = document.lengths.resolve(parent?.get("dy") ?: "0", viewport.height)
-                        adjusted.positionPath(start + along + x, normal + length("dy",viewport.height))
-                    } else if (adjusted != null) adjusted.position(x, y, length("textLength", viewport.width))
+                        adjusted.positionPath(start + along + x, normal + length("dy",viewport.height) - baselineShift)
+                    } else if (adjusted != null) adjusted.position(x, y, if (element["textLength"] == null) text.layoutBounds.width else length("textLength", viewport.width))
                     else {
                         setGeometry(text.xProperty(), x - anchor * text.layoutBounds.width)
                         setGeometry(text.yProperty(), y)
@@ -266,11 +306,9 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             }
             "image" -> {
                 require(!clipping) { "Images are not supported inside clipPath" }
-                val href = element["href"] ?: element["xlink:href"] ?: throw SvgException("Missing image href")
-                val data = Regex("data:image/(png|jpeg);base64,([\\s\\S]*)").matchEntire(href)
-                    ?: throw SvgException("Only embedded base64 PNG/JPEG images are supported")
-                val bytes = Base64.getDecoder().decode(data.groupValues[2].filterNot { it.isWhitespace() })
-                val image = Image(ByteArrayInputStream(bytes))
+                // Resolution/validation happened during loading. Rendering never opens URLs or files.
+                val resource = document.resources.images[element] ?: return null
+                val image = imageCache.getOrPut(resource) { resource.open().use { Image(it) } }
                 require(!image.isError && image.width > 0 && image.height > 0) { "Cannot decode SVG image" }
                 val imageView = ImageView(image)
                 val group = Group(imageView)
@@ -392,6 +430,9 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             } else {
                 styleNode.styleClass += "svg-shape"
                 applyShapeStyle(styleNode, style, viewport, element, node, dynamicGeometry = geometry.isAnimated)
+                if (styleNode is Text && (styleNode.properties.containsKey(SvgTextDecorationPaint.KEY) || "overline" in SvgTextStyles.decoration(style["text-decoration"] ?: "none"))) {
+                    update(element, phase = paintUpdates) { validateDecorationPaint(styleNode, element) }
+                }
             }
         }
         val painted = if (!clipping && style.getValue("vector-effect") == "non-scaling-stroke") when (node) {
@@ -419,7 +460,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 }
             }
         } else marked
-        val result = if (!clipping && style.getValue("filter") != "none") applyFilter(sized, style.getValue("filter"), viewport, element) else sized
+        val result = if (!clipping && style.getValue("filter") != "none") applyFilter(sized, style.getValue("filter"), viewport, element, styleNode) else sized
         if (style.getValue("clip-path") != "none") applyClip(result, style.getValue("clip-path"), viewport, element)
         return if (!clipping && style.getValue("mask") != "none") applyMask(result, style.getValue("mask"), viewport, element) else result
     }
@@ -447,6 +488,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val paintCheckpoint = paintUpdates.size
         val styleCheckpoint = shapeStyles.size
         val maskCheckpoint = masks.size
+        val filterCheckpoint = filterChains.size
         val patternCheckpoint = patterns.size
         val animationCheckpoint = animations.size
         val layer: SvgMarkers
@@ -496,6 +538,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             animations.discardFrom(animationCheckpoint)
             shapeStyles.discardFrom(styleCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
+            while (filterChains.size > filterCheckpoint) filterChains.removeAt(filterChains.lastIndex).dispose()
             while (patterns.size > patternCheckpoint) patterns.removeAt(patterns.lastIndex).also { definitions.children.remove(it.hidden); it.dispose() }
             report(failure.message ?: "Invalid SVG marker", owner)
             return source
@@ -527,13 +570,21 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         update(element, phase = geometryUpdates) { layout.position() }
         data class Piece(
             val value: String, val preserve: Boolean, val owner: SvgElement,
-            val style: Map<String, String>, val scopes: List<SvgTextLayout.Scope>, var text: Text? = null
-        )
+            val style: Map<String, String>, val scopes: List<SvgTextLayout.Scope>,
+            val decoration: Map<String, Map<String, String>>, var text: Text? = null, var decorated: Node? = null
+        ) {
+            val nativeDecoration get() = decoration.filterValues { it === this.style }
+        }
         val pieces = mutableListOf<Piece>()
+        val decorationScopes = java.util.IdentityHashMap<Map<String, String>, List<SvgTextLayout.Scope>>()
+        val decorationOwners = java.util.IdentityHashMap<Map<String, String>, SvgElement>()
+        val decorationSources = java.util.IdentityHashMap<Map<String, String>, Text>()
+        val decorationLayers = mutableListOf<SvgPropagatedTextDecorations>()
         val childPlans = linkedMapOf<Group, MutableList<() -> Node?>>()
         fun build(
             owner: SvgElement, lineage: List<SvgElement>, computed: Map<String, String>, group: Group,
-            parents: List<SvgTextLayout.Scope>, preserveParent: Boolean
+            parents: List<SvgTextLayout.Scope>, preserveParent: Boolean, parentStyle: Map<String, String>,
+            parentDecoration: Map<String, Map<String, String>>
         ) {
             require(lineage.size < document.options.maxDepth) { "SVG text depth limit exceeded" }
             val children = mutableListOf<() -> Node?>()
@@ -567,7 +618,12 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 }
             }
             val geometry = if (owner === element) rootGeometry else animations.geometry(owner, viewport)
-            val scopes = parents + SvgTextLayout.Scope(coordinates, geometry)
+            val scopes = parents + SvgTextLayout.Scope(coordinates, geometry,
+                computed.getValue("baseline-shift"),
+                parentStyle["font-size"]?.toDoubleOrNull() ?: computed.getValue("font-size").toDouble())
+            val decoration = textDecoration(computed, parentDecoration)
+            decorationScopes[computed] = scopes
+            decorationOwners[computed] = owner
             val preserve = when (owner["xml:space"]) {
                 "preserve" -> true
                 "default" -> false
@@ -576,9 +632,9 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             for (part in owner.content) {
                 when (part) {
                     is SvgContent.Characters -> {
-                        val piece = Piece(part.value, preserve, owner, computed, scopes)
+                        val piece = Piece(part.value, preserve, owner, computed, scopes, decoration)
                         pieces += piece
-                        children += { piece.text }
+                        children += { piece.decorated ?: piece.text }
                     }
                     is SvgContent.Child -> {
                         val child = part.element
@@ -588,7 +644,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                             if (childStyle.getValue("display") != "none") {
                                 val childGroup = Group()
                                 children += { childGroup }
-                                build(child, lineage + owner, childStyle, childGroup, scopes, preserve)
+                                build(child, lineage + owner, childStyle, childGroup, scopes, preserve, computed, decoration)
                             }
                         } else if (!child.name.startsWith('{') && child.name !in TEXT_CHILDREN) {
                             report("Unsupported text child: ${child.name}", child)
@@ -598,7 +654,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             }
         }
         val preserve = ancestors.asReversed().firstNotNullOfOrNull { it["xml:space"] } == "preserve"
-        build(element, ancestors, style, layout, emptyList(), preserve)
+        build(element, ancestors, style, layout, emptyList(), preserve, emptyMap(), emptyMap())
         val values = SvgTextLayout.normalize(pieces.map { it.value to it.preserve })
         val wholeText = values.joinToString("")
         if (java.text.Bidi.requiresBidi(wholeText.toCharArray(), 0, wholeText.length)) {
@@ -614,6 +670,13 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 val text = Text(values[index])
                 piece.text = text
                 configureTextFont(text, piece.style)
+                configureTextDecoration(text, piece.nativeDecoration, piece.style, piece.owner)
+                decorationSources.putIfAbsent(piece.style, text)
+                if ("overline" in piece.nativeDecoration && piece.style["vector-effect"] != "non-scaling-stroke") {
+                    require(document.options.maxElements - renderedElements >= 2) { "SVG expanded text node limit exceeded" }
+                    renderedElements += 2
+                    piece.decorated = SvgOverlinedText(text)
+                }
                 text.isVisible = piece.style.getValue("visibility") == "visible"
                 if (!clipping) text.styleClass.addAll("svg-text-run", "svg-shape")
                 layout.runs += SvgTextLayout.Run(text, piece.scopes, textAnchor(piece.style))
@@ -623,8 +686,44 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 }
             }
         }
+        pieces.forEach { piece ->
+            piece.text?.let { text ->
+                val propagated = piece.decoration.filterValues { it !== piece.style }.filterKeys { it != "blink" }
+                if ("blink" in piece.decoration) report("Unsupported text-decoration: blink", piece.owner)
+                if (propagated.isNotEmpty()) {
+                    if (piece.style["vector-effect"] == "non-scaling-stroke") {
+                        report("Propagated text-decoration with non-scaling-stroke is unsupported", piece.owner)
+                    }
+                    val sources = propagated.mapValues { (_, source) ->
+                        decorationSources.getOrPut(source) {
+                            require(++renderedElements <= document.options.maxElements) { "SVG expanded text node limit exceeded" }
+                            Text(" ").also { model ->
+                                configureTextFont(model, source)
+                                if (clipping) { model.fill = Color.BLACK; model.stroke = null }
+                                else applyShapeStyle(model, source, viewport, decorationOwners.getValue(source), layout, dynamicGeometry = true)
+                            }
+                        }
+                    }
+                    require(document.options.maxElements - renderedElements >= sources.size + 1) { "SVG expanded text node limit exceeded" }
+                    renderedElements += sources.size + 1
+                    val wrapper = SvgPropagatedTextDecorations(text, piece.decorated ?: text, sources) { kind ->
+                        val ownShift = piece.scopes.sumOf { SvgTextStyles.shift(it.baselineShift, it.parentFontSize) }
+                        val sourceShift = decorationScopes.getValue(propagated.getValue(kind)).sumOf {
+                            SvgTextStyles.shift(it.baselineShift, it.parentFontSize)
+                        }
+                        text.y + ownShift - sourceShift
+                    }
+                    piece.decorated = wrapper
+                    decorationLayers += wrapper
+                }
+            }
+        }
         childPlans.forEach { (group, children) -> group.children.setAll(children.mapNotNull { it() }) }
         layout.position()
+        update(element, phase = geometryUpdates) {
+            pieces.forEach { piece -> piece.text?.let { refreshTextDecoration(it, piece.nativeDecoration) } }
+            decorationLayers.forEach { it.refresh() }
+        }
         pieces.forEach { piece ->
             piece.text?.let { text ->
                 if (clipping) {
@@ -641,7 +740,47 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 }
             }
         }
+        decorationSources.forEach { (sourceStyle, source) ->
+            if (source.properties[SvgTextDecorationPaint.KEY] == true) {
+                val owner = decorationOwners.getValue(sourceStyle)
+                update(owner, phase = paintUpdates) { validateDecorationPaint(source, owner) }
+            }
+        }
         return layout
+    }
+
+    private fun validateDecorationPaint(source: Text, owner: SvgElement) {
+        @Suppress("UNCHECKED_CAST")
+        val enabled = source.properties[SvgTextDecorationPaint.KEY] as? (() -> Boolean)
+        if (enabled?.invoke() == false) return
+        if (!SvgTextDecorationPaint.supported(source.fill) || !SvgTextDecorationPaint.supported(source.stroke)) {
+            report("Custom text decorations do not support proportional radial gradients or image paints; decoration paint is omitted", owner)
+        }
+    }
+
+    /** Decorations propagate through text content, but are not inherited CSS computed values. */
+    private fun textDecoration(
+        style: Map<String, String>, parent: Map<String, Map<String, String>> = emptyMap()
+    ): Map<String, Map<String, String>> = parent + SvgTextStyles.decoration(style["text-decoration"] ?: "none").associateWith { style }
+
+    private fun configureTextDecoration(
+        text: Text, decoration: Map<String, Map<String, String>>, style: Map<String, String>, owner: SvgElement
+    ) {
+        if ("blink" in decoration) report("Unsupported text-decoration: blink", owner)
+        if (decoration.isNotEmpty() && style["vector-effect"] == "non-scaling-stroke" && "overline" in decoration) {
+            report("Overline with non-scaling-stroke is unsupported", owner)
+        }
+        refreshTextDecoration(text, decoration)
+        // CSS origin can change without a Boolean value change (false -> false), so request a pass.
+        val changed = javafx.beans.InvalidationListener { if (themeReady) root.parent?.requestLayout() }
+        text.styleProperty().addListener(changed)
+        text.styleClass.addListener(changed)
+        text.pseudoClassStates.addListener(changed)
+    }
+
+    private fun refreshTextDecoration(text: Text, decoration: Map<String, Map<String, String>>) {
+        setSvgBaseStyle(text.underlineProperty(), "underline" in decoration)
+        setSvgBaseStyle(text.strikethroughProperty(), "line-through" in decoration)
     }
 
     private fun configureTextFont(text: Text, style: Map<String, String>) {
@@ -684,6 +823,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val geometryCheckpoint = geometryUpdates.size
         val paintCheckpoint = paintUpdates.size
         val maskCheckpoint = masks.size
+        val filterCheckpoint = filterChains.size
         val patternCheckpoint = patterns.size
         val animationCheckpoint = animations.size
         try {
@@ -719,6 +859,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             while (paintUpdates.size > paintCheckpoint) paintUpdates.removeAt(paintUpdates.lastIndex)
             animations.discardFrom(animationCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
+            while (filterChains.size > filterCheckpoint) filterChains.removeAt(filterChains.lastIndex).dispose()
             while (patterns.size > patternCheckpoint) patterns.removeAt(patterns.lastIndex).also { definitions.children.remove(it.hidden); it.dispose() }
             report(failure.message ?: "Invalid mask", owner)
             // Invalid or unavailable masks must not expose the unmasked source.
@@ -727,7 +868,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
     }
 
-    private fun applyFilter(node: Node, value: String, viewport: SvgViewport, owner: SvgElement): Node {
+    private fun applyFilter(node: Node, value: String, viewport: SvgViewport, owner: SvgElement, opacityNode: Node): Node {
         return try {
             val id = LOCAL_REFERENCE.matchEntire(value)?.groupValues?.get(1)
                 ?: throw SvgException("Only local filter references are supported")
@@ -737,8 +878,11 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 "Filter templates and filterRes are unsupported"
             }
             val primitives = filter.children.filter { !it.name.startsWith('{') && it.name !in setOf("title", "desc", "metadata") }
-            require(primitives.size == 1 && primitives.single().name in setOf("feGaussianBlur", "feDropShadow", "feOffset")) {
-                "Only a single feGaussianBlur, feDropShadow or feOffset primitive is supported"
+            require(primitives.size <= document.options.maxFilterPrimitives) { "SVG filter exceeds maxFilterPrimitives" }
+            if (primitives.size != 1 || primitives.single().name !in setOf("feGaussianBlur", "feDropShadow", "feOffset")) {
+                return SvgFilterChain(node, opacityNode, filter, primitives, viewport, document.lengths, filterBudget,
+                    paints::styleOf, { if (themeReady) root.parent?.requestLayout() }, { report(it, owner) })
+                    .also { chain -> filterChains += chain; update(owner) { chain.refresh() } }
             }
             val primitive = primitives.single()
             require(primitive.children.all { it.name.startsWith('{') || it.name in setOf("title", "desc", "metadata") }) {

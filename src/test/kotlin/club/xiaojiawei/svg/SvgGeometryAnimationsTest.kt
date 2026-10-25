@@ -290,7 +290,8 @@ class SvgGeometryAnimationsTest {
     }
 
     @Test fun embeddedImagePositionAndSizeAnimateTogetherWithItsClip() = FxTest.run {
-        val data = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1cAAAAASUVORK5CYII="
+        // A 16px opaque tile avoids software-pipeline edge sampling of a magnified single texel.
+        val data = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAFklEQVR4nGP4TyFgGDVg1IBRA4aLAQBdePwur/3haQAAAABJRU5ErkJggg=="
         val v = view("""<image id="p" x="10" y="10" width="20" height="20" href="data:image/png;base64,$data" preserveAspectRatio="none">
             <animate attributeName="x" values="10;30" dur="2s"/>
             <animate attributeName="y" values="10;30" dur="2s"/>

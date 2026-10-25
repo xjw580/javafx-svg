@@ -19,7 +19,10 @@ class SvgTextPathTest {
     @Test fun horizontalNativeGlyphsAndCss() = FxTest.run {
         val v = view()
         assertEquals(3,runs(v).size)
-        assertTrue(runs(v).all { it.fill == Color.BLUE && it.localToParentTransform.ty == 40.0 })
+        runs(v).forEach {
+            assertEquals(Color.BLUE, it.fill)
+            assertEquals(40.0, it.localToParentTransform.ty, 1e-8)
+        }
         val text=v.lookup("#tp") as Text
         text.style="-fx-fill: red; -fx-font-size: 30px;"
         v.applyCss(); v.layout()

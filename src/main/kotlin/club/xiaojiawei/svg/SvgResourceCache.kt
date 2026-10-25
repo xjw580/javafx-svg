@@ -14,7 +14,8 @@ import java.util.concurrent.ExecutionException
 /**
  * Bounded, thread-safe local resource cache with in-flight request sharing for all URL protocols.
  * Contains documents only. Loading is blocking; call remote loads on a background thread.
- * HTTP/other remote documents are shared only while loading, never retained after completion.
+ * HTTP/other remote documents and documents with external-resource resolvers are shared only while
+ * loading, never retained after completion; dependency changes cannot leave a stale local snapshot.
  */
 class SvgResourceCache internal constructor(
     val maxEntries: Int,
@@ -117,7 +118,7 @@ class SvgResourceCache internal constructor(
             synchronized(lock) {
                 if (flights[key] === flight) {
                     flights.remove(key)
-                    if (unchanged && maxEntries > 0 && ttlNanos > 0 && document.sourceBytes <= maxSourceBytes) {
+                    if (key.options.resourceResolver == null && unchanged && maxEntries > 0 && ttlNanos > 0 && document.sourceBytes <= maxSourceBytes) {
                         remove(key)
                         entries[key] = Entry(document, checkNotNull(flight.version), nanoTime())
                         bytes += document.sourceBytes

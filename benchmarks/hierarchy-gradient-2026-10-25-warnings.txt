@@ -1,4 +1,0 @@
-r2-native-before/path : last warm=54.26055; early measured=50.8676; late measured=60.0609; inspect GC/JIT/noise; no rows removed.
-r4-jsvg-fx/path : last warm=137.0034; early measured=133.5652; late measured=165.83795; inspect GC/JIT/noise; no rows removed.
-r4-native-before/path : last warm=53.24455; early measured=47.2611; late measured=55.4292; inspect GC/JIT/noise; no rows removed.
-r4-native/path : last warm=47.12045; early measured=59.5712; late measured=47.4421; inspect GC/JIT/noise; no rows removed.

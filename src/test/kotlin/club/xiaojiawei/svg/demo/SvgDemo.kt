@@ -66,8 +66,8 @@ class SvgDemo : Application() {
         Sample("cache", "共享文档与独立样式", "资源", "showcase-cache.svg", "RESOURCE CACHE", "同一 source 共享解析文档，两个实例使用各自的主题和节点。", "此示例默认显示对比：蓝色与绿色视图共享文档。"),
         Sample("fxml", "直接从 FXML 使用", "资源", "icon.fxml", "FXML", "直接加载现有 FXML，相对 SVG 与样式表由 FXMLLoader 解析。", "源码页展示实际 FXML；运行时无需 Controller 手动创建 SVG。"),
         Sample("badge", "本地与网络资源", "资源", "/svg/shields-release.svg", "ASYNC SOURCE", "默认显示离线徽章。点击网络加载才访问远程地址，失败保留原内容。", "观察加载状态，也可以清空视图或重新加载本地资源。")
-    )
-    private val groups = listOf("动画", "图形", "颜色与效果", "文本与布局", "资源", "全部")
+    ) + DemoRoadmapSamples.entries.map { Sample(it.key,it.title,"阶段 1–6",it.file,"ROADMAP",it.tip,"可打开实时编辑器修改当前示例；所有默认资源离线。") }
+    private val groups = listOf("动画", "图形", "颜色与效果", "文本与布局", "资源", "阶段 1–6", "全部")
     private val documents = mutableMapOf<String, SvgDocument>()
     private val categoryButtons = linkedMapOf<String, DemoAction>()
     private val sampleButtons = linkedMapOf<String, DemoAction>()
@@ -86,6 +86,7 @@ class SvgDemo : Application() {
     private var codeMode = 0
     private var resumeAfterSeek = false
     private var smoke = false
+    private var demoFont: String? = null
     private var playgroundStage: Stage? = null
     private lateinit var active: SvgView
     private lateinit var reference: SvgView
@@ -116,8 +117,13 @@ class SvgDemo : Application() {
     private lateinit var resources: VBox
 
     override fun start(stage: Stage) {
-        smoke = "--smoke" in parameters.raw
-        content = VBox(20.0).apply { styleClass += listOf("showcase", "blue"); padding = Insets(26.0) }
+        smoke = "--smoke" in parameters.raw || "--smoke-show" in parameters.raw
+        parameters.raw.firstOrNull { it.startsWith("--font-file=") }?.let { option ->
+            val loaded = javafx.scene.text.Font.loadFont(Path.of(option.substringAfter('=')).toUri().toString(), 12.0)
+                ?: error("Unable to load demo UI font")
+            demoFont = loaded.family
+        }
+        content = VBox(20.0).apply { styleClass += listOf("showcase", "blue"); padding = Insets(26.0); demoFont?.let { style = "-fx-font-family: '${it.replace("'", "") }';" } }
         val side = sidebar()
         val editor = editor()
         HBox.setHgrow(editor, Priority.ALWAYS)
@@ -128,7 +134,7 @@ class SvgDemo : Application() {
         stage.title = "JavaFX SVG · 原生渲染实验室"
         stage.minWidth = 940.0; stage.minHeight = 650.0; stage.scene = scene
         selectCategory("动画")
-        if (smoke) runSmoke() else stage.show()
+        if (smoke) { if ("--smoke-show" in parameters.raw) stage.show(); runSmoke() } else stage.show()
     }
 
     private fun header(): VBox {
@@ -136,7 +142,7 @@ class SvgDemo : Application() {
             text("SVG 原生渲染实验室", "page-title"),
             text("从静态图标到动态反馈，直接观察样式、布局与播放行为。", "subtitle"))
         val spacer = Region().apply { HBox.setHgrow(this, Priority.ALWAYS) }
-        val badge = VBox(7.0, text("●  本地示例已就绪", "ready"), text(samples.size.toString() + " 个示例 · 5 个分类", "hint")).apply { alignment = Pos.CENTER_RIGHT }
+        val badge = VBox(7.0, text("●  本地示例已就绪", "ready"), text(samples.size.toString() + " 个示例 · " + (groups.size - 1) + " 个分类", "hint")).apply { alignment = Pos.CENTER_RIGHT }
         val row = HBox(20.0, heading, spacer, badge).apply { alignment = Pos.CENTER_LEFT }
         val themes = HBox(7.0, text("界面主题", "toolbar-label")).apply { alignment = Pos.CENTER_LEFT }
         listOf("蓝色", "绿色", "紫色").forEachIndexed { i, label ->
@@ -310,7 +316,7 @@ class SvgDemo : Application() {
         description.text = sample.description
         tip.text = "观察提示  /  " + sample.tip
         active.styleClass += "live-preview"; reference.styleClass += "reference-preview"
-        if (sample.group == "动画") active.styleClass += "animation-preview"
+        if (active.hasAnimations) active.styleClass += "animation-preview"
         if (sample.key == "theme") active.styleClass += "theme-preview"
         if (sample.key == "markers") active.styleClass += "marker-preview"
         if (sample.key == "cache") { active.styleClass += "cache-blue"; reference.styleClass += "cache-green" }
@@ -444,7 +450,7 @@ val icon = SvgView(document).apply {
     preserveRatio = true
 }
 container.children.add(icon)
-""".replace("LOCATION", location(selected.file)) + if (selected.group == "动画") """
+""".replace("LOCATION", location(selected.file)) + if (active.hasAnimations) """
 icon.playAnimations()
 icon.pauseAnimations()
 icon.seekAnimations(Duration.seconds(0.75))
@@ -464,7 +470,7 @@ icon.loadingProperty().addListener { _, _, loading ->
     private fun countNodes(node: Node): Int = 1 + if (node is Parent) node.childrenUnmodifiable.sumOf(::countNodes) else 0
     private fun location(name: String) = if (name.startsWith('/')) name else "/demo/" + name
     private fun resource(name: String) = javaClass.getResource(location(name))!!.toExternalForm()
-    private fun text(value: String, css: String) = Text(value).apply { styleClass += css }
+    private fun text(value: String, css: String) = Text(value).apply { styleClass += css; demoFont?.let { style = "-fx-font-family: '${it.replace("'", "")}';" } }
     private fun separator() = Region().apply { styleClass += "separator"; minHeight = 1.0; prefHeight = 1.0; maxHeight = 1.0 }
 
     private fun runSmoke() {
@@ -474,7 +480,7 @@ icon.loadingProperty().addListener { _, _, loading ->
             if (active.hasAnimations) seek(.75)
             layoutPage()
             check(active.diagnostics.isEmpty() && reference.diagnostics.isEmpty()) { sample.key + ": " + active.diagnostics }
-            check(active.hasAnimations == (sample.group == "动画")) { sample.key }
+            check(active.hasAnimations == (sample.group == "动画" || DemoRoadmapSamples.entries.any { it.key == sample.key && it.animated })) { sample.key }
             if (sample.key == "css") check(kotlin.math.abs(active.lookup("#css-spin").transforms.first().mxx) < 1e-8)
             if (sample.key == "css-timing") {
                 check(kotlin.math.abs(active.lookup("#css-step").transforms.first().mxx) < 1e-8)
@@ -528,6 +534,31 @@ icon.loadingProperty().addListener { _, _, loading ->
         savePreview("demo-preview-geometry.png")
         selectSample(samples.first { it.key == "css" }); seek(.75)
         savePreview("demo-preview-css.png")
+        fun activate(button: DemoAction) {
+            javafx.event.Event.fireEvent(button, javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,
+                "", "", javafx.scene.input.KeyCode.ENTER, false, false, false, false))
+        }
+        // Exercise actual keyboard handlers, repeated transitions and transport.
+        repeat(2) {
+            for(entry in DemoRoadmapSamples.entries) {
+                activate(categoryButtons.getValue("阶段 1–6")); activate(sampleButtons.getValue(entry.key))
+                layoutPage(); check(active.diagnostics.isEmpty())
+                check(codeText.text == javaClass.getResource(entry.file)!!.readText())
+                if(entry.animated) {
+                    activate(playButton); activate(pauseButton); seek(1.0)
+                    check(active.animationStatus == Animation.Status.PAUSED)
+                    val before=active.snapshot(null,null)
+                    seek(0.0); layoutPage(); val after=active.snapshot(null,null)
+                    check((0 until min(before.height,after.height).toInt()).any { y ->
+                        (0 until min(before.width,after.width).toInt()).any { x -> before.pixelReader.getArgb(x,y)!=after.pixelReader.getArgb(x,y) }
+                    }) { "Roadmap filter animation did not change pixels" }
+                }
+            }
+        }
+        selectCategory("阶段 1–6"); selectSample(samples.first { it.key=="stage4" })
+        savePreview("demo-roadmap-preview.png")
+        selectSample(samples.first { it.key=="stage5-animation" }); seek(1.0)
+        savePreview("demo-roadmap-animation.png")
         println("SVG lab smoke passed: " + samples.size + " examples, independent nodes, animation frames, themes, source tabs, responsive layout and local loading.")
         Platform.exit()
     }

@@ -40,9 +40,9 @@ data class SvgOptions @JvmOverloads constructor(
     }
 }
 
-class SvgException(message: String, cause: Throwable? = null) : IllegalArgumentException(message, cause)
+class SvgException @JvmOverloads constructor(message: String, cause: Throwable? = null) : IllegalArgumentException(message, cause)
 
-data class SvgDiagnostic(val message: String, val elementId: String? = null)
+data class SvgDiagnostic @JvmOverloads constructor(val message: String, val elementId: String? = null)
 
 class SvgElement internal constructor(
     val name: String,

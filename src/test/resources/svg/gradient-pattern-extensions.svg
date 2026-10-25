@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+<title>Radial gradients and pattern overflow</title>
+<defs>
+<radialGradient id="ellipse" gradientTransform="rotate(-25 .5 .5) scale(1 .7)" fr=".12"><stop stop-color="#ffe9a8"/><stop offset=".5" stop-color="#ff8b6b"/><stop offset="1" stop-color="#5b3e9f"/></radialGradient>
+<radialGradient id="offset" fx=".2" fy=".35" fr=".12" spreadMethod="reflect" r=".28"><stop stop-color="#9df7ec"/><stop offset="1" stop-color="#24538a"/></radialGradient>
+<pattern id="clipped" patternUnits="userSpaceOnUse" width="30" height="30"><circle cx="0" cy="0" r="11" fill="#f5ad6f"/></pattern>
+<pattern id="overflow" href="#clipped" overflow="visible" patternTransform="rotate(15)"/>
+</defs>
+<rect width="640" height="360" fill="#0b1327"/>
+<rect x="25" y="50" width="275" height="115" rx="12" fill="url(#ellipse)"/>
+<rect x="340" y="50" width="275" height="115" rx="12" fill="url(#offset)"/>
+<rect x="25" y="220" width="275" height="115" rx="12" fill="#193348"/>
+<rect x="25" y="220" width="275" height="115" rx="12" fill="url(#clipped)"/>
+<rect x="340" y="220" width="275" height="115" rx="12" fill="#193348"/>
+<rect x="340" y="220" width="275" height="115" rx="12" fill="url(#overflow)"/>
+<g fill="#dceafa" font-family="sans-serif" font-size="17"><text x="25" y="30">Affine + focal circle</text><text x="340" y="30">Off-center + reflect</text><text x="25" y="200">Pattern: clipped</text><text x="340" y="200">Pattern: visible overflow</text></g>
+</svg>

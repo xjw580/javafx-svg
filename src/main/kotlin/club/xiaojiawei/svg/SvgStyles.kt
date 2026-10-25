@@ -2,6 +2,7 @@ package club.xiaojiawei.svg
 
 import club.xiaojiawei.svg.SvgStyleSheet.Compound
 import club.xiaojiawei.svg.SvgStyleSheet.Declaration
+import club.xiaojiawei.svg.SvgStyleSheet.Specificity
 import java.util.IdentityHashMap
 
 /** A deliberately bounded SVG stylesheet engine. JavaFX CSS remains the host application's override layer. */
@@ -11,8 +12,18 @@ internal class SvgStyles(
 ) {
     private val sheet = document.styleSheet
     private val lengths = document.lengths
-    private data class Winner(val value: String, val important: Boolean, val specificity: Int, val order: Int)
+    private data class Winner(val value: String, val important: Boolean, val specificity: Specificity, val order: Int)
     private val elementClasses = IdentityHashMap<SvgElement, Set<String>>()
+    // Shared across all styled elements in this renderer, not reset per selector/target.
+    // Charge before scans/allocation so hostile sibling chains cannot turn maxElements into
+    // unbounded cubic matching work. Loose mode diagnoses once and stops stylesheet matching.
+    private var selectorWork = 0L
+    private var selectorLimitReported = false
+    private class SelectorWorkLimit : RuntimeException()
+    private fun selectorCharge(amount: Long) {
+        if (selectorLimitReported || amount < 0 || amount > 2_000_000L - selectorWork) throw SelectorWorkLimit()
+        selectorWork += amount
+    }
 
     init {
         sheet.reportDiagnostics(report)
@@ -21,7 +32,7 @@ internal class SvgStyles(
     fun compute(element: SvgElement, ancestors: List<SvgElement>, parent: Map<String, String>, inheritedKeys: MutableSet<String>? = null): Map<String, String> {
         val winners = mutableMapOf<String, Winner>()
         var order = 0
-        fun add(d: Declaration, specificity: Int) {
+        fun add(d: Declaration, specificity: Specificity) {
             if (d.name == "animation") {
                 try { SvgCssTiming.expand(d.value).forEach { (name, value) -> add(d.copy(name = name, value = value), specificity) } }
                 catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid CSS animation", element) }
@@ -50,16 +61,21 @@ internal class SvgStyles(
                 winners[d.name] = next
             }
         }
-        element.attributes.forEach { (k, v) -> if (k in defaults) add(Declaration(k, v, false), -1) }
-        sheet.candidates(element) { classes(element) }.forEach { rule ->
-            if (matches(rule.selector, element, ancestors)) {
-                rule.declarations.forEach { add(it, rule.specificity) }
+        element.attributes.forEach { (k, v) -> if (k in defaults) add(Declaration(k, v, false), Specificity(0)) }
+        if (!selectorLimitReported) try {
+            sheet.candidates(element) { classes(element) }.forEach { rule ->
+                if (matches(rule.selector, element, ancestors)) {
+                    rule.declarations.forEach { add(it, rule.specificity) }
+                }
             }
+        } catch (_: SelectorWorkLimit) {
+            selectorLimitReported = true
+            report("SVG stylesheet exceeds 2000000 selector-work limit", element)
         }
-        sheet.inline(element, report).forEach { d -> add(d, 1_000_000) }
+        sheet.inline(element, report).forEach { d -> add(d, Specificity(2)) }
         val result = LinkedHashMap<String, String>(defaults.size)
         defaults.forEach { (key, default) ->
-            val initial = if (key == "overflow" && element.name == "marker") "hidden" else default
+            val initial = if (key == "overflow" && element.name in setOf("marker", "pattern")) "hidden" else default
             val value = winners[key]?.value ?: if (key in inherited) parent[key] ?: initial else initial
             if (value == "inherit" || (value == "unset" && key in inherited) || (winners[key] == null && key in inherited)) inheritedKeys?.add(key)
             result[key] = when (value) {
@@ -86,28 +102,75 @@ internal class SvgStyles(
             result["vector-effect"] = "none"
         }
         return SvgComputedStyle(result, winners.filterValues { it.important }.keys.toSet(), winners.keys.toSet(),
-            winners["transform"]?.let { it.specificity >= 0 } == true)
+            winners["transform"]?.let { it.specificity.level >= 1 } == true)
     }
 
     private fun matches(selector: List<Compound>, element: SvgElement, ancestors: List<SvgElement>): Boolean {
-        if (!matchesCompound(selector.last(), element)) return false
-        var ancestor = ancestors.lastIndex
-        for (index in selector.lastIndex - 1 downTo 0) {
-            val part = selector[index]
-            while (ancestor >= 0 && !matchesCompound(part, ancestors[ancestor])) ancestor--
-            if (ancestor < 0) return false
-            ancestor--
+        // Right-to-left matching needs backtracking: a nearest matching ancestor can fail the
+        // remainder while an earlier matching ancestor succeeds. Memoization bounds repeated work.
+        data class State(val part: Int, val node: SvgElement, val depth: Int)
+        val memo = HashMap<State, Boolean>()
+        fun match(part: Int, node: SvgElement, path: List<SvgElement>): Boolean {
+            selectorCharge(1L + path.size + selector[part].ids.size + selector[part].classes.size + selector[part].attributes.size)
+            val key = State(part, node, path.size)
+            memo[key]?.let { return it }
+            val answer = if (!matchesCompound(selector[part], node)) false else if (part == 0) true else {
+                when (selector[part].combinator) {
+                    '>' -> path.lastOrNull()?.let { match(part - 1, it, path.dropLast(1)) } ?: false
+                    '+', '~' -> {
+                        val siblings = path.lastOrNull()?.children.orEmpty()
+                        selectorCharge(siblings.size.toLong())
+                        val index = siblings.indexOfFirst { it === node }
+                        if (index <= 0) false else if (selector[part].combinator == '+')
+                            match(part - 1, siblings[index - 1], path)
+                        else (index - 1 downTo 0).any { match(part - 1, siblings[it], path) }
+                    }
+                    else -> path.indices.reversed().any { match(part - 1, path[it], path.take(it)) }
+                }
+            }
+            memo[key] = answer
+            return answer
         }
-        return true
+        // A use instance is a shadow subtree: inherited properties cross its host, complex
+        // selectors do not. Ancestors before/including the nearest use were not cloned.
+        val shadowBoundary = ancestors.indexOfLast { it.name == "use" }
+        selectorCharge(ancestors.size.toLong())
+        return match(selector.lastIndex, element, if (shadowBoundary < 0) ancestors else ancestors.drop(shadowBoundary + 1))
     }
 
-    private fun matchesCompound(selector: Compound, element: SvgElement): Boolean =
-        (selector.type == null || selector.type == element.name) &&
+    private fun matchesCompound(selector: Compound, element: SvgElement): Boolean {
+        selectorCharge(element.name.length.toLong() + selector.ids.sumOf { it.length.toLong() } + selector.classes.sumOf { it.length.toLong() } +
+            selector.attributes.sumOf { (it.value?.length ?: 0).toLong() + (element[it.name]?.length ?: 0).toLong() })
+        return (selector.type == null || selector.type == element.name) &&
             selector.ids.all { it == element.id } &&
-            (selector.classes.isEmpty() || classes(element).containsAll(selector.classes))
+            (selector.classes.isEmpty() || classes(element).containsAll(selector.classes)) &&
+            selector.attributes.all { condition ->
+                val actual = element[condition.name]
+                val wanted = condition.value.orEmpty()
+                actual != null && when (condition.operator) {
+                    null -> true
+                    "=" -> actual == wanted
+                    "~=" -> wanted.isNotEmpty() && !wanted.any(Char::isWhitespace) && actual.split(whitespace).contains(wanted)
+                    "|=" -> actual == wanted || actual.startsWith("$wanted-")
+                    "^=" -> wanted.isNotEmpty() && actual.startsWith(wanted)
+                    "$=" -> wanted.isNotEmpty() && actual.endsWith(wanted)
+                    "*=" -> wanted.isNotEmpty() && wanted.length <= actual.length && run {
+                        // String substring search may compare a long repetitive prefix at every
+                        // offset. Bound that worst-case work before calling the platform search.
+                        selectorCharge(actual.length.toLong() * wanted.length.toLong())
+                        actual.contains(wanted)
+                    }
+                    else -> false
+                }
+            }
+    }
 
     private fun classes(element: SvgElement): Set<String> = elementClasses.getOrPut(element) {
-        element["class"]?.split(whitespace)?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+        val value = element["class"] ?: return@getOrPut emptySet()
+        // Synthetic use roots have distinct identities, even when their attribute strings
+        // are shared. Charge each uncached tokenization before allocating its token set.
+        selectorCharge(value.length.toLong())
+        value.split(whitespace).filter { it.isNotEmpty() }.toSet()
     }
 
     companion object {
@@ -121,12 +184,12 @@ internal class SvgStyles(
             "display" to "inline", "visibility" to "visible", "overflow" to "visible",
             "marker" to "none", "marker-start" to "none", "marker-mid" to "none", "marker-end" to "none",
             "clip-path" to "none", "mask" to "none", "mask-type" to "luminance", "filter" to "none", "color-interpolation-filters" to "linearRGB",
-            "stop-color" to "black", "stop-opacity" to "1", "flood-color" to "black", "flood-opacity" to "1",
+            "stop-color" to "black", "stop-opacity" to "1", "flood-color" to "black", "flood-opacity" to "1", "lighting-color" to "white",
             "font-family" to "sans-serif", "font-size" to "16", "font-weight" to "normal",
             "font-style" to "normal", "text-anchor" to "start", "text-decoration" to "none", "baseline-shift" to "baseline",
             "transform" to "none", "transform-origin" to "0 0", "transform-box" to "view-box", "animation" to "none"
         ) + SvgCssTiming.defaults
-        private val inherited = defaults.keys - setOf("text-decoration", "baseline-shift", "opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity", "flood-color", "flood-opacity", "vector-effect", "overflow", "transform", "transform-origin", "transform-box", "animation") - SvgCssTiming.defaults.keys
+        private val inherited = defaults.keys - setOf("text-decoration", "baseline-shift", "opacity", "display", "clip-path", "mask", "mask-type", "filter", "stop-color", "stop-opacity", "flood-color", "flood-opacity", "lighting-color", "vector-effect", "overflow", "transform", "transform-origin", "transform-box", "animation") - SvgCssTiming.defaults.keys
     }
 }
 

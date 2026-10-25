@@ -1,12 +1,16 @@
 # javafx-svg
 
+> **1.0.0-rc 发布候选准备版**：此版本不是正式 1.0.0，也不表示已上传 Maven Central、创建 Git tag 或发布 GitHub Release。项目许可证已按所有者选择与 javafx-ui 一致，采用 MPL-2.0；公开发布渠道和实际发布操作仍待确认。见 [RC 发布说明](release/1.0.0-rc.md)、[发布检查表](release/CHECKLIST.md) 和 [API 契约](benchmarks/release-api.md)。
+
 将 SVG 文档解析为 JavaFX 原生场景图的 Kotlin/JVM 库。使用 JavaFX 公共 API，不依赖 javafx-web、WebView、Swing 或 Batik。
 
-兼容 Inkscape/Sodipodi 等编辑器的外部命名空间元数据：保留解析限制，从渲染和样式编译中排除私有节点；严格模式仍诊断未知 SVG 绘图元素和 foreignObject。实际文件回归及边界见 [编辑器元数据兼容报告](benchmarks/editor-metadata-2026-10-24.md)。
+兼容 Inkscape/Sodipodi 等编辑器的外部命名空间元数据：保留解析限制，从渲染和样式编译中排除私有节点；严格模式仍诊断未知 SVG 绘图元素及 foreignObject 中超出已实现 XHTML 子集的内容。实际文件回归及边界见 [编辑器元数据兼容报告](benchmarks/editor-metadata-2026-10-24.md)。
 
 构建基线：JDK 21+、Maven 3.8.8+；Kotlin 2.2.0，JavaFX 21.0.8。生成的字节码目标为 Java 21。
 
 ## 构建与示例
+
+当前候选 Maven 坐标为 `club.xiaojiawei:javafx-svg:1.0.0-rc`。 自动模块名为 `club.xiaojiawei.svg`（不是显式 JPMS 封装）；打包提供库 JAR 与 Kotlin 源码附件，具体产物和发布前条件见 RC 发布说明。尚未承诺任何公共仓库可下载；准备阶段先从本源码构建并 `mvn install` 到本地仓库，再由独立消费者验证。库 JAR 不包含 Kotlin/JavaFX 依赖或 Demo，不是可双击运行的 fat JAR。RC 期间仍可能有兼容性调整；不保证旧 SNAPSHOT 的 Kotlin 二进制构造/copy 签名，迁移后应重新编译消费者。
 
 ```shell
 mvn clean verify
@@ -14,7 +18,7 @@ mvn install
 mvn -Pdemo test-compile exec:java
 ```
 
-示例是包含 27 个示例、5 个分类的交互实验室：分类导航、大尺寸预览、源图对比、SVG/FXML/CSS/Kotlin 源码、动画播放与时间定位。新增沿路径运动、沿路径文字、图案填充及投影。提供旋转加载、呼吸变色、路径绘制、组合变换、圆点跳动、音量柱、CSS 关键帧和多动画叠加；原有渐变、裁剪、遮罩、文字、箭头、缓存及 FXML 演示全部保留。支持三种主题、80%/100%/120% 缩放、网格/深色背景及宽窄布局。默认全部离线，点击「加载网络徽章」才访问远程资源。详见 [Demo 使用说明](demo/README.md)。点击「输入 SVG · 实时预览」可直接编辑当前 SVG，自动刷新预览并显示错误；详见 Demo 文档。示例代码和资源位于 `src/test`，不进入库 JAR。
+示例是按分类组织的交互实验室（界面显示实际示例数）：分类导航、大尺寸预览、源图对比、SVG/FXML/CSS/Kotlin 源码、动画播放与时间定位。新增沿路径运动、沿路径文字、图案填充及投影。提供旋转加载、呼吸变色、路径绘制、组合变换、圆点跳动、音量柱、CSS 关键帧和多动画叠加；原有渐变、裁剪、遮罩、文字、箭头、缓存及 FXML 演示全部保留。支持三种主题、80%/100%/120% 缩放、网格/深色背景及宽窄布局。默认全部离线，点击「加载网络徽章」才访问远程资源。详见 [Demo 使用说明](demo/README.md)。点击「输入 SVG · 实时预览」可直接编辑当前 SVG，自动刷新预览并显示错误；详见 Demo 文档。示例代码和资源位于 `src/test`，不进入库 JAR。交付源码包保留完整 demo；JDK 21+ 与 Maven 启动后选择「阶段 1–6」，可直接查看新增的 11 个离线演示、播放滤镜动画并打开实时编辑器。单独库 JAR 不是 demo 启动包。
 
 可见窗口交互基准（运行约 90 秒，完成后自动关闭窗口）：
 
@@ -61,7 +65,7 @@ Demo 使用 classpath 启动，项目没有 `module-info.java`。不要为它配
 mvn -Pdemo test-compile exec:java "-Dexec.args=--smoke"
 ```
 
-生成三种界面状态 `target/demo-preview{,-themed,-compact}.png`，以及 `target/demo-cases/` 下全部 23 个示例的画布快照；检查动画帧变化、共享文档与独立节点、主题、源码、响应式布局及本地资源清空/恢复，不访问网络。渲染测试及示例仍需要 JavaFX 图形环境；Linux 无显示器环境可使用 `xvfb-run`。Demo smoke 不显示窗口；生命周期回归测试会短暂创建透明测试窗口。
+生成三种界面状态 `target/demo-preview{,-themed,-compact}.png`，以及 `target/demo-cases/` 下全部已注册示例的画布快照；检查动画帧变化、共享文档与独立节点、主题、源码、响应式布局及本地资源清空/恢复，不访问网络。渲染测试及示例仍需要 JavaFX 图形环境；Linux 无显示器环境可使用 `xvfb-run`。Demo smoke 不显示窗口；生命周期回归测试会短暂创建透明测试窗口。
 
 ## 使用
 
@@ -71,7 +75,7 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--smoke"
 <dependency>
     <groupId>club.xiaojiawei</groupId>
     <artifactId>javafx-svg</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.0-rc</version>
 </dependency>
 ```
 
@@ -332,7 +336,7 @@ println(icon.hasAnimations)
 
 FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需要视图连接到显示中的窗口；窗口隐藏或最小化、视图自身/任意父节点隐藏、视图移出场景时自动暂停时钟，恢复显示后继续。显式 pause/stop 后保持停止推进；更换 document/source 会重置时钟并采用当前 animationAutoPlay，失败的替换保留原内容和播放状态。停止回到首帧，不保证回到未动画的源样式；seek 接受有限非负时间，并限制在有限动画总时长内。所有播放控制在 FX 线程执行。
 
-动画沿用源 SVG 样式层：应用侧 JavaFX CSS、属性绑定及统一主题保持已有优先级，移除覆盖后显示当前动画值。变换通过原生 Affine 更新；固定描边、marker、clipPath、mask 和普通/片段/定长文字复用已有节点。每帧由 JavaFX pulse 推进，仅更新属性与必要布局，不重新解析 XML，不把插值结果写入共享文档缓存。每个视图有独立时钟，未播放时不运行计时器。
+动画沿用源 SVG 样式层：应用侧 JavaFX CSS、属性绑定及统一主题保持已有优先级，移除覆盖后显示当前动画值。变换通过原生 Affine 更新；固定描边、marker、clipPath、mask 和普通/片段/定长文字复用已有节点。每帧由 JavaFX pulse 推进，仅更新属性与必要布局，不重新解析 XML，不把插值结果写入共享文档缓存。每个视图有独立时钟，未播放时不运行计时器。受支持的滤镜参数动画会按时间重新生成受预算约束的软件滤镜图像，不应将节点复用理解为所有动画都只改原生矢量属性。
 
 几何动画按目标元素支持以下 XML 属性（attributeType=auto/XML）：
 
@@ -361,7 +365,7 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 
 不支持几何 CSS 属性动画、根 svg 的位置/尺寸动画、use 的 width/height 动画、textLength 本身及文字位置列表动画。SvgView 的布局尺寸由 fitWidth/fitHeight 和父布局管理。形状几何语义参考 [SVG Basic Shapes](https://www.w3.org/TR/SVG11/shapes.html)。
 
-首版不支持事件/同步链 begin、begin 时间列表、end/repeatDur、累积动画、数值/颜色的 additive=sum、普通属性轨道的 paced、set、animateColor、路径数据/points、渐变/滤镜属性动画，以及 CSS transition。tspan 支持上述样式动画，自身的变换动画仍受 tspan 变换限制。已检测到的不支持内容在严格模式拒绝，在宽松模式报告诊断并保留可用的静态内容。规则参考 [SVG 1.1 Animation](https://www.w3.org/TR/SVG11/animate.html)。
+不支持事件/同步链 begin、begin 时间列表、end/repeatDur、累积动画、数值/颜色的 additive=sum、普通属性轨道的 paced、set、animateColor、路径数据/points、渐变属性动画，以及 CSS transition。滤镜原语的指定数值/颜色属性支持 SMIL animate；白名单见下文「阶段 5」，其他滤镜属性和光源子节点动画仍不支持。tspan 支持上述样式动画，自身的变换动画仍受 tspan 变换限制。已检测到的不支持内容在严格模式拒绝，在宽松模式报告诊断并保留可用的静态内容。规则参考 [SVG 1.1 Animation](https://www.w3.org/TR/SVG11/animate.html)。
 
 ### SVG 内嵌 CSS 动画
 
@@ -410,18 +414,31 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 | 图形 | path（M/L/H/V/C/S/Q/T/A/Z，大小写与重复参数）、rect/圆角、circle、ellipse、line、polyline、polygon |
 | 容器和布局 | svg、嵌套 svg、g、a 的静态内容；viewBox、preserveAspectRatio 的对齐及 meet/slice/none |
 | 坐标 | matrix、translate、scale、rotate、skewX/Y；无单位数、px、%、in、cm、mm、pt、pc、q |
-| 样式 | 属性、style 属性、style 元素；类型/class/id/复合/后代/逗号选择器；继承、优先级、!important、currentColor |
+| 样式 | 属性、style 属性、style 元素；类型/class/id/属性/复合/后代/子代/兄弟/逗号选择器；继承、优先级、!important、currentColor |
 | 描边 | 颜色、宽度、透明度、端点、连接、miterlimit、虚线、non-scaling-stroke |
 | 引用 | 本文档内 defs/use/symbol、href/xlink:href；独立实例、循环和展开数量限制 |
-| 动画 | animateMotion/mpath、animateTransform、样式与几何 animate、CSS @keyframes；关键帧/缓动、延迟/循环、播放/暂停/停止/时间定位 |
+| 动画 | animateMotion/mpath、animateTransform、样式/几何及白名单滤镜参数 animate、CSS @keyframes（不含滤镜参数）；关键帧/缓动、延迟/循环、播放/暂停/停止/时间定位 |
 | 标记 | marker-start/mid/end、marker 简写；自动定向、两类坐标单位、上下文颜色/线性渐变 |
-| 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
+| 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性/径向渐变变换、径向焦点半径 fr |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
 | 遮罩 | alpha/luminance（默认）；区域、两种坐标单位、嵌套遮罩、CSS 与引用 |
-| 滤镜 | feFlood / feComposite / feMerge 与 feGaussianBlur / feDropShadow / feOffset 的滤镜链；命名/隐式输入、两类坐标单位、区域裁剪 |
-| 图案 | pattern 填充/描边、模板、坐标单位、viewBox 与二维变换 |
-| 文本 | 单段 textPath；text/嵌套 tspan、单值 x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space；单段文字支持 textLength/lengthAdjust；字号支持 em 和相对父字号的百分比；text-decoration、baseline-shift 见专项边界 |
+| 滤镜 | feFlood / feComposite / feMerge、feGaussianBlur / feDropShadow / feOffset、feTurbulence / feDisplacementMap / feMorphology、feColorMatrix / feBlend / feConvolveMatrix / feComponentTransfer、feTile / feImage、feDiffuseLighting / feSpecularLighting 的滤镜链；命名/隐式输入、两类坐标单位、区域裁剪 |
+| 图案 | pattern 填充/描边、模板、坐标单位、viewBox、二维变换及显式 overflow=visible 的有界跨图块绘制 |
+| 文本 | 单段 textPath；text/嵌套 tspan、逐字 x/y/dx/dy 与 rotate 列表、字体/字号/粗细/斜体、text-anchor、xml:space；普通水平文字与嵌套 tspan 支持 textLength/lengthAdjust；字号支持 em 和相对父字号的百分比；text-decoration、baseline-shift 见专项边界 |
 | 图片 | 内嵌 base64 PNG/JPEG；显式授权解析器提供的外部 PNG/JPEG；preserveAspectRatio、视口裁剪 |
+| 混合内容 | foreignObject 中有界的 XHTML div/span/br 与内联盒模型、字体和文字颜色；不使用 WebView，不等于完整浏览器 |
+
+### foreignObject：有界的原生 XHTML 子集
+
+`foreignObject` 使用 JavaFX 原生 Rectangle、Text/TextFlow 和容器节点渲染 XHTML 命名空间（`http://www.w3.org/1999/xhtml`）中的 `div`、`span`、`br`。支持 SVG 的 x/y/width/height、变换和视口裁剪，HTML 块顺序布局、文字换行和嵌套片段；HTML 自动高度由内容决定，不自动撑满 foreignObject 的定位矩形。节点数量及源文档深度仍受 `SvgOptions` 限制。
+
+内联 `style` 支持纯色背景、solid/none 边框、单值圆角、padding、width/height、box-sizing；color、font 简写及字体族/字号/字重/斜体、text-align、white-space、visibility/display 和 overflow 的已实现值。span 支持文字样式和 visibility/display，不实现独立的 CSS 盒模型。颜色和字体在片段间继承，`inherit/initial/unset` 与内联 `!important` 在这个子集中生效；字体实际外观仍依赖系统已安装字体。
+
+这不是浏览器布局引擎，也不加载 WebView。尚不支持其他 HTML 元素、外部/HTML 样式表、flex/grid、绝对定位、margin、CSS 变量/calc、背景图片、表单、链接和嵌入文档；不执行脚本或事件处理器，不发起 HTML 资源请求。未知元素/属性、未实现的 CSS 属性或取值会产生诊断，严格模式拒绝；宽松模式只保留可用内容，不能把无诊断视为完整 HTML/CSS 规范验证。
+
+`normal/pre-wrap` 中超过行宽且无合法断行点的长文本当前会报告兼容性诊断（严格模式报错）；可使用 `nowrap/pre` 显式保持不换行。SVG 源样式表不进入 XHTML 子树，XHTML 目前仅解释内联声明及从外层 SVG 继承的颜色/字体。 HTML 盒模型按这些声明排版；宿主 JavaFX CSS 直接覆盖 Text 字体时不保证自动重排，应修改 SVG 内联字号后重新加载。
+
+原样回归文件 `src/test/resources/svg/foreign-object.svg` 包含圆角背景和描边、居中粗体文字及两个独立颜色的 span。测试同时检查原生文字节点与实际快照像素，避免将空白 HTML 区域误认为成功。
 
 ### 遮罩
 
@@ -448,7 +465,7 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 
 语义依据 [SVG Masking](https://www.w3.org/TR/css-masking-1/#MaskElement) 与 [luminanceToAlpha](https://www.w3.org/TR/filter-effects-1/#element-attrdef-fecolormatrix-type)。
 
-含 `tspan` 的 `text` 按原始顺序渲染文字与嵌套片段，支持继承字体、填充、描边、透明度，以及单值 `x/y/dx/dy`。没有绝对坐标的片段接续当前文字位置，新的 `x` 或 `y` 开始独立锚定的文字块，可配合 `dy` 手动换行。`xml:space` 跨片段处理；渐变按整段文字的几何边界计算。
+含 `tspan` 的 `text` 按原始顺序渲染文字与嵌套片段，支持继承字体、填充、描边、透明度，以及普通水平 LTR 文字的 `x/y/dx/dy` 位置列表和 `rotate` 列表。没有绝对坐标的片段接续当前文字位置，新的 `x` 或 `y` 开始独立锚定的文字块，可配合 `dy` 手动换行。`xml:space` 跨片段处理；渐变按整段文字的几何边界计算。
 
 ```xml
 <text x="20" y="30" font-size="20" fill="#334155">
@@ -468,13 +485,13 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 }
 ```
 
-修改字体后会重新计算后续位置和整块锚点，根 `-svg-*` 主题也作用于文字片段。单段、无 `tspan` 的文字仍直接使用原有 Text 样式节点。
+修改字体后会重新计算后续位置和整块锚点，根 `-svg-*` 主题也作用于文字片段。未启用逐字定位/旋转等拆字路径的单段、无 `tspan` 文字仍直接使用原有 Text 样式节点。
 
-当前片段排版支持单行水平的拉丁、汉字等非上下文文字；可用绝对坐标和偏移组织多行。暂不支持 `tspan` 与 `textLength/lengthAdjust` 组合、逐字位置列表、旋转、双向或跨片段连写排版，以及片段自身的 transform/filter/mask/clip-path；整段 text 仍支持变换、滤镜、遮罩和裁剪。上述已检测到的不支持内容在严格模式抛出异常，宽松模式报告诊断并保留自然文字排版。规则参考 [SVG 文本](https://www.w3.org/TR/SVG11/text.html)。
+当前片段排版支持单行水平的拉丁、汉字等非上下文文字；可用绝对坐标和偏移组织多行。支持逐字位置/旋转列表与嵌套 textLength（见阶段 5）；暂不支持双向或跨片段连写排版，以及片段自身的 transform/filter/mask/clip-path；整段 text 仍支持变换、滤镜、遮罩和裁剪。上述已检测到的不支持内容在严格模式抛出异常，宽松模式报告诊断并保留自然文字排版。规则参考 [SVG 文本](https://www.w3.org/TR/SVG11/text.html)。
 
 ### 文本装饰与基线偏移
 
-支持属性和 SVG CSS 中的 `text-decoration: none/underline/overline/line-through` 及组合。装饰线按祖先传播，后代 `none` 不擦除祖先的线；保留产生装饰的祖先字体、绘制属性和基线，后代重新声明某种装饰可建立自己的样式来源。应用侧 `-fx-underline/-fx-strikethrough` 可覆盖并在移除后恢复。`textLength` spacing 的装饰线连续跨过新增字间距，而不是每个字形各画一截。
+支持属性和 SVG CSS 中的 `text-decoration: none/underline/overline/line-through` 及组合。装饰线按祖先传播，后代 `none` 不擦除祖先的线；保留产生装饰的祖先字体、绘制属性和基线，后代重新声明某种装饰可建立自己的样式来源。应用侧 `-fx-underline/-fx-strikethrough` 可覆盖并在移除后恢复。普通未拆分文字路径中，`textLength` spacing 的装饰线连续跨过新增字间距；逐字位置/旋转路径使用跟随字形变换的装饰线，不能据此承诺任意旋转字形之间都是连续直线。
 
 ```xml
 <text x="20" y="40" font-size="24" text-decoration="underline" fill="#2563eb">
@@ -485,7 +502,7 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 
 `baseline-shift` 支持 text/tspan/textPath 的 baseline/0、正负长度、百分比、em、sub/super。嵌套偏移相加，但不会推动后续文字的排版笔位置；该属性不自动继承，显式 inherit 继承已计算值并再次偏移。百分比以父 SVG 字号为参考（根 text 使用自己的字号），em 使用当前 SVG 字号；这些相对长度在 SVG 样式层计算，不随应用侧 JavaFX 字体覆盖重新解释。sub/super 使用规范允许的字体指标缺失回退：下移 0.3 倍父字号、上移 0.6 倍父字号，不自动缩小字体。
 
-边界会明确诊断：blink；ex 使用半 em 回退（严格模式拒绝）；自定义装饰线与 non-scaling-stroke；自定义线的比例 radialGradient/ImagePattern 绘制（宽松模式省略该线的相应绘制）；弯曲或多线段 textPath 装饰目前为按字形切线分段的近似（严格模式拒绝）。直线 textPath 的继承下划线/删除线受支持。原有 tspan+textLength、混合 textPath 与复杂连写限制不变，不宣称完整 CSS Text Decoration 支持。
+边界会明确诊断：blink；ex 使用半 em 回退（严格模式拒绝）；自定义装饰线与 non-scaling-stroke；自定义线的比例 radialGradient/ImagePattern 绘制（宽松模式省略该线的相应绘制）；弯曲或多线段 textPath 装饰目前为按字形切线分段的近似（严格模式拒绝）。直线 textPath 的继承下划线/删除线受支持。混合 textPath 与复杂连写限制不变；tspan+textLength 已扩展，见阶段 5，不宣称完整 CSS Text Decoration 支持。
 
 语义参考 [SVG Text Decoration](https://www.w3.org/TR/SVG11/text.html#TextDecorationProperty)、[SVG Baseline Shift](https://www.w3.org/TR/SVG11/text.html#BaselineShiftProperty) 与 [CSS Inline baseline-shift](https://www.w3.org/TR/css-inline-3/#baseline-shift-property)。
 
@@ -529,16 +546,16 @@ spacing 模式当前支持单行水平的拉丁、汉字等非上下文文字；
 
 基础高斯模糊通过 JavaFX 原生效果实现，支持 SVG 属性、内联 style 和样式表中的 `filter: url(#id)`。`stdDeviation` 可为一个或两个数值；0 关闭对应方向的模糊，负值使该原语退回输入图像。滤镜坐标先于元素变换计算，滤镜输入按 filter 区域裁剪，输出再按原语子区域和 clipPath 裁剪。应用 CSS 修改填充或字体后会更新效果。
 
-单个 `feGaussianBlur`、`feDropShadow` 或 `feOffset` 继续使用原生快速路径，支持 `edgeMode="none"`；暂不支持模板引用、filterRes 和 duplicate/wrap 边缘扩展。该原生快速路径的颜色限制如下；新增软件滤镜链见下一节。sRGB/auto 支持多色输入；默认 linearRGB 仅支持单色或 SourceAlpha 输入，多色线性 RGB 合成会报告诊断并在宽松模式下保留未滤镜处理的原图。较大的标准差通过分解方差执行多轮模糊，最多 16 轮，超限会报告诊断而不会静默截断。
+符合快速路径条件、没有滤镜参数动画的单个 `feGaussianBlur`、`feDropShadow` 或 `feOffset` 使用原生路径，支持 `edgeMode="none"`；滤镜参数动画转入软件链。支持本地滤镜模板引用；暂不支持 filterRes；此处模糊路径不支持 duplicate/wrap 边缘扩展（feConvolveMatrix 的 edgeMode 支持见下文）。该原生快速路径的颜色限制如下；新增软件滤镜链见下一节。sRGB/auto 支持多色输入；默认 linearRGB 仅支持单色或 SourceAlpha 输入，多色线性 RGB 合成会报告诊断并在宽松模式下保留未滤镜处理的原图。较大的标准差通过分解方差执行多轮模糊，最多 16 轮，超限会报告诊断而不会静默截断。
 
 Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，可在严格模式下渲染；测试使用固定资源，不依赖网络或 GitHub 版本变化。
 
 当前不支持完整 SVG 规范。限制包括：
 
-- 不执行脚本和事件处理器，不渲染 foreignObject；声明式动画的支持范围见上文。
-- 不支持光照滤镜、feBlend/feColorMatrix 等未列出的滤镜原语、滤镜模板和 filterRes；radialGradient 的 gradientTransform 和非零 fr 仍未实现。vector-effect 目前只支持 none/non-scaling-stroke；SVG 逆向导出后置。
-- SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量和条件规则；支持 @keyframes、显式授权的无条件 @import。应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
-- 不支持逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
+- 不执行脚本和事件处理器；foreignObject 仅支持上述有界 XHTML 子集，不支持完整 HTML/CSS 或浏览器行为。声明式动画的支持范围见上文。
+- 不支持 filterRes 及未列出的滤镜扩展。vector-effect 目前只支持 none/non-scaling-stroke；SVG 逆向导出后置。
+- SVG 内部静态 CSS 支持后代、子代、相邻/一般兄弟及已列出的属性选择器；不支持伪类、选择器转义/命名空间、CSS 变量和条件规则。支持 @keyframes、显式授权的无条件 @import；CSS @keyframes 不支持滤镜参数。应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
+- 普通水平 LTR 文字支持逐字位置/旋转列表和嵌套 textLength；不支持垂直/双向/复杂连写排版、嵌入字体或文字位置列表动画。textPath 和 tspan 的组合限制见文本说明，文本外观依赖系统字体。
 - 默认不自动加载外部资源；image 与样式表可通过资源解析器显式启用。use/gradient/clipPath 的跨文档引用仍不支持。load(URL) 打开调用方明确提供的顶层地址。
 - 未实现的属性不构成完整的规范校验。严格模式用于拒绝已检测到的错误或不支持内容，不是 SVG 全规范验证器。
 
@@ -567,9 +584,9 @@ mvn -Pheadless clean verify
 核心运行依赖仅为 Kotlin 标准库和 javafx-graphics（传递引入 javafx-base）；构建会禁止引入 javafx-web。FXML 集成测试使用的 javafx-fxml，以及测试及示例 PNG 导出使用的 JUnit/Java2D 不属于库运行接口。
 
 
-feDropShadow 支持 dx/dy、一个或两个 stdDeviation、flood-color/currentColor/flood-opacity，以及两种区域坐标单位。使用原生 Gaussian DropShadow；每轴标准差最多 127/3，超限报告诊断。sRGB/auto 支持多色源；默认 linearRGB 目前要求源与阴影颜色相同（SourceAlpha 要求黑色阴影），避免把 sRGB 合成冒充线性 RGB。可在下述软件滤镜链中组合；原语属性动画仍不支持。
+feDropShadow 支持 dx/dy、一个或两个 stdDeviation、flood-color/currentColor/flood-opacity，以及两种区域坐标单位。使用原生 Gaussian DropShadow；每轴标准差最多 127/3，超限报告诊断。sRGB/auto 支持多色源；默认 linearRGB 目前要求源与阴影颜色相同（SourceAlpha 要求黑色阴影），避免把 sRGB 合成冒充线性 RGB。可在下述软件滤镜链中组合；stdDeviation、dx/dy、flood-color/flood-opacity 的 SMIL 动画使用软件链，见「阶段 5」。
 
-`feOffset` 支持 SourceGraphic（默认）和 SourceAlpha 输入、dx/dy（默认 0）、两种坐标单位及原语子区域。先裁剪输入，再偏移，最后裁剪输出；元素变换与 clipPath 作用于最终结果。使用原生 Group/Translate，保留原节点的 id、class 和 JavaFX CSS 更新。单个原语保留该原生快速路径；命名结果引用和滤镜链使用下述软件管线。原语属性动画仍不支持；原生快速路径的无效参数在严格模式抛出异常，宽松模式报告诊断并保留源图。
+`feOffset` 支持 SourceGraphic（默认）和 SourceAlpha 输入、dx/dy（默认 0）、两种坐标单位及原语子区域。先裁剪输入，再偏移，最后裁剪输出；元素变换与 clipPath 作用于最终结果。使用原生 Group/Translate，保留原节点的 id、class 和 JavaFX CSS 更新。单个原语保留该原生快速路径；命名结果引用和滤镜链使用下述软件管线。dx/dy 的 SMIL 动画使用软件链；原生快速路径的无效参数在严格模式抛出异常，宽松模式报告诊断并保留源图。
 
 
 animateMotion 支持 path、优先的本地 mpath、values/from-to 坐标、默认 paced 弧长匀速，以及 linear/discrete/spline、keyPoints/keyTimes、rotate 数值/auto/auto-reverse、additive replace/sum。共用自动播放、延迟、重复、freeze 和 seek 控制；运动变换追加在基础及 animateTransform 之后。路径测量按文档复用，曲线有界细分；测量线段总数受 maxElements 限制，不共享节点或时钟。暂不支持百分比运动坐标、by、累积、变换后的 mpath；检测到时报告诊断。
@@ -578,7 +595,7 @@ animateMotion 支持 path、优先的本地 mpath、values/from-to 坐标、默�
 textPath 支持本地 href/xlink:href 路径引用、startOffset 长度/百分比、pathLength 校准、text-anchor、引用路径自身 transform、父 text 的 x/dx/dy，以及字体/绘制属性继承和 JavaFX CSS。沿路径放置原生 Text 字素簇并按切线旋转，曲线测量复用文档缓存；可组合整段变换、裁剪、遮罩、滤镜及固定描边。当前要求 text 内只有一个 textPath 文字段；不支持混合 tspan、method=stretch、textLength、复杂连写和双向排版。spacing=auto/exact 使用原生字形度量，不额外执行排版优化。规则参考 [SVG textPath](https://www.w3.org/TR/SVG11/text.html#TextPathElement)。
 
 
-pattern 支持填充/描边、本地 href 模板、patternUnits/patternContentUnits、viewBox/preserveAspectRatio、x/y/width/height 与二维 patternTransform。定义内容使用原生场景节点，通过 JavaFX 快照和 Canvas 生成重复图案；无需 WebView/Java2D。CSS 和内容动画变化会刷新，稳定布局复用图像，纯外部旋转复用同尺寸采样；定义内容不受根 -svg-* 主题改色。每视图所有图案的 tile 与目标图像共用 maxPatternPixels 像素预算（默认 4,194,304），单轴最多 4096，超限报告诊断。当前按 tile 边界裁剪，不支持 overflow=visible 跨 tile 绘制；快照后极端离屏放大仍可能重采样。模板循环、引用深度和展开节点有界。规则参考 [SVG Patterns](https://www.w3.org/TR/SVG11/pservers.html#Patterns)。
+pattern 支持填充/描边、本地 href 模板、patternUnits/patternContentUnits、viewBox/preserveAspectRatio、x/y/width/height 与二维 patternTransform。定义内容使用原生场景节点，通过 JavaFX 快照和 Canvas 生成重复图案；无需 WebView/Java2D。CSS 和内容动画变化会刷新，稳定布局复用图像，纯外部旋转复用同尺寸采样；定义内容不受根 -svg-* 主题改色。每视图所有图案的 tile 与目标图像共用 maxPatternPixels 像素预算（默认 4,194,304），单轴最多 4096，超限报告诊断。默认按 tile 边界裁剪，显式 overflow=visible 支持有界跨 tile 绘制；快照后极端离屏放大仍可能重采样。模板循环、引用深度和展开节点有界。规则参考 [SVG Patterns](https://www.w3.org/TR/SVG11/pservers.html#Patterns)。
 
 
 固定描边在内部矩阵为均匀缩放、旋转或反射时，复用原生 Shape，仅按缩放比例调整描边宽度与虚线长度/偏移，避免每帧创建布尔运算轮廓。非均匀缩放、斜切仍使用原轮廓算法；切换时保留端点、连接、渐变、几何绑定和 CSS 行为。
@@ -589,7 +606,7 @@ renderCacheEnabled 默认 true，静态文档及仅旋转/平移/路径运动的
 
 ### 可组合滤镜与资源限制
 
-新增 `feFlood`、`feComposite`、`feMerge/feMergeNode`，可与 `feGaussianBlur`、`feOffset`、`feDropShadow` 任意按文档顺序组合。支持 `in/in2/result`、隐式前一结果、`SourceGraphic/SourceAlpha`；重复命名引用最近的前序结果，缺失或前向结果名按省略输入处理。空 filter/feMerge 输出透明。BackgroundImage/BackgroundAlpha/FillPaint/StrokePaint 会明确诊断，不以近似输入代替。
+`feFlood`、`feComposite`、`feMerge/feMergeNode`、`feTurbulence`、`feDisplacementMap`、`feMorphology`、`feColorMatrix`、`feBlend`、`feConvolveMatrix`、`feComponentTransfer`、`feTile`、`feImage`、`feDiffuseLighting`、`feSpecularLighting` 可与 `feGaussianBlur`、`feOffset`、`feDropShadow` 按文档顺序组合。支持 `in/in2/result`、隐式前一结果、`SourceGraphic/SourceAlpha`；重复命名引用最近的前序结果，缺失或前向结果名按省略输入处理。空 filter/feMerge 输出透明。BackgroundImage/BackgroundAlpha/FillPaint/StrokePaint 会明确诊断，不以近似输入代替。
 
 ```xml
 <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -603,11 +620,33 @@ renderCacheEnabled 默认 true，静态文档及仅旋转/平移/路径运动的
 
 `feComposite` 实现 over/in/out/atop/xor/lighter/arithmetic；算术系数 k1–k4 默认 0，使用预乘 RGBA，限制输出到有效 alpha/颜色范围，不用 JavaFX MULTIPLY/EXCLUSION 冒充 Porter-Duff。按每个原语的 `color-interpolation-filters` 在线性 RGB（默认）或 sRGB 中计算，auto 按 sRGB；feOffset 保持输入颜色空间。SourceGraphic 快照仍沿用 JavaFX 的源绘制/渐变合成行为，不承诺整个 SVG 源画面的线性光绘制。
 
+`feTurbulence` 使用 SVG 规范的确定性、按 seed 初始化的梯度噪声，支持 turbulence/fractalNoise、一个或两个 baseFrequency、numOctaves、seed 和 stitch/noStitch；它产生真实噪声图像，不是用固定纹理代替。梯度初始化采用当前 Filter Effects 参考算法（拒绝零向量和单位圆外的向量），与旧 SVG 1.1 参考代码的随机序列不同，因此不承诺与采用旧算法的渲染器逐像素相同。`feDisplacementMap` 支持 R/G/B/A 通道选择、正/负 scale，按位移图的非预乘通道进行双线性取样，越界为透明黑；color-interpolation-filters 作用于位移图，源图保持其颜色空间。`feMorphology` 实现矩形 erode/dilate、单值或双值 radius，在预乘 RGBA 上执行可分离滑动极值处理，边界外为透明黑；非正半径按规范禁用该原语。
+
+原样回归文件 `src/test/resources/svg/advanced-filters.svg` 的噪声位移圆环与膨胀后模糊的紫色光晕直接走上述软件管线。回归要求严格模式、零诊断，并在 1×/1.25×/1.5×/2× 比例及重复缩放中检查实际变形轮廓和外部光晕；`regular-filters.svg` 的既有模糊/投影链也继续覆盖。支持的效果不再依赖「部分渲染」或保留未滤镜源图来通过验证。
+
 管线通过 JavaFX 公共快照 API 取样，保留源节点的 id/class、应用 CSS 与主题；正常场景缩放和窗口输出比例改变时重新采样，稳定画面复用结果。极高倍率离屏导出可能重采样缓存图。合成前后遵守 filter 区域和原语子区域裁剪、filterUnits/primitiveUnits；省略的原语子区域由引用输入的区域并集决定，标准输入及无输入原语默认使用完整 filter 区域。元素 opacity 在软件滤镜之后应用；直接绑定源 opacity 的组合目前明确报告不支持。
 
-每个视图共享 `maxFilterPixels`（默认 4,194,304 个中间像素槽），按每个管线 `(原语数 + 12) × 像素宽 × 像素高` 保守计费，覆盖保留结果及转换/模糊临时缓冲；不是字节级堆上限。每轴最多 4096，`maxFilterPrimitives` 默认 64。高斯使用截断到 3σ 的归一化可分离卷积，单轴半径最多 256 像素、每次模糊最多 1.5 亿像素分量采样；每个视图全部软件滤镜合计最多 2 亿估算分量操作。超限不悄悄降采样或截断：严格模式抛异常，宽松模式记录诊断并清空受影响滤镜输出，缩小后可恢复。未支持的图结构在创建时诊断并按现有宽松模式保留源图。
+每个视图共享 `maxFilterPixels`（默认 4,194,304 个中间像素槽），按同时存活的源、命名结果、转换/模糊临时缓冲及旧/新显示图像保守计费；不是字节级堆上限。命名结果最后一次使用后释放，完成的管线只保留显示图像的像素预算，工作量预算仍按整个视图累计。高斯跳过透明支撑区外的计算，对纯 alpha 输入只卷积 alpha 通道；仍使用同一归一化核，不改变分辨率或模糊算法。每轴最多 4096，`maxFilterPrimitives` 默认 64。高斯使用截断到 3σ 的归一化可分离卷积，单轴半径最多 256 像素、每次模糊最多 1.5 亿像素分量采样；每个视图全部软件滤镜合计最多 2 亿估算分量操作。超限不悄悄降采样或截断：严格模式抛异常，宽松模式记录诊断并清空受影响滤镜输出，缩小后可恢复。未支持的图结构在创建时诊断并按现有宽松模式保留源图。
 
-语义依据 [Filter Effects：输入与子区域](https://www.w3.org/TR/filter-effects-1/#FilterPrimitiveSubRegion)、[feComposite](https://www.w3.org/TR/filter-effects-1/#feCompositeElement) 和 [颜色空间](https://www.w3.org/TR/filter-effects-1/#color-interpolation-filters-property)。光照滤镜和 SVG 逆向导出不属于本轮实现。
+新增内核也受独立上限约束：feTurbulence 最多 16 个 octave、单次最多 4,000,000 像素及每轴 4096 像素，噪声格点坐标另有限幅；feMorphology 每轴半径最多 256 个采样像素；湍流、位移和形态学每次分别最多 1.5 亿估算分量采样/操作，并继续计入上述视图总工作量预算。半径和位移按当前采样比例与 primitiveUnits 换算，放大时可能触达限制；不因新增效果而提高默认预算或忽略超限错误。
+
+语义依据 [Filter Effects：输入与子区域](https://www.w3.org/TR/filter-effects-1/#FilterPrimitiveSubRegion)、[feComposite](https://www.w3.org/TR/filter-effects-1/#feCompositeElement) 和 [颜色空间](https://www.w3.org/TR/filter-effects-1/#color-interpolation-filters-property)。SVG 逆向导出仍后置；光照支持见下节。
+
+### 光照滤镜：漫反射、镜面反射和三类光源
+
+支持 `feDiffuseLighting`、`feSpecularLighting`，以及其直接子元素 `feDistantLight`、`fePointLight`、`feSpotLight`。它们使用输入 alpha 作为高度图，计算 SVG Sobel 表面法线和 Phong/Blinn-Phong 光照，不调用 WebView，也不以固定阴影替代光照。支持 `in`/`result` 串联、surfaceScale、diffuseConstant/specularConstant、specularExponent、聚光灯目标点/聚焦指数/limitingConeAngle，以及原语子区域裁剪。
+
+- 漫反射在其输出子区域中是**不透明**的，包括输入 alpha 为零的平面；需要保留原图轮廓时，请再通过 `feComposite operator="in" in2="SourceAlpha"` 裁切。镜面反射的 alpha 是最终 RGB 最大分量，RGB 已为预乘值，不能再乘一次 alpha。
+- `lighting-color` 默认为白色、不自动继承，可使用样式表、style、presentation attribute、显式 inherit 和 currentColor。颜色本身的 alpha 不削弱光照。光色按原语的 color-interpolation-filters 转为 linearRGB（默认）或 sRGB；输入 RGB 不参与高度计算。
+- 光源位置默认均为 0；远光角度以度为单位。使用第一个直接光源子元素；没有光源时输出透明黑。光源子节点动画仍明确诊断；滤镜原语的部分数值和颜色参数现支持 SMIL 动画，详见阶段 5。聚光锥边界采用有界的 2×2 子像素覆盖取样（含双线性高度取样），减轻硬截断的像素阶梯；不是整个光照方程的完整超采样。
+- `primitiveUnits="objectBoundingBox"` 时，光源 x/y 和目标 x/y 按几何包围盒的位置和宽高换算，z/pointsAtZ 使用归一化对角线长度 `hypot(width,height)/sqrt(2)`；surfaceScale 保持表面/user-space 高度值，远光方位/仰角不变。这与主流浏览器的光源坐标约定一致，但不表示所有浏览器逐像素相同。
+- 默认法线间距为当前离屏图像的一像素，使用 SVG 的内部/边缘/角点 Sobel 核；单像素维度在该轴采用零导数。正值 `kernelUnitLength` 建立指定间距的独立中间网格：先双线性重采样 alpha 高度图，在网格上执行 Sobel/光照，再双线性重采样回原分辨率。网格锚定输入像素覆盖范围左上边缘，保持指定间距；最后不足一个网格的边缘采用复制取样。中间网格每轴不超过 4096，内存和工作量计入同一视图预算；不再使用仅改变法线取样间距的近似。插值约定仍不意味着所有浏览器逐像素一致。非正值按 Filter Effects 1 回退到默认间距。
+- 常量必须非负，镜面材质指数为 1–128，聚光源的指数独立且非负；数值必须有限，光源属性不接受 px/% 等长度语法。极端数值溢出会报错，不输出 NaN。严格校验可能比浏览器的错误值钳制更严格。
+- 默认网格光照只创建一个输出 RGBA 缓冲；显式不同间距另计重采样输入和着色输出两个有界网格缓冲，以及两次双线性重采样工作量。光照通常按每网格像素 160 次估算操作、带 limitingConeAngle 的聚光源按每像素 320 次估算操作保守计费，仍共享原有 `maxFilterPixels` 和每视图 2 亿工作量上限，**没有提高预算**。极大滤镜区域或放大倍数可能被拒绝，缩小后可以恢复。
+
+演示和回归输入：`src/test/resources/svg/lighting-filters.svg`。它把漫反射/镜面反射与三类光源组合，并使用模糊高度图与合成链。测试包含数值核、CSS/坐标、子区域、重复缩放、预算和错误恢复；只在 Linux JavaFX 软件渲染上验证，不代表 Windows GPU 或真实高 DPI 验证。
+
+语义参考：[漫反射](https://www.w3.org/TR/filter-effects-1/#feDiffuseLightingElement)、[镜面反射](https://www.w3.org/TR/filter-effects-1/#feSpecularLightingElement)、[光源](https://www.w3.org/TR/filter-effects-1/#LightSourceDefinitions)、[SVG 1.1 法线表](https://www.w3.org/TR/SVG11/filters.html#feDiffuseLightingElement)。
 
 ### 外部样式表与图片：显式授权
 
@@ -635,3 +674,66 @@ Path/URL 加载自动记录来源，支持继承的 xml:base；每个外部 CSS 
 当前仅支持 UTF-8 CSS（可带 BOM 或开头 UTF-8 @charset）、无条件/all import；media 条件、layer/supports、CSS URL 转义、命名/备用 xml-stylesheet、外部 SVG 图片会明确诊断。外部 use、字体、渐变、clipPath 及 CSS url() 跨文档绘制资源尚未实现。XML DTD/外部实体仍始终禁用，资源解析器不能开启它们。
 
 新增 SvgOptions 参数保持既有 Java 重载和 Kotlin 源码调用方式，但 Kotlin data class 的二进制构造/copy 描述符有变化；升级后请重新编译依赖本库的 Kotlin 调用方。
+
+
+### 颜色矩阵与图层混合
+
+`feColorMatrix` 支持 `matrix`（20 个数、默认单位矩阵）、`saturate`（默认 1，支持有限负值及大于 1 的增强饱和度）、`hueRotate`（角度默认 0）以及 `luminanceToAlpha`（忽略 values，输出黑色 RGB 与亮度 alpha）。矩阵作用于非预乘 RGBA，逐通道裁剪到 [0,1] 后重新预乘，透明输入按透明黑处理；因此带常数偏移的矩阵可以在透明输入处产生颜色/不透明度，但仍受原语子区域限制。色相旋转角度支持有限大数的周期归约。有效数字列表的项数不匹配时，按当前 Filter Effects 1 规范执行直通；非法数字、未知类型仍会诊断。luminanceToAlpha 使用当前规范的 .2126/.7152/.0722 系数。
+
+`feBlend` 支持 16 种标准模式（见下方扩展混合说明），在预乘 alpha 下合成，`in` 是前景、`in2` 是背景。未实现 no-composite 和 plus-lighter；这些值会明确诊断，不静默替换成 normal。
+
+两者使用已有 `in/in2/result`、隐式输入、命名结果、`SourceGraphic/SourceAlpha`、子区域和 `color-interpolation-filters` 流程；默认 linearRGB，可显式选择 sRGB。新算子分配与运算也计入已有像素及视图总工作量上限，不提高预算。背景输入与外部资源边界保持不变；滤镜参数动画见阶段 5。
+
+语义参考：[颜色矩阵](https://www.w3.org/TR/filter-effects-1/#feColorMatrixElement)、[混合](https://www.w3.org/TR/SVG11/filters.html#feBlendElement)。样例见 `src/test/resources/svg/color-blend-filters.svg`。
+
+### 卷积滤镜
+
+`feConvolveMatrix` 支持 `order`、`kernelMatrix`、`divisor`、`bias`、`targetX/Y`、`edgeMode=duplicate/wrap/none`、`preserveAlpha` 和 `kernelUnitLength`。核按 SVG 定义旋转 180°，默认在预乘 RGBA 上卷积；preserveAlpha=true 时对非预乘颜色卷积，再用保留的 alpha 预乘。零 divisor 使用核和（核和为零则为 1），有效但数量不匹配的 kernelMatrix 按 Filter Effects 1 原样通过。非正 kernelUnitLength 使用默认一像素间距。显式间距采用输入→独立网格→输出的双线性重采样，而非直接拉开卷积抽头。
+
+核每轴最多 4096、总计最多 65536 个元素；实际运算还受既有 2 亿工作量和 maxFilterPixels 预算约束，未提高上限。重复/环绕扩展以实际输入子区域为边界，输出仍裁剪到滤镜原语区域。示例 `convolve-lighting-filters.svg` 包含锐化、浮雕、边缘检测和显式网格光照。
+
+### 路线阶段 2：通道映射与扩展混合
+
+支持 `feComponentTransfer` 的四通道 identity/table/discrete/linear/gamma 变换；`feBlend` 现支持 16 种标准混合模式，包括 overlay、soft-light、hard-light、difference、exclusion 及 hue/saturation/color/luminosity。no-composite 和 plus-lighter 仍诊断为未支持。见 [阶段 2 说明](benchmarks/roadmap-stage2.md)。
+
+### 滤镜图像、平铺与模板
+
+`feImage` 支持文档内 `#id` 引用，以及内嵌 PNG/JPEG；显式 `resourceResolver` 提供的外部 PNG/JPEG 仍受请求、字节和解码像素预算限制。资源仅在加载时解析，渲染和缩放不发起网络或文件请求。SVG 片段复用原生渲染路径、循环引用、深度和展开元素数保护；`primitiveUnits` 控制片段坐标；本地片段按 use 语义处理，省略 x/y 时保留其自然坐标，滤镜区域本身只裁剪，不额外平移片段。不承诺与各浏览器默认原点解释逐像素一致。独立位图按原语子区域和 `preserveAspectRatio` 放置。丢失或不可用图像产生透明输出及诊断，严格模式拒绝。独立外部 SVG 文件仍不支持，不创建新加载器递归入口。
+
+`feTile` 重复输入原语的完整子区域（包括透明像素），不是非透明内容包围盒；默认输出扩展到滤镜区域，可通过原语 x/y/width/height 再裁剪。浮点平铺周期采用预乘颜色双线性采样。
+
+`filter` 的本地 `href` / `xlink:href` 模板可继承 x/y/width/height、filterUnits、primitiveUnits；自己的原语列表优先，否则使用最近模板的原语。原语保留原始对象身份、原样式上下文和预加载资源。循环、非本地引用和深度超限会诊断。`filterRes` 仍明确不支持。
+
+### 径向渐变与图案溢出
+
+`radialGradient` 支持一般二维 `gradientTransform` 和非零 `fr`，采用 SVG 2 双圆锥模型。隐式居中、sRGB、零焦点半径原生渐变保留 JavaFX 快路径；显式 fx/fy 采用软件路径，避免视口变化时被原生焦点钳制改变语义；一般变换/焦点圆由按目标与缩放缓存的有界软件栅格实现，支持 pad/repeat/reflect、颜色透明度及 sRGB/linearRGB 插值。渐变栅格与 pattern 共享现有 `maxPatternPixels`，单轴仍不超过 4096，不默认扩大预算。
+
+`pattern` 默认裁剪到单元格；显式 `overflow="visible"` 将相邻图块的可见溢出合成后重复，支持负位置与多个单元格重叠。限制为最多 4096 个贡献图块与 1600 万图块像素工作，超限产生诊断，不进行无界复制。图案内容栅格、Canvas/快照同时存活的峰值及旧缓存同样计入像素预算；严格预算可能拒绝此前低估了峰值的场景。SVG 2 对 visible 溢出仍未完全规定，本实现采用规范建议的从左到右、从上到下合成顺序。
+
+规范依据：https://www.w3.org/TR/SVG2/pservers.html 。软件采样不是无损向量输出，也不声明跨平台逐像素一致。
+
+### 阶段 5：文字、静态 CSS 与滤镜参数动画
+
+普通水平 LTR 文字现支持逐字 `x/y/dx/dy`、末值重复的 `rotate`、嵌套 `tspan/textLength` 与两种 lengthAdjust；绝对坐标重置、锚点和嵌套长度约束分开处理。复杂连写、双向排版、嵌入字体和 textPath 嵌套定位仍为专项，不把拆字回退当完整支持。详见 [文字边界](benchmarks/roadmap-stage5-text.md)。
+
+静态 SVG CSS 增加子代/兄弟组合符及七类属性匹配，使用字典序特异性和累计 200 万工作单位上限。use 宿主样式可继承，但复杂选择器不穿透实例边界；动态/功能伪类、转义、命名空间仍诊断。详见 [选择器边界](benchmarks/roadmap-stage5-css.md)。
+
+SMIL animate 支持模糊、偏移、投影、形态学、位移、洪水及光照原语的指定数值/颜色参数，独立视图时钟，seek/reverse/repeat/fill 与现有预算共同生效。结构性参数、光源子节点和 CSS @keyframes 滤镜属性未扩展。具体白名单与时序范围见 [滤镜动画](benchmarks/roadmap-stage5-filter-animation.md)。
+
+
+### 阶段 6：兼容性与资源收敛
+
+新增四份保持原始字节及许可的 Lucide SVG 回归语料，并与 Inkscape 1.4 独立导出的图像比较；保留全图误差及内部像素指标，不声明浏览器/GPU 一致。定位文字同 owner/style/绘制通道的径向渐变现在复用有界栅格，不改变预算或采样内核。2026-10-26 阶段 6 基线的演示整合后干净全量测试为 806 项通过（这是历史基线，不替代本 RC 的验证记录）；300 秒连续编辑完成 6000 次操作，缓存生命周期和节点数量断言通过，但这不构成无内存泄漏证明。
+
+同一 JAR 的重复计时主实验及一次预登记长预热诊断均未通过固定 5% 稳定性筛查，全部原始样本保留，未宣称速度提升或代码性能回退。Windows/GPU 未验证。详见 [阶段 6 中文验证记录](benchmarks/roadmap-stage6/results-zh.md) 和 [复现协议](benchmarks/roadmap-stage6/README.md)。
+
+
+## 许可证
+
+项目自身源码采用 [Mozilla Public License 2.0（MPL-2.0）](LICENSE)，见 [NOTICE](NOTICE)。这是按项目所有者“与 javafx-ui 同许可证”的选择添加的项目声明；并未给第三方素材改许可证。Lucide/Feather 测试样本继续保留其目录中的 [ISC/MIT 许可](src/test/resources/svg/real-corpus/LICENSE) 和来源记录。外部依赖保留各自许可证。匹配候选二进制的源码与源码附件应一起交付；公开发布位置尚需在实际发布时验证。
+
+## GitHub 构建发布与 JitPack
+
+候选版本按 javafx-ui 的标签触发 GitHub Releases 流程准备，增加完整测试、实际 JAR 消费者验证和附件摘要保护，发布为 prerelease 而非正式 latest。见 [流程与权限](release/GITHUB_WORKFLOW.md)。配置已准备不代表已公开发布。
+
+JitPack 会独立从 Git 标签构建，成功后使用 `com.github.xjw580:javafx-svg:v1.0.0-rc`；不能把 GitHub Release 成功当成 JitPack 构建成功。见 [依赖示例、JDK 与验证边界](release/JITPACK.md)。

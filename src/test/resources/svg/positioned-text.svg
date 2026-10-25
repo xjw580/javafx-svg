@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300" viewBox="0 0 640 300">
+<title>Positioned text and nested textLength</title><desc>Authored regression based on SVG2 text positioning rules, not a third-party corpus capture.</desc>
+<rect width="640" height="300" fill="#101c30"/>
+<text x="35 95 155 215 275" y="65" rotate="-15 0 15 0 -15" fill="#7de5ee" font-size="40">HELLO</text>
+<text x="35" y="130" textLength="550" fill="#f5c077" font-size="28">Nested <tspan textLength="170" fill="#aa9af5">spacing</tspan> test</text>
+<text x="35" y="195" textLength="550" lengthAdjust="spacingAndGlyphs" fill="#9de6a0" font-size="28">Scaled <tspan textLength="100" lengthAdjust="spacingAndGlyphs" fill="#f292bd">glyphs</tspan> test</text>
+<text x="35 75 115 155 195" y="260" font-size="24" text-decoration="underline overline" fill="white">A<tspan fill="#f292bd" rotate="20">B😀</tspan>CD</text>
+</svg>

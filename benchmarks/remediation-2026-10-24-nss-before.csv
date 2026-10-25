@@ -1,3 +1,0 @@
-scenario,icons,samples,seconds,pulse_p50_ms,pulse_p95_ms,pulse_p99_ms,pulse_max_ms,over_33ms,over_50ms,process_cpu_core_pct,fx_cpu_core_pct,fx_cpu_ms_per_pulse,total_alloc_mib_s,fx_alloc_mib_s,fx_alloc_bytes_per_pulse,gc_count,gc_time_ms,unfocused_samples,iconified_samples
-css-fixed,1,812,5.003985,6.066700,10.784300,12.678800,15.522100,0,0,80.560790,4.371516,0.269397,10.026928,9.167423,59238.926108,0,0,0,0
-css-fixed,500,114,5.000595,45.715200,61.410000,62.227400,68.357500,82,16,135.921339,79.990489,35.087719,633.270751,630.176627,28985379.578947,11,37,0,0

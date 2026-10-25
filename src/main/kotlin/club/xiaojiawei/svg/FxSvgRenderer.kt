@@ -72,6 +72,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     private val filterChains = mutableListOf<SvgFilterChain>()
     private val patternBudget = SvgPatternBudget(document.options.maxPatternPixels)
     private val patterns = mutableListOf<SvgPattern>()
+    private val radialPaints = mutableListOf<SvgRadialPaint>()
     private val definitions = Group().apply { isManaged=false; opacity=0.0; clip=Rectangle() }
     private var renderedElements = 0
     private val box = document.root["viewBox"]?.let(SvgBox::parse)
@@ -151,6 +152,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val maskCheckpoint = masks.size
         val filterCheckpoint = filterChains.size
         val patternCheckpoint = patterns.size
+        val radialCheckpoint = radialPaints.size
         val animationCheckpoint = animations.size
         return try {
             require(ancestors.size < document.options.maxDepth) { "SVG reference depth limit exceeded" }
@@ -164,6 +166,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             shapeStyles.discardFrom(styleCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
             while (filterChains.size > filterCheckpoint) filterChains.removeAt(filterChains.lastIndex).dispose()
+            while (radialPaints.size > radialCheckpoint) radialPaints.removeAt(radialPaints.lastIndex).dispose()
             while (patterns.size > patternCheckpoint) patterns.removeAt(patterns.lastIndex).also { definitions.children.remove(it.hidden); it.dispose() }
             report(e.message ?: "Invalid SVG element", element)
             null
@@ -212,7 +215,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 Group().apply {
                     render(paths.single(), ancestors + element, style, viewport)?.let { children += it }
                 }
-            } else if (element.children.any { it.name == "tspan" }) {
+            } else if (element.children.any { it.name == "tspan" } || SvgTextLayout.needsPositioned(element)) {
                 renderTextSpans(element, ancestors, style, viewport, geometry)
             } else {
                 val text = Text()
@@ -372,6 +375,19 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 }
                 group
             }
+            "foreignObject" -> {
+                hasTextLayout = true
+                SvgForeignObject(element, style, { count ->
+                    require(document.options.maxElements - renderedElements >= count) { "SVG expanded foreignObject node limit exceeded" }
+                    renderedElements += count
+                }, ::report).also { foreign ->
+                    updateGeometry {
+                        foreign.position(length("x", viewport.width), length("y", viewport.height),
+                            positive(length("width", viewport.width)), positive(length("height", viewport.height)),
+                            style.getValue("overflow"))
+                    }
+                }
+            }
             "path" -> SVGPath().apply {
                 content = document.geometry.path(element["d"] ?: "")
                 fillRule = fillRule(style.getValue(if (clipping) "clip-rule" else "fill-rule"))
@@ -422,7 +438,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         else if (style is SvgAnimatedStyle && "opacity" in style.affected) update(element) {
             setSvgBaseStyle(styleNode.opacityProperty(), svgStyleNumber(style, "opacity", 1.0, document.lengths).coerceIn(0.0, 1.0))
         } else styleNode.opacity = SvgNumbers.fraction(style.getValue("opacity"))
-        if (node !is Group || element.name in setOf("image", "text", "textPath") && node !is SvgTextLayout) node.isVisible = style.getValue("visibility") == "visible"
+        if (node !is SvgForeignObject && (node !is Group || element.name in setOf("image", "text", "textPath") && node !is SvgTextLayout)) node.isVisible = style.getValue("visibility") == "visible"
         if (styleNode is Shape) {
             if (clipping) {
                 styleNode.fill = Color.BLACK
@@ -459,6 +475,16 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     }
                 }
             }
+        } else if (node is SvgForeignObject) {
+            // SVG geometry includes the positioning rectangle's x/y. Keep the Region's layout
+            // translation inside a neutral local coordinate system, like a positioned shape,
+            // so raster filters and objectBoundingBox effects do not lose it during snapshots.
+            require(++renderedElements <= document.options.maxElements) { "SVG expanded foreignObject node limit exceeded" }
+            Group(marked).apply {
+                isAutoSizeChildren = false
+                transforms.setAll(marked.transforms)
+                marked.transforms.clear()
+            }
         } else marked
         val result = if (!clipping && style.getValue("filter") != "none") applyFilter(sized, style.getValue("filter"), viewport, element, styleNode) else sized
         if (style.getValue("clip-path") != "none") applyClip(result, style.getValue("clip-path"), viewport, element)
@@ -490,6 +516,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val maskCheckpoint = masks.size
         val filterCheckpoint = filterChains.size
         val patternCheckpoint = patterns.size
+        val radialCheckpoint = radialPaints.size
         val animationCheckpoint = animations.size
         val layer: SvgMarkers
         try {
@@ -539,6 +566,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             shapeStyles.discardFrom(styleCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
             while (filterChains.size > filterCheckpoint) filterChains.removeAt(filterChains.lastIndex).dispose()
+            while (radialPaints.size > radialCheckpoint) radialPaints.removeAt(radialPaints.lastIndex).dispose()
             while (patterns.size > patternCheckpoint) patterns.removeAt(patterns.lastIndex).also { definitions.children.remove(it.hidden); it.dispose() }
             report(failure.message ?: "Invalid SVG marker", owner)
             return source
@@ -566,12 +594,14 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         element: SvgElement, ancestors: List<SvgElement>, style: Map<String, String>, viewport: SvgViewport, rootGeometry: SvgAnimatedGeometry
     ): SvgTextLayout {
         val layout = SvgTextLayout(document.lengths, viewport)
+        val radialReuse = TextRadialReuse(layout, viewport)
         // Register flow before paint/filter updates, so CSS and resize use the new text geometry.
         update(element, phase = geometryUpdates) { layout.position() }
         data class Piece(
             val value: String, val preserve: Boolean, val owner: SvgElement,
             val style: Map<String, String>, val scopes: List<SvgTextLayout.Scope>,
-            val decoration: Map<String, Map<String, String>>, var text: Text? = null, var decorated: Node? = null
+            val decoration: Map<String, Map<String, String>>, var text: Text? = null, var decorated: Node? = null,
+            var generated: List<Piece>? = null, var advance: ((Text) -> Double)? = null
         ) {
             val nativeDecoration get() = decoration.filterValues { it === this.style }
         }
@@ -589,7 +619,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             require(lineage.size < document.options.maxDepth) { "SVG text depth limit exceeded" }
             val children = mutableListOf<() -> Node?>()
             childPlans[group] = children
-            for (attribute in listOf("rotate", "dominant-baseline", "writing-mode", "textLength", "lengthAdjust")) {
+            for (attribute in listOf("dominant-baseline", "writing-mode")) {
                 if (owner[attribute] != null) report("Unsupported attribute with tspan: $attribute", owner)
             }
             if (owner.name == "tspan") {
@@ -610,17 +640,18 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             for (name in listOf("x", "y", "dx", "dy")) {
                 owner[name]?.let { value ->
                     try {
-                        document.lengths.resolve(value, 1.0)
+                        SvgTextLayout.lengthList(value).forEach { document.lengths.resolve(it, 1.0) }
                         coordinates[name] = value
                     } catch (failure: IllegalArgumentException) {
-                        report("Unsupported or invalid text $name (single length required): $value", owner)
+                        report("Invalid text $name length list: $value", owner)
                     }
                 }
             }
             val geometry = if (owner === element) rootGeometry else animations.geometry(owner, viewport)
             val scopes = parents + SvgTextLayout.Scope(coordinates, geometry,
                 computed.getValue("baseline-shift"),
-                parentStyle["font-size"]?.toDoubleOrNull() ?: computed.getValue("font-size").toDouble())
+                parentStyle["font-size"]?.toDoubleOrNull() ?: computed.getValue("font-size").toDouble(),
+                owner["rotate"]?.let(SvgNumbers::list).orEmpty(), owner["textLength"], owner["lengthAdjust"] ?: "spacing")
             val decoration = textDecoration(computed, parentDecoration)
             decorationScopes[computed] = scopes
             decorationOwners[computed] = owner
@@ -634,7 +665,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                     is SvgContent.Characters -> {
                         val piece = Piece(part.value, preserve, owner, computed, scopes, decoration)
                         pieces += piece
-                        children += { piece.decorated ?: piece.text }
+                        children += { piece.generated?.let { glyphs -> Group().apply { this.children.setAll(glyphs.mapNotNull { it.decorated ?: it.text }) } } ?: piece.decorated ?: piece.text }
                     }
                     is SvgContent.Child -> {
                         val child = part.element
@@ -662,12 +693,39 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         } else if (wholeText.codePoints().anyMatch { Character.UnicodeScript.of(it) !in SIMPLE_TEXT_SCRIPTS }) {
             report("Contextual shaping across tspan fragments is unsupported", element)
         }
-        val runCount = values.count { it.isNotEmpty() }
+        val split = pieces.any { piece -> piece.scopes.any { it.positioned } }
+        if (split) {
+            if (wholeText.codePoints().anyMatch { it == 0x200D || Character.getType(it) in setOf(Character.NON_SPACING_MARK.toInt(), Character.COMBINING_SPACING_MARK.toInt(), Character.ENCLOSING_MARK.toInt()) }) {
+                report("Combining or joined glyph shaping with character positioning is unsupported", element)
+            }
+            val count = values.sumOf { it.codePointCount(0, it.length).toLong() } + pieces.size * 2L
+            require(count <= document.options.maxElements - renderedElements) { "SVG expanded text node limit exceeded" }
+            renderedElements += pieces.size * 2
+        }
+        val renderedPieces = if (!split) pieces else pieces.flatMapIndexed { index, piece ->
+            val value = values[index]
+            val model = Text(value).also { configureTextFont(it, piece.style) }
+            var offset = 0
+            val glyphs = value.codePoints().toArray().map { cp ->
+                val start = offset; offset += Character.charCount(cp); val end = offset
+                Piece(String(Character.toChars(cp)), piece.preserve, piece.owner, piece.style, piece.scopes, piece.decoration).also { glyph ->
+                    glyph.advance = { text ->
+                        model.font = text.font
+                        fun caret(at: Int) = model.caretShape(at, true).filterIsInstance<javafx.scene.shape.MoveTo>().firstOrNull()?.x ?: model.layoutBounds.width
+                        (caret(end) - caret(start)).coerceAtLeast(0.0)
+                    }
+                }
+            }
+            piece.generated = glyphs
+            glyphs
+        }
+        val renderedValues = if (split) renderedPieces.map { it.value } else values
+        val runCount = renderedValues.count { it.isNotEmpty() }
         require(runCount <= document.options.maxElements - renderedElements) { "SVG expanded text node limit exceeded" }
         renderedElements += runCount
-        pieces.forEachIndexed { index, piece ->
-            if (values[index].isNotEmpty()) {
-                val text = Text(values[index])
+        renderedPieces.forEachIndexed { index, piece ->
+            if (renderedValues[index].isNotEmpty()) {
+                val text = Text(renderedValues[index])
                 piece.text = text
                 configureTextFont(text, piece.style)
                 configureTextDecoration(text, piece.nativeDecoration, piece.style, piece.owner)
@@ -679,14 +737,14 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 }
                 text.isVisible = piece.style.getValue("visibility") == "visible"
                 if (!clipping) text.styleClass.addAll("svg-text-run", "svg-shape")
-                layout.runs += SvgTextLayout.Run(text, piece.scopes, textAnchor(piece.style))
+                layout.runs += SvgTextLayout.Run(text, piece.scopes, textAnchor(piece.style), piece.advance)
                 text.fontProperty().addListener { _, _, _ ->
                     layout.requestLayout()
                     if (themeReady) root.parent?.requestLayout()
                 }
             }
         }
-        pieces.forEach { piece ->
+        renderedPieces.forEach { piece ->
             piece.text?.let { text ->
                 val propagated = piece.decoration.filterValues { it !== piece.style }.filterKeys { it != "blink" }
                 if ("blink" in piece.decoration) report("Unsupported text-decoration: blink", piece.owner)
@@ -700,7 +758,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                             Text(" ").also { model ->
                                 configureTextFont(model, source)
                                 if (clipping) { model.fill = Color.BLACK; model.stroke = null }
-                                else applyShapeStyle(model, source, viewport, decorationOwners.getValue(source), layout, dynamicGeometry = true)
+                                else applyShapeStyle(model, source, viewport, decorationOwners.getValue(source), layout, dynamicGeometry = true, radialReuse = radialReuse)
                             }
                         }
                     }
@@ -721,16 +779,16 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         childPlans.forEach { (group, children) -> group.children.setAll(children.mapNotNull { it() }) }
         layout.position()
         update(element, phase = geometryUpdates) {
-            pieces.forEach { piece -> piece.text?.let { refreshTextDecoration(it, piece.nativeDecoration) } }
+            renderedPieces.forEach { piece -> piece.text?.let { refreshTextDecoration(it, piece.nativeDecoration) } }
             decorationLayers.forEach { it.refresh() }
         }
-        pieces.forEach { piece ->
+        renderedPieces.forEach { piece ->
             piece.text?.let { text ->
                 if (clipping) {
                     text.fill = Color.BLACK
                     text.stroke = null
                 } else {
-                    applyShapeStyle(text, piece.style, viewport, piece.owner, layout, dynamicGeometry = true)
+                    applyShapeStyle(text, piece.style, viewport, piece.owner, layout, dynamicGeometry = true, radialReuse = radialReuse)
                     if (piece.style.getValue("vector-effect") == "non-scaling-stroke") {
                         val parent = text.parent as Group
                         val index = parent.children.indexOf(text)
@@ -825,6 +883,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         val maskCheckpoint = masks.size
         val filterCheckpoint = filterChains.size
         val patternCheckpoint = patterns.size
+        val radialCheckpoint = radialPaints.size
         val animationCheckpoint = animations.size
         try {
             val id = LOCAL_REFERENCE.matchEntire(value)?.groupValues?.get(1)
@@ -860,6 +919,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             animations.discardFrom(animationCheckpoint)
             while (masks.size > maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
             while (filterChains.size > filterCheckpoint) filterChains.removeAt(filterChains.lastIndex).dispose()
+            while (radialPaints.size > radialCheckpoint) radialPaints.removeAt(radialPaints.lastIndex).dispose()
             while (patterns.size > patternCheckpoint) patterns.removeAt(patterns.lastIndex).also { definitions.children.remove(it.hidden); it.dispose() }
             report(failure.message ?: "Invalid mask", owner)
             // Invalid or unavailable masks must not expose the unmasked source.
@@ -869,19 +929,34 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
     }
 
     private fun applyFilter(node: Node, value: String, viewport: SvgViewport, owner: SvgElement, opacityNode: Node): Node {
+        val updateCheckpoint=updates.size; val geometryCheckpoint=geometryUpdates.size; val paintCheckpoint=paintUpdates.size
+        val styleCheckpoint=shapeStyles.size; val maskCheckpoint=masks.size; val filterCheckpoint=filterChains.size
+        val patternCheckpoint=patterns.size; val animationCheckpoint=animations.size; val radialCheckpoint=radialPaints.size
+        var reference: String? = null
         return try {
             val id = LOCAL_REFERENCE.matchEntire(value)?.groupValues?.get(1)
                 ?: throw SvgException("Only local filter references are supported")
-            val filter = document.elementsById[id] ?: throw SvgException("Missing filter: #$id")
-            require(filter.name == "filter") { "Filter reference is not a filter: #$id" }
-            require(filter["href"] == null && filter["xlink:href"] == null && filter["filterRes"] == null) {
-                "Filter templates and filterRes are unsupported"
-            }
+            val key="filter:$id"
+            require(activeReferences.add(key)) { "Circular filter reference: #$id" }
+            reference=key
+            require(activeReferences.size <= document.options.maxDepth) { "Filter reference depth limit exceeded" }
+            val filter = svgResolvedFilter(id, document)
             val primitives = filter.children.filter { !it.name.startsWith('{') && it.name !in setOf("title", "desc", "metadata") }
             require(primitives.size <= document.options.maxFilterPrimitives) { "SVG filter exceeds maxFilterPrimitives" }
-            if (primitives.size != 1 || primitives.single().name !in setOf("feGaussianBlur", "feDropShadow", "feOffset")) {
+            fun containsForeignObject(current: Node): Boolean = current is SvgForeignObject ||
+                (current is javafx.scene.Parent && current.childrenUnmodifiable.any(::containsForeignObject))
+            // Native blur cannot classify/layout arbitrary HTML parents for linearRGB. Keep their
+            // real multicolour pixels in the bounded software path, rather than declaring them monochrome.
+            val filterAnimation = animations.filter(primitives, paints::styleOf, viewport, filter["primitiveUnits"] == "objectBoundingBox")
+            val nativePrimitive = primitives.singleOrNull()?.name
+            if (filterAnimation.isAnimated || primitives.any { p -> p.children.any { it.name in SvgAnimation.NAMES } } || primitives.size != 1 || nativePrimitive !in setOf("feGaussianBlur", "feDropShadow", "feOffset") ||
+                (nativePrimitive in setOf("feGaussianBlur", "feDropShadow") && containsForeignObject(node))) {
+                val imageSources=primitives.filter { it.name == "feImage" }.mapNotNull { primitive ->
+                    prepareFilterImage(primitive, viewport, filter)?.let { primitive to it }
+                }.toMap()
                 return SvgFilterChain(node, opacityNode, filter, primitives, viewport, document.lengths, filterBudget,
-                    paints::styleOf, { if (themeReady) root.parent?.requestLayout() }, { report(it, owner) })
+                    filterAnimation::style, { if (themeReady) root.parent?.requestLayout() }, { report(it, owner) }, imageSources,
+                    filterAnimation::primitive, { if (filterAnimation.isAnimated) animations.time else null })
                     .also { chain -> filterChains += chain; update(owner) { chain.refresh() } }
             }
             val primitive = primitives.single()
@@ -899,8 +974,56 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
                 report(it, owner)
             }.also { filtered -> update(owner) { filtered.refresh() } }
         } catch (e: IllegalArgumentException) {
+            while(updates.size>updateCheckpoint) updates.removeAt(updates.lastIndex)
+            while(geometryUpdates.size>geometryCheckpoint) geometryUpdates.removeAt(geometryUpdates.lastIndex)
+            while(paintUpdates.size>paintCheckpoint) paintUpdates.removeAt(paintUpdates.lastIndex)
+            animations.discardFrom(animationCheckpoint); shapeStyles.discardFrom(styleCheckpoint)
+            while(masks.size>maskCheckpoint) masks.removeAt(masks.lastIndex).dispose()
+            while(filterChains.size>filterCheckpoint) filterChains.removeAt(filterChains.lastIndex).dispose()
+            while(radialPaints.size>radialCheckpoint) radialPaints.removeAt(radialPaints.lastIndex).dispose()
+            while(patterns.size>patternCheckpoint) patterns.removeAt(patterns.lastIndex).also { definitions.children.remove(it.hidden); it.dispose() }
             report(e.message ?: "Invalid filter", owner)
             node
+        } finally { reference?.let(activeReferences::remove) }
+    }
+
+    private fun prepareFilterImage(primitive: SvgElement, viewport: SvgViewport, filter: SvgElement): SvgFilterImageSource? {
+        val href=primitive["href"] ?: primitive["xlink:href"]
+        if(href == null) { report("Missing feImage href",primitive); return null }
+        if(href.startsWith('#')) {
+            val target=document.elementsById[href.drop(1)]
+            if(target == null) { report("Missing feImage target: $href",primitive); return null }
+            val key="feImage:$href"
+            require(activeReferences.add(key)) { "Circular feImage reference: $href" }
+            try {
+                require(activeReferences.size <= document.options.maxDepth) { "feImage reference depth limit exceeded" }
+                require(target.name !in setOf("filter","mask","marker","pattern","defs","style")) { "Invalid feImage target: $href" }
+                val proportional=svgFilterProportional(filter["primitiveUnits"] ?: "userSpaceOnUse")
+                val imageViewport=if(proportional) SvgViewport(1.0,1.0) else viewport
+                val instance=if(target.name in setOf("svg","symbol")) {
+                    val attrs=target.attributes.toMutableMap()
+                    listOf("width","height").forEach { name -> primitive[name]?.let { attrs[name]=it } }
+                    SvgElement(target.name,attrs,target.children,target.text,target.content)
+                } else target
+                val node=render(instance,paints.ancestorsOf(primitive)+primitive,paints.styleOf(primitive),imageViewport,referenced=true) ?: return null
+                val group=Group(node)
+                return SvgFilterImageSource(group) { bounds, _, bbox ->
+                    val x=document.lengths.resolve(primitive["x"] ?: "0",if(bbox)1.0 else viewport.width)
+                    val y=document.lengths.resolve(primitive["y"] ?: "0",if(bbox)1.0 else viewport.height)
+                    group.transforms.setAll(javafx.scene.transform.Translate(if(bbox)bounds.minX else 0.0,if(bbox)bounds.minY else 0.0),
+                        javafx.scene.transform.Scale(if(bbox)bounds.width else 1.0,if(bbox)bounds.height else 1.0),
+                        javafx.scene.transform.Translate(x,y))
+                }
+            } finally { activeReferences.remove(key) }
+        }
+        val resource=document.resources.images[primitive] ?: return null
+        val image=imageCache.getOrPut(resource) { resource.open().use { Image(it) } }
+        if(image.isError || image.width <= 0 || image.height <= 0) { report("Cannot decode feImage",primitive); return null }
+        val view=ImageView(image);val group=Group(view)
+        // Region clipping is done by the filter chain, including slice overflow.
+        return SvgFilterImageSource(group) { _, region, _ ->
+            view.transforms.setAll(javafx.scene.transform.Translate(region.minX,region.minY),
+                SvgBox(0.0,0.0,image.width,image.height).transform(region.width,region.height,primitive["preserveAspectRatio"]))
         }
     }
 
@@ -978,7 +1101,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             val merged = SvgElement("pattern",attrs,content.children,"",content.content)
             require(document.options.maxElements-renderedElements >= 3) { "SVG expanded pattern node limit exceeded" }
             renderedElements += 3
-            val instance = SvgPattern(target,merged,viewport,document.lengths,patternBudget) { if (themeReady) root.parent?.requestLayout() }
+            val instance = SvgPattern(target,merged,viewport,document.lengths,patternBudget,
+                styles.compute(merged, paints.ancestorsOf(chain.first()), paints.parentStyleOf(chain.first())).getValue("overflow")) { if (themeReady) root.parent?.requestLayout() }
             patterns += instance
             definitions.children += instance.hidden
             update(owner,phase=geometryUpdates) { instance.prepare() }
@@ -994,17 +1118,44 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         }
     }
 
+    private fun radial(value: String, owner: SvgElement, target: Node, viewport: SvgViewport): SvgRadialPaint? {
+        val id = PAINT_REFERENCE.matchEntire(value)?.groupValues?.get(1) ?: return null
+        if (document.elementsById[id]?.name !in setOf("linearGradient", "radialGradient")) return null
+        if (!try { paints.rasterRadial(id) } catch (_: IllegalArgumentException) { false }) return null
+        return SvgRadialPaint(target, viewport, patternBudget, { opacity, bounds -> paints.radial(id, opacity, viewport, bounds) },
+            { if (themeReady) root.parent?.requestLayout() }).also { radialPaints += it }
+    }
+
+    /** Render-local sharing only: positioned glyphs use one layout geometry and owner style.
+     * Identity keys prevent distinct spans or independently animated channels from aliasing.
+     * This lookup never survives renderTextSpans; radialPaints remains the sole disposal owner. */
+    private class TextRadialReuse(val target: Node, val viewport: SvgViewport) {
+        private val owners = java.util.IdentityHashMap<SvgElement, java.util.IdentityHashMap<Map<String, String>, MutableMap<String, SvgRadialPaint?>>>()
+        fun get(owner: SvgElement, style: Map<String, String>, channel: String, create: () -> SvgRadialPaint?): SvgRadialPaint? {
+            val styles = owners.getOrPut(owner) { java.util.IdentityHashMap() }
+            val channels = styles.getOrPut(style) { mutableMapOf() }
+            return channels.getOrPut(channel + ":" + style.getValue(channel)) { create() }
+        }
+    }
+
     private fun applyShapeStyle(
         shape: Shape, style: Map<String, String>, viewport: SvgViewport, element: SvgElement,
-        geometry: Node = shape, dynamicGeometry: Boolean = false
+        geometry: Node = shape, dynamicGeometry: Boolean = false, radialReuse: TextRadialReuse? = null
     ) {
         val context = paintContext
         val fillPattern = pattern(style.getValue("fill"),element,geometry,viewport)
         val strokePattern = pattern(style.getValue("stroke"),element,geometry,viewport)
+        check(radialReuse == null || radialReuse.target === geometry && radialReuse.viewport === viewport)
+        fun radialChannel(channel: String): SvgRadialPaint? {
+            val create = { radial(style.getValue(channel), element, geometry, viewport) }
+            return if (radialReuse == null) create() else radialReuse.get(element, style, channel, create)
+        }
+        val fillRadial = radialChannel("fill")
+        val strokeRadial = radialChannel("stroke")
         val entry = if (masking || context != null) null else shapeStyles.register(shape)
         val action = {
-            val fill = paint(style.getValue("fill"), style, svgStyleNumber(style, "fill-opacity", 1.0, document.lengths).coerceIn(0.0, 1.0), element, geometry, viewport, context, svgStyleColour(style, "fill"), fillPattern)
-            val stroke = paint(style.getValue("stroke"), style, svgStyleNumber(style, "stroke-opacity", 1.0, document.lengths).coerceIn(0.0, 1.0), element, geometry, viewport, context, svgStyleColour(style, "stroke"), strokePattern)
+            val fill = paint(style.getValue("fill"), style, svgStyleNumber(style, "fill-opacity", 1.0, document.lengths).coerceIn(0.0, 1.0), element, geometry, viewport, context, svgStyleColour(style, "fill"), fillPattern, fillRadial)
+            val stroke = paint(style.getValue("stroke"), style, svgStyleNumber(style, "stroke-opacity", 1.0, document.lengths).coerceIn(0.0, 1.0), element, geometry, viewport, context, svgStyleColour(style, "stroke"), strokePattern, strokeRadial)
             val width = svgStyleNumber(style, "stroke-width", viewport.diagonal, document.lengths).also { require(it >= 0) }
             if (entry != null) entry.setBase(fill, stroke, width) else {
                 setSvgBaseStyle(shape.fillProperty(), fill)
@@ -1016,7 +1167,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
         if (context != null && (style.getValue("fill").startsWith("context-") || style.getValue("stroke").startsWith("context-"))) {
             action()
             context.updates += { try { action() } catch (failure: IllegalArgumentException) { report(failure.message ?: "Invalid marker paint", element) } }
-        } else if (fillPattern != null || strokePattern != null) update(element) { action() }
+        } else if (fillPattern != null || strokePattern != null || fillRadial != null || strokeRadial != null) update(element) { action() }
         else update(element, if (dynamicGeometry || style is SvgAnimatedStyle && style.affected.isNotEmpty()) null else viewport, phase = paintUpdates) { action() }
         shape.strokeType = StrokeType.CENTERED
         shape.strokeLineCap = when (style.getValue("stroke-linecap")) {
@@ -1039,7 +1190,7 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
 
     private fun paint(
         value: String, style: Map<String, String>, opacity: Double, element: SvgElement, shape: Node,
-        viewport: SvgViewport, context: SvgMarkerContext? = null, animatedColour: Color? = null, pattern: SvgPattern? = null
+        viewport: SvgViewport, context: SvgMarkerContext? = null, animatedColour: Color? = null, pattern: SvgPattern? = null, radial: SvgRadialPaint? = null
     ): Paint? {
         if (animatedColour != null) return Color(animatedColour.red, animatedColour.green, animatedColour.blue, animatedColour.opacity * opacity)
         if (value == "none") return null
@@ -1048,7 +1199,8 @@ internal class FxSvgRenderer(private val document: SvgDocument) {
             val match = PAINT_REFERENCE.matchEntire(value)
                 ?: throw SvgException("Only local paint references are supported: $value")
             return try {
-                if (pattern != null) { if (themeReady) pattern.paint(opacity) else Color.TRANSPARENT }
+                if (radial != null) radial.paint(opacity)
+                else if (pattern != null) { if (themeReady) pattern.paint(opacity) else Color.TRANSPARENT }
                 else paints.gradient(match.groupValues[1], opacity, viewport, svgGeometryBounds(shape))
             } catch (e: IllegalArgumentException) {
                 report(e.message ?: "Invalid paint server", element)

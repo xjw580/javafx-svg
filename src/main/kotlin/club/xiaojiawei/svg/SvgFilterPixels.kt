@@ -6,14 +6,17 @@ import javafx.scene.paint.Color
 import kotlin.math.ceil
 import kotlin.math.exp
 import kotlin.math.floor
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
  * Filter-local pixels in premultiplied RGBA order, in either sRGB or linear RGB.
  *
- * Operations do not change their inputs, except [clip]. Identity operations may return this
- * instance, so a caller clipping a shared DAG input must first copy its data.
+ * Operations do not change their inputs, except [clip] and private-accumulator [mergeOver].
+ * Identity operations may return this instance or share an alpha-only backing array across
+ * colour spaces, so a caller clipping a shared DAG input must first copy its data.
  */
 internal class SvgFilterPixels(
     val width: Int,
@@ -25,8 +28,13 @@ internal class SvgFilterPixels(
         require(data.size == componentCount(width, height)) { "Filter pixel data has the wrong size" }
     }
 
+    /** A pure-alpha image has identical values in either RGB space and needs no copied buffer. */
+    fun conversionNeedsBuffer(linear: Boolean): Boolean = linear != this.linear &&
+        data.indices.step(4).any { data[it] != 0f || data[it + 1] != 0f || data[it + 2] != 0f }
+
     fun converted(linear: Boolean): SvgFilterPixels {
         if (linear == this.linear) return this
+        if (!conversionNeedsBuffer(linear)) return SvgFilterPixels(width, height, linear, data)
         val result = SvgFilterPixels(width, height, linear)
         for (i in data.indices step 4) {
             val alpha = data[i + 3]
@@ -79,22 +87,69 @@ internal class SvgFilterPixels(
         return result
     }
 
+    /**
+     * Conservative component taps for the actual Gaussian support, excluding its input scan.
+     * Recompute on every call: [data] and [clip] permit mutation between estimates and rendering.
+     */
+    fun blurWork(sigmaX: Double, sigmaY: Double): Long = blurPlan(sigmaX, sigmaY).componentTaps
+
     /** A separable, normalized Gaussian truncated at three standard deviations. */
     fun blur(sigmaX: Double, sigmaY: Double): SvgFilterPixels {
-        require(sigmaX.isFinite() && sigmaY.isFinite()) { "Non-finite Gaussian deviation" }
-        // A negative component disables the primitive; a zero component disables only that axis.
-        if (sigmaX < 0.0 || sigmaY < 0.0 || (sigmaX == 0.0 && sigmaY == 0.0)) return this
-        val radiusX = kernelRadius(sigmaX)
-        val radiusY = kernelRadius(sigmaY)
-        val taps = (if (radiusX == 0) 0L else radiusX * 2L + 1) +
-            (if (radiusY == 0) 0L else radiusY * 2L + 1)
-        require(data.size.toLong() * taps <= MAX_BLUR_COMPONENT_TAPS) {
+        val plan = blurPlan(sigmaX, sigmaY)
+        require(plan.componentTaps <= MAX_BLUR_COMPONENT_TAPS) {
             "Gaussian filter exceeds the $MAX_BLUR_COMPONENT_TAPS pixel-component tap work limit"
         }
+        if (plan.componentTaps == 0L) return this
         var result = this
-        if (radiusX > 0) result = result.convolve(kernel(sigmaX, radiusX), horizontal = true)
-        if (radiusY > 0) result = result.convolve(kernel(sigmaY, radiusY), horizontal = false)
+        if (plan.radiusX > 0) result = result.convolve(kernel(sigmaX, plan.radiusX),
+            horizontal = true, plan.horizontalBounds, plan.alphaOnly)
+        if (plan.radiusY > 0) result = result.convolve(kernel(sigmaY, plan.radiusY),
+            horizontal = false, plan.outputBounds, plan.alphaOnly)
         return result
+    }
+
+    private data class PixelBounds(val left: Int, val top: Int, val right: Int, val bottom: Int) {
+        val area: Long get() = (right - left).toLong() * (bottom - top)
+    }
+
+    private data class BlurPlan(
+        val radiusX: Int,
+        val radiusY: Int,
+        val horizontalBounds: PixelBounds,
+        val outputBounds: PixelBounds,
+        val alphaOnly: Boolean,
+        val componentTaps: Long
+    )
+
+    private fun blurPlan(sigmaX: Double, sigmaY: Double): BlurPlan {
+        require(sigmaX.isFinite() && sigmaY.isFinite()) { "Non-finite Gaussian deviation" }
+        val empty = PixelBounds(0, 0, 0, 0)
+        // A negative component disables the primitive; a zero component disables only that axis.
+        if (sigmaX < 0.0 || sigmaY < 0.0 || (sigmaX == 0.0 && sigmaY == 0.0)) {
+            return BlurPlan(0, 0, empty, empty, true, 0)
+        }
+        // Validate even an empty image, rather than letting empty support bypass the radius limit.
+        val radiusX = kernelRadius(sigmaX)
+        val radiusY = kernelRadius(sigmaY)
+        var left = width; var top = height; var right = 0; var bottom = 0
+        var alphaOnly = true
+        for (y in 0 until height) for (x in 0 until width) {
+            val i = (y * width + x) * 4
+            val colour = data[i] != 0f || data[i + 1] != 0f || data[i + 2] != 0f
+            if (colour) alphaOnly = false
+            if (colour || data[i + 3] != 0f) {
+                left = min(left, x); top = min(top, y)
+                right = max(right, x + 1); bottom = max(bottom, y + 1)
+            }
+        }
+        if (right <= left || bottom <= top) return BlurPlan(radiusX, radiusY, empty, empty, true, 0)
+        val horizontal = PixelBounds(max(0, left - radiusX), top, min(width, right + radiusX), bottom)
+        val output = PixelBounds(horizontal.left, max(0, top - radiusY),
+            horizontal.right, min(height, bottom + radiusY))
+        val channels = if (alphaOnly) 1L else 4L
+        val taps = channels * ((if (radiusX == 0) 0L else horizontal.area * (radiusX * 2L + 1)) +
+            (if (radiusY == 0) 0L else output.area * (radiusY * 2L + 1)))
+        return BlurPlan(radiusX, radiusY, horizontal, output, alphaOnly, taps)
     }
 
     /** This is SVG's source (in); [other] is its destination (in2). */
@@ -153,6 +208,23 @@ internal class SvgFilterPixels(
         return result
     }
 
+    /** Source-over into a private merge accumulator; never call on a retained DAG input. */
+    fun mergeOver(source: SvgFilterPixels): SvgFilterPixels {
+        require(width == source.width && height == source.height && linear == source.linear) {
+            "Merge inputs have different dimensions or colour spaces"
+        }
+        for (i in data.indices step 4) {
+            val destinationFactor = 1.0 - source.data[i + 3].toDouble()
+            for (channel in 0..3) {
+                data[i + channel] = (source.data[i + channel].toDouble() +
+                    data[i + channel] * destinationFactor).coerceIn(0.0, 1.0).toFloat()
+            }
+            val alpha = data[i + 3]
+            for (channel in 0..2) data[i + channel] = data[i + channel].coerceAtMost(alpha)
+        }
+        return this
+    }
+
     /** Clear outside [left, right) x [top, bottom), in place. */
     fun clip(left: Int, top: Int, right: Int, bottom: Int): SvgFilterPixels {
         val x0 = left.coerceIn(0, width)
@@ -190,11 +262,11 @@ internal class SvgFilterPixels(
         }
     }
 
-    private fun convolve(weights: DoubleArray, horizontal: Boolean): SvgFilterPixels {
+    private fun convolve(weights: DoubleArray, horizontal: Boolean, bounds: PixelBounds, alphaOnly: Boolean): SvgFilterPixels {
         val result = SvgFilterPixels(width, height, linear)
         val radius = weights.size / 2
-        for (y in 0 until height) {
-            for (x in 0 until width) {
+        for (y in bounds.top until bounds.bottom) {
+            for (x in bounds.left until bounds.right) {
                 var red = 0.0; var green = 0.0; var blue = 0.0; var alpha = 0.0
                 for (tap in weights.indices) {
                     val sx = if (horizontal) x + tap - radius else x
@@ -202,9 +274,11 @@ internal class SvgFilterPixels(
                     if (sx !in 0 until width || sy !in 0 until height) continue
                     val input = (sy * width + sx) * 4
                     val weight = weights[tap]
-                    red += data[input] * weight
-                    green += data[input + 1] * weight
-                    blue += data[input + 2] * weight
+                    if (!alphaOnly) {
+                        red += data[input] * weight
+                        green += data[input + 1] * weight
+                        blue += data[input + 2] * weight
+                    }
                     alpha += data[input + 3] * weight
                 }
                 val out = (y * width + x) * 4

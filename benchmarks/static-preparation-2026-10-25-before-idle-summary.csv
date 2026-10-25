@@ -1,3 +1,0 @@
-"provider","kind","icons","valid","attempts","rounds","fx_cpu_ms_s","cpu_min","cpu_max","fx_alloc_kib_s","alloc_min","alloc_max","process_cpu_core_pct"
-"native","gradient","500","3","3","r1-native+r2-native+r3-native","0","0","0","0.507761","0.507655","32.263706","0"
-"native","path","500","3","3","r1-native+r2-native+r3-native","0","0","0","32.257499","0.507705","32.263119","0.312331"

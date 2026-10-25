@@ -116,7 +116,8 @@ internal class SvgResourceSession(
                 }
                 sheet(element.text, base, element, 0, false)
             }
-            if (element.name == "image") attempt(element) {
+            if (element.name == "image" || (element.name == "feImage" &&
+                !(element["href"] ?: element["xlink:href"] ?: "").startsWith('#'))) attempt(element) {
                 val href = element["href"] ?: element["xlink:href"] ?: throw SvgException("Missing image href")
                 val key = if (href.startsWith("data:", true)) href else resolve(href, base).toString()
                 val resource = if (imageResources.containsKey(key)) imageResources[key] else {

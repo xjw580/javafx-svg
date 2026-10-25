@@ -49,7 +49,7 @@ class SvgDropShadowTest {
 
     @Test fun supportedChainsAndUnsupportedInputsAreDistinguished() = FxTest.run {
         assertTrue(view("""<feDropShadow/><feGaussianBlur/>""").diagnostics.isEmpty())
-        assertFailsWith<SvgException> { view("""<feDropShadow/><feBlend/>""") }
+        assertFailsWith<SvgException> { view("""<feDropShadow/><feUnsupported/>""") }
         assertFailsWith<SvgException> { view("""<feDropShadow stdDeviation="1000"/>""") }
         assertFailsWith<SvgException> { view("""<feDropShadow in="unknown"/>""") }
         assertFailsWith<SvgException> { view("""<feDropShadow flood-color="blue"/>""",

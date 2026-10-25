@@ -1,0 +1,5 @@
+# Pin an available Java 21 SDK; fail instead of silently building with JDK 17.
+before_install:
+  - sdk install java 21.0.13.0+9-tem
+install:
+  - sdk use java 21.0.13.0+9-tem && mvn -B -V -Pheadless clean install

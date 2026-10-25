@@ -37,3 +37,6 @@ build/
 
 ### Mac OS ###
 .DS_Store
+# Local Python release/benchmark tooling
+__pycache__/
+*.py[cod]

@@ -65,7 +65,7 @@ object SvgLoader {
             require(baseUri == null || baseUri.isAbsolute) { "SVG base URI must be absolute" }
             val dom = parseDom(bytes, options.maxDepth)
             val root = dom.documentElement ?: throw SvgException("Missing SVG root")
-            if (root.localName != "svg" || root.namespaceURI !in listOf(null, "", SVG_NS)) {
+            if (root.localName != "svg" || !isSvgNamespace(root.namespaceURI)) {
                 throw SvgException("Expected an SVG root element")
             }
             val ids = linkedMapOf<String, SvgElement>()
@@ -75,6 +75,7 @@ object SvgLoader {
                 diagnostics += SvgDiagnostic(message, element?.id)
             }
             var count = 0
+            var hasResourceFeatures = false
             fun read(element: Element, depth: Int): SvgElement {
                 if (depth > options.maxDepth || ++count > options.maxElements) {
                     throw SvgException("SVG exceeds element/depth limit")
@@ -87,6 +88,11 @@ object SvgLoader {
                         "http://www.w3.org/1999/xlink" -> attrs["xlink:" + attr.localName] = attr.nodeValue
                         XMLConstants.XML_NS_URI -> attrs["xml:" + attr.localName] = attr.nodeValue
                     }
+                }
+                // Detect resource work during the existing DOM walk. xml:base must be included even
+                // without an image or stylesheet: invalid bases still produce diagnostics.
+                if (element.localName == "style" || element.localName == "image" || attrs.containsKey("xml:base")) {
+                    hasResourceFeatures = true
                 }
                 val children = mutableListOf<SvgElement>()
                 val text = StringBuilder()
@@ -115,7 +121,7 @@ object SvgLoader {
                     }
                 }
                 flushText()
-                val name = if (element.namespaceURI in listOf(null, "", SVG_NS)) element.localName
+                val name = if (isSvgNamespace(element.namespaceURI)) element.localName
                     else "{${element.namespaceURI}}${element.localName}"
                 val result = SvgElement(name, Collections.unmodifiableMap(attrs),
                     Collections.unmodifiableList(children), text.toString(), Collections.unmodifiableList(content))
@@ -143,7 +149,12 @@ object SvgLoader {
                 }
             }
             val parsedRoot = read(root, 1)
-            val resources = SvgResourceSession(options, baseUri, ::report).prepare(parsedRoot, processingInstructions)
+            val resources = if (hasResourceFeatures || processingInstructions.isNotEmpty()) {
+                SvgResourceSession(options, baseUri, ::report).prepare(parsedRoot, processingInstructions)
+            } else {
+                // Most icons need no resource session, its initialization, or a second tree walk.
+                SvgPreparedResources(Collections.emptyList(), Collections.emptyMap(), Collections.emptyList())
+            }
             return SvgDocument(parsedRoot, Collections.unmodifiableMap(ids),
                 Collections.unmodifiableList(diagnostics), options, bytes.size, baseUri, resources)
         } catch (e: SvgException) {
@@ -152,6 +163,9 @@ object SvgLoader {
             throw SvgException("Cannot parse SVG: ${e.message}", e)
         }
     }
+
+    private fun isSvgNamespace(namespace: String?): Boolean =
+        namespace == null || namespace.isEmpty() || namespace == SVG_NS
 
 
     private fun stylesheetAttributes(text: String): Map<String, String> {

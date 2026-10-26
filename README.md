@@ -549,7 +549,7 @@ Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，
 当前不支持完整 SVG 规范。限制包括：
 
 - 不执行脚本和事件处理器；foreignObject 仅支持上述有界 XHTML 子集，不支持完整 HTML/CSS 或浏览器行为。声明式动画的支持范围见上文。
-- 不支持光照滤镜、feBlend/feColorMatrix/feConvolveMatrix 等未列出的滤镜原语、滤镜模板和 filterRes；radialGradient 的 gradientTransform 和非零 fr 仍未实现。vector-effect 目前只支持 none/non-scaling-stroke；SVG 逆向导出后置。
+- 不支持 feBlend/feColorMatrix/feConvolveMatrix 等未列出的滤镜原语、滤镜模板和 filterRes；radialGradient 的 gradientTransform 和非零 fr 仍未实现。vector-effect 目前只支持 none/non-scaling-stroke；SVG 逆向导出后置。
 - SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量和条件规则；支持 @keyframes、显式授权的无条件 @import。应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
 - 不支持逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
 - 默认不自动加载外部资源；image 与样式表可通过资源解析器显式启用。use/gradient/clipPath 的跨文档引用仍不支持。load(URL) 打开调用方明确提供的顶层地址。
@@ -626,7 +626,23 @@ renderCacheEnabled 默认 true，静态文档及仅旋转/平移/路径运动的
 
 新增内核也受独立上限约束：feTurbulence 最多 16 个 octave、单次最多 4,000,000 像素及每轴 4096 像素，噪声格点坐标另有限幅；feMorphology 每轴半径最多 256 个采样像素；湍流、位移和形态学每次分别最多 1.5 亿估算分量采样/操作，并继续计入上述视图总工作量预算。半径和位移按当前采样比例与 primitiveUnits 换算，放大时可能触达限制；不因新增效果而提高默认预算或忽略超限错误。
 
-语义依据 [Filter Effects：输入与子区域](https://www.w3.org/TR/filter-effects-1/#FilterPrimitiveSubRegion)、[feComposite](https://www.w3.org/TR/filter-effects-1/#feCompositeElement) 和 [颜色空间](https://www.w3.org/TR/filter-effects-1/#color-interpolation-filters-property)。光照滤镜和 SVG 逆向导出不属于本轮实现。
+语义依据 [Filter Effects：输入与子区域](https://www.w3.org/TR/filter-effects-1/#FilterPrimitiveSubRegion)、[feComposite](https://www.w3.org/TR/filter-effects-1/#feCompositeElement) 和 [颜色空间](https://www.w3.org/TR/filter-effects-1/#color-interpolation-filters-property)。SVG 逆向导出仍后置；光照支持见下节。
+
+### 光照滤镜：漫反射、镜面反射和三类光源
+
+支持 `feDiffuseLighting`、`feSpecularLighting`，以及其直接子元素 `feDistantLight`、`fePointLight`、`feSpotLight`。它们使用输入 alpha 作为高度图，计算 SVG Sobel 表面法线和 Phong/Blinn-Phong 光照，不调用 WebView，也不以固定阴影替代光照。支持 `in`/`result` 串联、surfaceScale、diffuseConstant/specularConstant、specularExponent、聚光灯目标点/聚焦指数/limitingConeAngle，以及原语子区域裁剪。
+
+- 漫反射在其输出子区域中是**不透明**的，包括输入 alpha 为零的平面；需要保留原图轮廓时，请再通过 `feComposite operator="in" in2="SourceAlpha"` 裁切。镜面反射的 alpha 是最终 RGB 最大分量，RGB 已为预乘值，不能再乘一次 alpha。
+- `lighting-color` 默认为白色、不自动继承，可使用样式表、style、presentation attribute、显式 inherit 和 currentColor。颜色本身的 alpha 不削弱光照。光色按原语的 color-interpolation-filters 转为 linearRGB（默认）或 sRGB；输入 RGB 不参与高度计算。
+- 光源位置默认均为 0；远光角度以度为单位。使用第一个直接光源子元素；没有光源时输出透明黑。动画光源/动画滤镜仍明确诊断，不会被静默当作有效动画执行。聚光锥边界采用有界的 2×2 子像素覆盖取样（含双线性高度取样），减轻硬截断的像素阶梯；不是整个光照方程的完整超采样。
+- `primitiveUnits="objectBoundingBox"` 时，光源 x/y 和目标 x/y 按几何包围盒的位置和宽高换算，z/pointsAtZ 使用归一化对角线长度 `hypot(width,height)/sqrt(2)`；surfaceScale 保持表面/user-space 高度值，远光方位/仰角不变。这与主流浏览器的光源坐标约定一致，但不表示所有浏览器逐像素相同。
+- 默认法线间距为当前离屏图像的一像素，使用 SVG 的内部/边缘/角点 Sobel 核；单像素维度在该轴采用零导数。正值 `kernelUnitLength` 采用指定间距的双线性 alpha 取样，**没有建立规范描述的独立中间网格后再重采样输出**，因此是有界近似，不保证该属性的跨渲染器一致性。非正值按 Filter Effects 1 回退到默认间距。
+- 常量必须非负，镜面材质指数为 1–128，聚光源的指数独立且非负；数值必须有限，光源属性不接受 px/% 等长度语法。极端数值溢出会报错，不输出 NaN。严格校验可能比浏览器的错误值钳制更严格。
+- 光照只创建一个输出 RGBA 缓冲，通常按每像素 160 次估算操作、带 limitingConeAngle 的聚光源按每像素 320 次估算操作保守计费，仍共享原有 `maxFilterPixels` 和每视图 2 亿工作量上限，**没有提高预算**。极大滤镜区域或放大倍数可能被拒绝，缩小后可以恢复。
+
+演示和回归输入：`src/test/resources/svg/lighting-filters.svg`。它把漫反射/镜面反射与三类光源组合，并使用模糊高度图与合成链。测试包含数值核、CSS/坐标、子区域、重复缩放、预算和错误恢复；只在 Linux JavaFX 软件渲染上验证，不代表 Windows GPU 或真实高 DPI 验证。
+
+语义参考：[漫反射](https://www.w3.org/TR/filter-effects-1/#feDiffuseLightingElement)、[镜面反射](https://www.w3.org/TR/filter-effects-1/#feSpecularLightingElement)、[光源](https://www.w3.org/TR/filter-effects-1/#LightSourceDefinitions)、[SVG 1.1 法线表](https://www.w3.org/TR/SVG11/filters.html#feDiffuseLightingElement)。
 
 ### 外部样式表与图片：显式授权
 

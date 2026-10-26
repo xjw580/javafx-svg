@@ -132,6 +132,8 @@ internal class SvgFilterChain(
                 }
                 validateInput(it["in"])
             }
+        } else if (primitive.name in LIGHTING) {
+            SvgLightingParameters.parse(primitive) // Validate light subtree and numbers before reparenting.
         } else require(children.isEmpty()) { "Animated filter primitives are unsupported" }
         if (primitive.name !in setOf("feFlood", "feTurbulence", "feMerge")) validateInput(primitive["in"])
         if (primitive.name == "feComposite") {
@@ -295,7 +297,7 @@ internal class SvgFilterChain(
                         return input.blur(sigmaX, sigmaY)
                     }
                     val conversionInputs = when (primitive.name) {
-                        "feOffset" -> emptyList()
+                        "feOffset", "feDiffuseLighting", "feSpecularLighting" -> emptyList()
                         "feDisplacementMap" -> inputs.drop(1)
                         else -> inputs
                     }
@@ -315,7 +317,7 @@ internal class SvgFilterChain(
                     }
                     val conversionBuffers = conversionInputs.count { it.pixels.conversionNeedsBuffer(linear) }
                     val scratch = when (primitive.name) {
-                        "feFlood", "feOffset", "feTurbulence" -> 1
+                        "feFlood", "feOffset", "feTurbulence", "feDiffuseLighting", "feSpecularLighting" -> 1
                         "feGaussianBlur", "feMorphology" -> conversionBuffers + 2 // Two separable pass outputs.
                         "feComposite" -> conversionBuffers + 1
                         "feDisplacementMap" -> 1 + conversionBuffers
@@ -368,6 +370,40 @@ internal class SvgFilterChain(
                             budget.reserveWork(this, work)
                             inputs[0].pixels.displace(inputs[1].pixels, scaleX, scaleY,
                                 primitive["xChannelSelector"] ?: "A", primitive["yChannelSelector"] ?: "A", linear)
+                        }
+                        "feDiffuseLighting", "feSpecularLighting" -> {
+                            val parameters = SvgLightingParameters.parse(primitive).resolved(bounds, primitiveProportional)
+                            val source = inputs[0].pixels
+                            work += source.lightingWork(parameters.light)
+                            budget.reserveWork(this, work)
+                            val stepX = 1.0 / sx
+                            val stepY = 1.0 / sy
+                            val paint = style.getValue("lighting-color").let {
+                                if (it == "currentColor") style.getValue("color") else it
+                            }
+                            val lightColor = Color.web(paint)
+                            if (subregion.width <= 0.0 || subregion.height <= 0.0) {
+                                SvgFilterPixels(source.width, source.height, linear)
+                            } else {
+                                // A cropped input's edge uses the SVG boundary Sobel kernel when it
+                                // coincides with this output edge. An expanded output still sees the
+                                // transparent padding, and a narrowed output may read its input beyond
+                                // the output clip. Do not globally clamp all samples to the input box.
+                                val inputRegion = intersect(region, inputs[0].region)
+                                fun x0(r: Bounds) = floor(r.minX * sx - left).toInt().coerceIn(0, source.width)
+                                fun y0(r: Bounds) = floor(r.minY * sy - top).toInt().coerceIn(0, source.height)
+                                fun x1(r: Bounds) = ceil(r.maxX * sx - left).toInt().coerceIn(0, source.width)
+                                fun y1(r: Bounds) = ceil(r.maxY * sy - top).toInt().coerceIn(0, source.height)
+                                // Only alpha is a height map. Input RGB needs no conversion or copying.
+                                source.lighting(parameters.specular, parameters.surfaceScale, parameters.constant,
+                                    parameters.exponent, lightColor, linear, parameters.light,
+                                    (left + .5) / sx, (top + .5) / sy, stepX, stepY,
+                                    parameters.kernelX ?: stepX, parameters.kernelY ?: stepY,
+                                    if (x0(inputRegion) == x0(subregion)) x0(subregion) else 0,
+                                    if (y0(inputRegion) == y0(subregion)) y0(subregion) else 0,
+                                    if (x1(inputRegion) == x1(subregion)) x1(subregion) - 1 else source.width - 1,
+                                    if (y1(inputRegion) == y1(subregion)) y1(subregion) - 1 else source.height - 1)
+                            }
                         }
                         "feOffset" -> inputs[0].pixels.offset(distance("dx", true), distance("dy", false))
                         "feGaussianBlur" -> blur(inputs[0].pixels.converted(linear))
@@ -503,7 +539,8 @@ internal class SvgFilterChain(
     }
     companion object {
         private val DESCRIPTIVE = setOf("title", "desc", "metadata")
-        private val SUPPORTED = setOf("feFlood", "feComposite", "feMerge", "feOffset", "feGaussianBlur", "feDropShadow", "feTurbulence", "feMorphology", "feDisplacementMap")
+        private val LIGHTING = setOf("feDiffuseLighting", "feSpecularLighting")
+        private val SUPPORTED = LIGHTING + setOf("feFlood", "feComposite", "feMerge", "feOffset", "feGaussianBlur", "feDropShadow", "feTurbulence", "feMorphology", "feDisplacementMap")
         private val OPERATORS = setOf("over", "in", "out", "atop", "xor", "arithmetic", "lighter")
     }
 }

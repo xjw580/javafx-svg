@@ -129,7 +129,7 @@ class SvgGaussianFilterTest {
 
     @Test fun invalidAndUnsupportedFiltersPreserveSourceInLenientMode() = FxTest.run {
         val filters = listOf(
-            """<filter id="f"><feBlend/></filter>""",
+            """<filter id="f"><feConvolveMatrix/></filter>""",
             """<filter id="f"><feGaussianBlur stdDeviation="1 2 3"/></filter>""",
             """<filter id="f"><feGaussianBlur stdDeviation="1000"/></filter>""",
             """<filter id="f"><feGaussianBlur stdDeviation="2" edgeMode="wrap"/></filter>""",

@@ -183,7 +183,7 @@ class SvgFilterChainTest {
     }
 
     @Test fun unsupportedFeaturesAndBudgetsNeverProduceStaleSuccess() = FxTest.run {
-        for (p in listOf("<feBlend/>", "<feComposite in='BackgroundImage'/>", "<feComposite operator='multiply'/>",
+        for (p in listOf("<feConvolveMatrix/>", "<feComposite in='BackgroundImage'/>", "<feComposite operator='multiply'/>",
             "<feMerge><feFlood/></feMerge>", "<feFlood><animate attributeName='flood-color'/></feFlood>")) {
             assertFailsWith<SvgException>(p) { view(p) }
         }

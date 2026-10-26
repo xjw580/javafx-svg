@@ -93,3 +93,5 @@ mvn -Pdemo test-compile exec:java "-Dexec.args=--smoke"
 在 SVG 代码实时预览中打开 `src/test/resources/svg/lighting-filters.svg`，可对比漫反射/镜面反射下的远光、点光、聚光三种光源。拖动缩放、修改 `surfaceScale` 或光源坐标后应重新渲染。两个光照原语原生处理 alpha 高度图，不使用 WebView；完整限制和参数说明见项目 README 的「光照滤镜」一节。
 
 Linux 无显示环境可以执行 `mvn -Pheadless clean verify`；光照回归会在 `target/lighting-filters-1x.png` 保存实际渲染样例，在 `target/lighting-filters-editor-preview.png` 保存实时预览编辑器验证截图。
+
+颜色矩阵与混合样例：将 `src/test/resources/svg/color-blend-filters.svg` 粘贴到实时预览器，检查四类颜色矩阵及五种混合模式。测试覆盖代码编辑、缩放和错误恢复。

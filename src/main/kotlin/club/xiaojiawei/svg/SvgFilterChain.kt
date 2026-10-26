@@ -136,6 +136,12 @@ internal class SvgFilterChain(
             SvgLightingParameters.parse(primitive) // Validate light subtree and numbers before reparenting.
         } else require(children.isEmpty()) { "Animated filter primitives are unsupported" }
         if (primitive.name !in setOf("feFlood", "feTurbulence", "feMerge")) validateInput(primitive["in"])
+        if (primitive.name == "feColorMatrix") SvgFilterColorBlend.matrix(primitive)
+        if (primitive.name == "feBlend") {
+            require(primitive["no-composite"] == null) { "feBlend no-composite is unsupported" }
+            validateInput(primitive["in2"])
+            SvgFilterColorBlend.blendMode(primitive)
+        }
         if (primitive.name == "feComposite") {
             validateInput(primitive["in2"])
             require((primitive["operator"] ?: "over") in OPERATORS) { "Invalid feComposite operator" }
@@ -185,7 +191,7 @@ internal class SvgFilterChain(
             val inputs = when (primitive.name) {
                 "feFlood", "feTurbulence" -> emptyList()
                 "feMerge" -> primitive.children.filter { it.name == "feMergeNode" }.map { it["in"] }
-                "feComposite", "feDisplacementMap" -> listOf(primitive["in"], primitive["in2"])
+                "feComposite", "feDisplacementMap", "feBlend" -> listOf(primitive["in"], primitive["in2"])
                 else -> listOf(primitive["in"])
             }
             inputs.filterNotNull().forEach { put(it, index) }
@@ -269,7 +275,7 @@ internal class SvgFilterChain(
                     val inputs = when (primitive.name) {
                         "feFlood", "feTurbulence" -> emptyList()
                         "feMerge" -> primitive.children.filter { it.name == "feMergeNode" }.map { input(it["in"]) }
-                        "feComposite", "feDisplacementMap" -> listOf(input(primitive["in"]), input(primitive["in2"]))
+                        "feComposite", "feDisplacementMap", "feBlend" -> listOf(input(primitive["in"]), input(primitive["in2"]))
                         else -> listOf(input(primitive["in"]))
                     }
                     charge(1.0) // Every primitive clips its output; full RGBA traversal is an upper bound.
@@ -310,6 +316,8 @@ internal class SvgFilterChain(
                         "feOffset" -> charge(4.0) // Four premultiplied bilinear taps.
                         "feGaussianBlur" -> charge(conversions * 3.0)
                         "feMorphology" -> charge(2.0 + conversions * 3.0) // Two fresh alpha/support scans.
+                        "feColorMatrix" -> charge(16.0 + conversions * 3.0) // 64 scalar operations per pixel.
+                        "feBlend" -> charge(8.0 + conversions * 3.0) // 32 scalar operations per pixel.
                         "feComposite" -> charge(2.0 + conversions * 3.0) // Composite and RGB/alpha clamp.
                         "feMerge" -> charge(1.0 + inputs.size * 2.0 + conversions * 3.0)
                         "feDropShadow" -> charge(10.0 + conversions * 3.0) // Alpha, offset, flood, two composites.
@@ -319,7 +327,7 @@ internal class SvgFilterChain(
                     val scratch = when (primitive.name) {
                         "feFlood", "feOffset", "feTurbulence", "feDiffuseLighting", "feSpecularLighting" -> 1
                         "feGaussianBlur", "feMorphology" -> conversionBuffers + 2 // Two separable pass outputs.
-                        "feComposite" -> conversionBuffers + 1
+                        "feComposite", "feColorMatrix", "feBlend" -> conversionBuffers + 1
                         "feDisplacementMap" -> 1 + conversionBuffers
                         "feMerge" -> 1 + if (conversionBuffers > 0) 1 else 0 // Private accumulator and one conversion.
                         "feDropShadow" -> conversionBuffers + 5
@@ -407,6 +415,9 @@ internal class SvgFilterChain(
                         }
                         "feOffset" -> inputs[0].pixels.offset(distance("dx", true), distance("dy", false))
                         "feGaussianBlur" -> blur(inputs[0].pixels.converted(linear))
+                        "feColorMatrix" -> inputs[0].pixels.converted(linear).colorMatrix(SvgFilterColorBlend.matrix(primitive))
+                        "feBlend" -> inputs[0].pixels.converted(linear).blend(inputs[1].pixels.converted(linear),
+                            SvgFilterColorBlend.blendMode(primitive))
                         "feComposite" -> {
                             val operator = primitive["operator"] ?: "over"
                             fun coefficient(index: Int) = if (operator == "arithmetic") SvgNumbers.scalar(primitive["k$index"] ?: "0") else 0.0
@@ -540,7 +551,7 @@ internal class SvgFilterChain(
     companion object {
         private val DESCRIPTIVE = setOf("title", "desc", "metadata")
         private val LIGHTING = setOf("feDiffuseLighting", "feSpecularLighting")
-        private val SUPPORTED = LIGHTING + setOf("feFlood", "feComposite", "feMerge", "feOffset", "feGaussianBlur", "feDropShadow", "feTurbulence", "feMorphology", "feDisplacementMap")
+        private val SUPPORTED = LIGHTING + setOf("feFlood", "feComposite", "feMerge", "feOffset", "feGaussianBlur", "feDropShadow", "feTurbulence", "feMorphology", "feDisplacementMap", "feColorMatrix", "feBlend")
         private val OPERATORS = setOf("over", "in", "out", "atop", "xor", "arithmetic", "lighter")
     }
 }

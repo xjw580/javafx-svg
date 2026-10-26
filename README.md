@@ -418,7 +418,7 @@ FXML 可用 `animationAutoPlay="false"` 关闭自动播放。手动播放也需�
 | 渐变 | linearGradient、radialGradient、stop；objectBoundingBox/userSpaceOnUse、spreadMethod、模板引用、线性渐变变换 |
 | 裁剪 | clipPath、userSpaceOnUse/objectBoundingBox、clip-rule、嵌套裁剪 |
 | 遮罩 | alpha/luminance（默认）；区域、两种坐标单位、嵌套遮罩、CSS 与引用 |
-| 滤镜 | feFlood / feComposite / feMerge、feGaussianBlur / feDropShadow / feOffset、feTurbulence / feDisplacementMap / feMorphology 的滤镜链；命名/隐式输入、两类坐标单位、区域裁剪 |
+| 滤镜 | feFlood / feComposite / feMerge、feGaussianBlur / feDropShadow / feOffset、feTurbulence / feDisplacementMap / feMorphology、feColorMatrix / feBlend、feDiffuseLighting / feSpecularLighting 的滤镜链；命名/隐式输入、两类坐标单位、区域裁剪 |
 | 图案 | pattern 填充/描边、模板、坐标单位、viewBox 与二维变换 |
 | 文本 | 单段 textPath；text/嵌套 tspan、单值 x/y/dx/dy、字体/字号/粗细/斜体、text-anchor、xml:space；单段文字支持 textLength/lengthAdjust；字号支持 em 和相对父字号的百分比；text-decoration、baseline-shift 见专项边界 |
 | 图片 | 内嵌 base64 PNG/JPEG；显式授权解析器提供的外部 PNG/JPEG；preserveAspectRatio、视口裁剪 |
@@ -549,7 +549,7 @@ Shields 徽章回归样本位于 `src/test/resources/svg/shields-release.svg`，
 当前不支持完整 SVG 规范。限制包括：
 
 - 不执行脚本和事件处理器；foreignObject 仅支持上述有界 XHTML 子集，不支持完整 HTML/CSS 或浏览器行为。声明式动画的支持范围见上文。
-- 不支持 feBlend/feColorMatrix/feConvolveMatrix 等未列出的滤镜原语、滤镜模板和 filterRes；radialGradient 的 gradientTransform 和非零 fr 仍未实现。vector-effect 目前只支持 none/non-scaling-stroke；SVG 逆向导出后置。
+- 不支持 feConvolveMatrix 等未列出的滤镜原语、滤镜模板和 filterRes；radialGradient 的 gradientTransform 和非零 fr 仍未实现。vector-effect 目前只支持 none/non-scaling-stroke；SVG 逆向导出后置。
 - SVG 内部 CSS 不支持子/兄弟/属性/伪类选择器、CSS 变量和条件规则；支持 @keyframes、显式授权的无条件 @import。应用侧 JavaFX CSS 按 JavaFX 自身规则处理。
 - 不支持逐字位置列表、复杂排版或嵌入字体；tspan 的组合限制见文本说明，文本外观依赖系统字体。
 - 默认不自动加载外部资源；image 与样式表可通过资源解析器显式启用。use/gradient/clipPath 的跨文档引用仍不支持。load(URL) 打开调用方明确提供的顶层地址。
@@ -602,7 +602,7 @@ renderCacheEnabled 默认 true，静态文档及仅旋转/平移/路径运动的
 
 ### 可组合滤镜与资源限制
 
-`feFlood`、`feComposite`、`feMerge/feMergeNode`、`feTurbulence`、`feDisplacementMap`、`feMorphology` 可与 `feGaussianBlur`、`feOffset`、`feDropShadow` 按文档顺序组合。支持 `in/in2/result`、隐式前一结果、`SourceGraphic/SourceAlpha`；重复命名引用最近的前序结果，缺失或前向结果名按省略输入处理。空 filter/feMerge 输出透明。BackgroundImage/BackgroundAlpha/FillPaint/StrokePaint 会明确诊断，不以近似输入代替。
+`feFlood`、`feComposite`、`feMerge/feMergeNode`、`feTurbulence`、`feDisplacementMap`、`feMorphology`、`feColorMatrix`、`feBlend` 可与 `feGaussianBlur`、`feOffset`、`feDropShadow` 按文档顺序组合。支持 `in/in2/result`、隐式前一结果、`SourceGraphic/SourceAlpha`；重复命名引用最近的前序结果，缺失或前向结果名按省略输入处理。空 filter/feMerge 输出透明。BackgroundImage/BackgroundAlpha/FillPaint/StrokePaint 会明确诊断，不以近似输入代替。
 
 ```xml
 <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -670,3 +670,14 @@ Path/URL 加载自动记录来源，支持继承的 xml:base；每个外部 CSS 
 当前仅支持 UTF-8 CSS（可带 BOM 或开头 UTF-8 @charset）、无条件/all import；media 条件、layer/supports、CSS URL 转义、命名/备用 xml-stylesheet、外部 SVG 图片会明确诊断。外部 use、字体、渐变、clipPath 及 CSS url() 跨文档绘制资源尚未实现。XML DTD/外部实体仍始终禁用，资源解析器不能开启它们。
 
 新增 SvgOptions 参数保持既有 Java 重载和 Kotlin 源码调用方式，但 Kotlin data class 的二进制构造/copy 描述符有变化；升级后请重新编译依赖本库的 Kotlin 调用方。
+
+
+### 颜色矩阵与图层混合
+
+`feColorMatrix` 支持 `matrix`（20 个数、默认单位矩阵）、`saturate`（默认 1，支持有限负值及大于 1 的增强饱和度）、`hueRotate`（角度默认 0）以及 `luminanceToAlpha`（忽略 values，输出黑色 RGB 与亮度 alpha）。矩阵作用于非预乘 RGBA，逐通道裁剪到 [0,1] 后重新预乘，透明输入按透明黑处理；因此带常数偏移的矩阵可以在透明输入处产生颜色/不透明度，但仍受原语子区域限制。色相旋转角度支持有限大数的周期归约。有效数字列表的项数不匹配时，按当前 Filter Effects 1 规范执行直通；非法数字、未知类型仍会诊断。luminanceToAlpha 使用当前规范的 .2126/.7152/.0722 系数。
+
+`feBlend` 支持 SVG 1.1 的五种模式：`normal`（默认）、`multiply`、`screen`、`darken`、`lighten`，在预乘 alpha 下合成，`in` 是前景、`in2` 是背景。未实现 no-composite 属性或 overlay、color-dodge、soft-light、hue 等扩展混合模式；这些值会明确诊断，不静默替换成 normal。
+
+两者使用已有 `in/in2/result`、隐式输入、命名结果、`SourceGraphic/SourceAlpha`、子区域和 `color-interpolation-filters` 流程；默认 linearRGB，可显式选择 sRGB。新算子分配与运算也计入已有像素及视图总工作量上限，不提高预算。滤镜动画、背景输入与外部资源边界保持不变。
+
+语义参考：[颜色矩阵](https://www.w3.org/TR/filter-effects-1/#feColorMatrixElement)、[混合](https://www.w3.org/TR/SVG11/filters.html#feBlendElement)。样例见 `src/test/resources/svg/color-blend-filters.svg`。

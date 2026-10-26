@@ -74,6 +74,37 @@ internal class SvgPaints(private val document: SvgDocument, private val styles: 
         return GradientDefinition(attrs, chain.first().name == "linearGradient", stops)
     }
 
+    fun rasterRadial(id: String): Boolean {
+        val d = gradients.getOrPut(id) { gradientDefinition(id) }
+        if(d.linear || d.sourceStops.size<=1) return false
+        val a=d.attrs
+        // Keep the common implicit-centered sRGB fast path. An explicit focus may cross
+        // the end circle as a viewport changes, so never select a static native clamp.
+        return !d.transform.isIdentity || a.containsKey("fx") || a.containsKey("fy") ||
+            (a["fr"]?.let { document.lengths.resolve(it,1.0) } ?: 0.0)!=0.0 ||
+            computed(document.elementsById.getValue(id))["color-interpolation"]=="linearRGB"
+    }
+
+    fun radial(id: String, opacity: Double, viewport: SvgViewport, bounds: Bounds): SvgRadialSampler {
+        val d = gradients.getOrPut(id) { gradientDefinition(id) }
+        val a = d.attrs
+        val proportional = when(a["gradientUnits"] ?: "objectBoundingBox") {
+            "objectBoundingBox" -> true; "userSpaceOnUse" -> false
+            else -> throw SvgException("Invalid gradientUnits")
+        }
+        fun c(name: String, fallback: String, reference: Double) = document.lengths.resolve(a[name] ?: fallback, if (proportional) 1.0 else reference)
+        val mapping = if (proportional) Affine(bounds.width,0.0,bounds.minX,0.0,bounds.height,bounds.minY) else Affine()
+        mapping.append(d.transform)
+        val r = c("r","50%",viewport.diagonal); val fr = c("fr","0",viewport.diagonal)
+        require(r >= 0.0 && fr >= 0.0) { "Negative radial gradient radius" }
+        val spread = a["spreadMethod"] ?: "pad"
+        require(spread in setOf("pad","repeat","reflect")) { "Invalid spreadMethod" }
+        val element = document.elementsById.getValue(id)
+        return SvgRadialSampler(svgPaintInverse(mapping), c("cx","50%",viewport.width),c("cy","50%",viewport.height),r,
+            c("fx",a["cx"] ?: "50%",viewport.width),c("fy",a["cy"] ?: "50%",viewport.height),fr,
+            spread,d.stops(opacity),computed(element)["color-interpolation"] == "linearRGB")
+    }
+
     fun gradient(id: String, opacity: Double, viewport: SvgViewport, bounds: Bounds): Paint {
         val definition = gradients.getOrPut(id) { gradientDefinition(id) }
         val attrs = definition.attrs

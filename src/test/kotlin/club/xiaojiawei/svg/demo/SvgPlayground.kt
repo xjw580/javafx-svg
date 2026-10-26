@@ -155,7 +155,7 @@ internal class SvgPlayground(private val original: String) : BorderPane(), AutoC
 
     private companion object {
         val PARTIAL_PREVIEW_DIAGNOSTICS = setOf(
-            "Unsupported filter primitive: feConvolveMatrix",
+            "Unsupported filter primitive: feUnsupported",
             "Unsupported foreignObject element: {http://www.w3.org/1999/xhtml}p"
         )
     }

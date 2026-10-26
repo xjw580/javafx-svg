@@ -136,7 +136,7 @@ class SvgColorBlendRenderingTest {
         }
     }
     @Test fun malformedParametersAndUnsupportedModesProduceStrictDiagnostics()=FxTest.run {
-        val invalid=listOf("<feColorMatrix type='unknown'/>","<feColorMatrix values='oops'/>","<feColorMatrix type='saturate' values='NaN'/>","<feColorMatrix type='saturate' values='1 nope'/>","<feColorMatrix type='hueRotate' values='90deg'/>","<feBlend mode='overlay'/>","<feBlend no-composite='true'/>","<feBlend mode='Multiply'/>","<feBlend in2='BackgroundImage'/>","<feColorMatrix><animate attributeName='values' values='0;1'/></feColorMatrix>")
+        val invalid=listOf("<feColorMatrix type='unknown'/>","<feColorMatrix values='oops'/>","<feColorMatrix type='saturate' values='NaN'/>","<feColorMatrix type='saturate' values='1 nope'/>","<feColorMatrix type='hueRotate' values='90deg'/>","<feBlend mode='unsupported'/>","<feBlend no-composite='true'/>","<feBlend mode='Multiply'/>","<feBlend in2='BackgroundImage'/>","<feColorMatrix><animate attributeName='values' values='0;1'/></feColorMatrix>")
         for(p in invalid)assertFailsWith<SvgException>(p){image(view(p))}
     }
     @Test fun pixelBudgetClearsFailedOutputAndDocumentReplacementRecovers()=FxTest.run {

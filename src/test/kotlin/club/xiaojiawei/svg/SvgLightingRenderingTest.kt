@@ -152,7 +152,7 @@ class SvgLightingRenderingTest {
             specular("specularExponent='129'"),diffuse("surfaceScale='NaN'"),diffuse("kernelUnitLength='1 2 3'"),
             diffuse(light="<fePointLight x='1px'/>"),diffuse(light="<feSpotLight specularExponent='-1'/>"),
             diffuse(light="<feSpotLight limitingConeAngle='NaN'/>"),diffuse(light="<feDistantLight><animate attributeName='elevation' values='0;90' dur='1s'/></feDistantLight>"),
-            "<feDiffuseLighting><animate attributeName='surfaceScale' values='1;2' dur='1s'/><feDistantLight/></feDiffuseLighting>")
+            "<feDiffuseLighting><animate attributeName='kernelUnitLength' values='1;2' dur='1s'/><feDistantLight/></feDiffuseLighting>")
         for (p in invalid) assertFailsWith<SvgException>(p) { image(view(p)) }
     }
 

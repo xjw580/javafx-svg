@@ -98,7 +98,7 @@ class SvgFilterColorBlendTest {
         assertEquals("normal",SvgFilterColorBlend.blendMode(element("<feBlend/>")))
         for (mode in SvgFilterColorBlend.BLEND_MODES)
             assertEquals(mode,SvgFilterColorBlend.blendMode(element("<feBlend mode='$mode'/>")))
-        for (mode in listOf("overlay","NORMAL","")) assertFailsWith<IllegalArgumentException> {
+        for (mode in listOf("unsupported","NORMAL","")) assertFailsWith<IllegalArgumentException> {
             SvgFilterColorBlend.blendMode(element("<feBlend mode='$mode'/>"))
         }
     }
@@ -115,7 +115,7 @@ class SvgFilterColorBlendTest {
         repeat(250) {
             val a=DoubleArray(4){random.nextDouble()};val b=DoubleArray(4){random.nextDouble()}
             val source=pixel(a[0],a[1],a[2],a[3]);val dest=pixel(b[0],b[1],b[2],b[3])
-            for (mode in SvgFilterColorBlend.BLEND_MODES) {
+            for (mode in listOf("normal","multiply","screen","darken","lighten")) {
                 val output=source.blend(dest,mode)
                 val expected=DoubleArray(4);expected[3]=a[3]+b[3]-a[3]*b[3]
                 for (c in 0..2) {
@@ -142,7 +142,7 @@ class SvgFilterColorBlendTest {
     @Test fun blendRejectsDimensionMismatchAndUnknownMode() {
         val p=pixel(.2,.3,.4)
         assertFailsWith<IllegalArgumentException> { p.blend(SvgFilterPixels(2,1,false),"normal") }
-        assertFailsWith<IllegalArgumentException> { p.blend(p,"overlay") }
+        assertFailsWith<IllegalArgumentException> { p.blend(p,"unsupported") }
     }
     @Test fun fullImageDimensionsAreRetained() {
         val p=SvgFilterPixels(4,3,false)

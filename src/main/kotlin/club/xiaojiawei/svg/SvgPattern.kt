@@ -18,22 +18,23 @@ import javafx.scene.transform.Scale
 import kotlin.math.ceil
 import kotlin.math.hypot
 import kotlin.math.max
+import kotlin.math.floor
 
 internal class SvgPatternBudget(private val limit: Int) {
-    private val sizes = java.util.IdentityHashMap<SvgPattern, Long>()
+    private val sizes = java.util.IdentityHashMap<Any, Long>()
     private var used = 0L
-    fun reserve(owner: SvgPattern, pixels: Long) {
+    fun reserve(owner: Any, pixels: Long) {
         val next = used - (sizes[owner] ?: 0) + pixels
         require(next <= limit) { "SVG patterns exceed maxPatternPixels ($limit)" }
         sizes[owner] = pixels; used = next
     }
-    fun release(owner: SvgPattern) { used -= sizes.remove(owner) ?: 0 }
+    fun release(owner: Any) { used -= sizes.remove(owner) ?: 0 }
 }
 
 /** Per-target paint server. Only the tile and the current target raster are retained. */
 internal class SvgPattern(
     private val target: Node, val definition: SvgElement, private val viewport: SvgViewport,
-    private val lengths: SvgLengthCache, private val budget: SvgPatternBudget,
+    private val lengths: SvgLengthCache, private val budget: SvgPatternBudget, private val overflow: String = "hidden",
     private val invalidateRenderer: () -> Unit
 ) {
     val content = Group()
@@ -49,6 +50,7 @@ internal class SvgPattern(
     private var refreshing = false
     private var previous: List<Double>? = null
     private var cached: Paint = Color.TRANSPARENT
+    private var retainedPixels=0L
     private val changed = InvalidationListener { observable ->
         (observable as? ObservableValue<*>)?.value
         if (!refreshing) { dirty = true; invalidateRenderer() }
@@ -59,7 +61,10 @@ internal class SvgPattern(
         if (!refreshing) invalidateRenderer()
     }
 
-    init { target.localToSceneTransformProperty().addListener(scaleChanged) }
+    init {
+        require(overflow in setOf("visible", "hidden", "scroll", "auto")) { "Invalid pattern overflow" }
+        target.localToSceneTransformProperty().addListener(scaleChanged)
+    }
 
     fun observe() {
         fun visit(node: Node) {
@@ -100,13 +105,13 @@ internal class SvgPattern(
             val w = coordinate("width",true); val h = coordinate("height",false)
             require(w >= 0 && h >= 0) { "Negative pattern dimensions" }
             if (w == 0.0 || h == 0.0 || bounds.width <= 0 || bounds.height <= 0 || sx == 0.0 || sy == 0.0) {
-                budget.release(this); previous=null; cached=Color.TRANSPARENT; return cached
+                budget.release(this); previous=null; cached=Color.TRANSPARENT; retainedPixels=0; return cached
             }
             val transform = SvgTransforms.parse(definition["patternTransform"])
             val mapping = if (proportional) Affine(bounds.width,0.0,bounds.minX,0.0,bounds.height,bounds.minY).apply {
                 append(transform); append(Affine(1/bounds.width,0.0,-bounds.minX/bounds.width,0.0,1/bounds.height,-bounds.minY/bounds.height))
             } else transform
-            val inverse = mapping.createInverse()
+            val inverse = svgPaintInverse(mapping)
             val extra = if (target is Shape && target.stroke != null) target.strokeWidth * max(1.0,target.strokeMiterLimit) else 0.0
             val left=bounds.minX-extra; val top=bounds.minY-extra
             val width=bounds.width+2*extra; val height=bounds.height+2*extra
@@ -115,14 +120,38 @@ internal class SvgPattern(
             require(listOf(tw,th,pw,ph).all { it.isFinite() && it in 1.0..4096.0 }) { "SVG pattern raster exceeds 4096 pixels per axis" }
             val key=listOf(x,y,w,h,left,top,width,height,tw,th,pw,ph,opacity,bounds.width,bounds.height)
             if (!dirty && previous == key) return cached
-            budget.reserve(this,tw.toLong()*th.toLong()+pw.toLong()*ph.toLong())
+            budget.reserve(this,retainedPixels+2*tw.toLong()*th.toLong()+2*pw.toLong()*ph.toLong())
             if (box != null) contentMapping.setToTransform(box.transform(w,h,definition["preserveAspectRatio"]))
             else if (proportionalContent) contentMapping.setToTransform(bounds.width,0.0,0.0,0.0,bounds.height,0.0)
             else contentMapping.setToIdentity()
-            val tile=mapped.snapshot(SnapshotParameters().apply {
+            val tile=if (overflow != "visible") mapped.snapshot(SnapshotParameters().apply {
                 fill=Color.TRANSPARENT; this.transform=Scale(tw/w,th/h)
                 this.viewport=Rectangle2D(0.0,0.0,tw,th)
-            },null)
+            },null) else {
+                val cb=mapped.boundsInParent
+                val rx=tw/w; val ry=th/h
+                val bx=floor(cb.minX*rx)/rx; val by=floor(cb.minY*ry)/ry
+                val cw=ceil(cb.maxX*rx)-floor(cb.minX*rx); val ch=ceil(cb.maxY*ry)-floor(cb.minY*ry)
+                val tileCanvas=Canvas(tw,th)
+                if(cw>0 && ch>0) {
+                    require(cw.isFinite() && ch.isFinite() && cw<=4096 && ch<=4096) { "SVG pattern overflow raster exceeds 4096 pixels per axis" }
+                    val firstX=floor(-cb.maxX/w)+1; val lastX=ceil((w-cb.minX)/w)-1
+                    val firstY=floor(-cb.maxY/h)+1; val lastY=ceil((h-cb.minY)/h)-1
+                    val copies=(lastX-firstX+1).coerceAtLeast(0.0)*(lastY-firstY+1).coerceAtLeast(0.0)
+                    require(listOf(firstX,lastX,firstY,lastY).all { it.isFinite() && it in Int.MIN_VALUE.toDouble()..Int.MAX_VALUE.toDouble() } &&
+                        copies<=4096 && copies*tw*th<=16_000_000) { "SVG pattern overflow exceeds bounded tile work" }
+                    budget.reserve(this,retainedPixels+2*tw.toLong()*th.toLong()+2*pw.toLong()*ph.toLong()+cw.toLong()*ch.toLong())
+                    val source=mapped.snapshot(SnapshotParameters().apply {
+                        fill=Color.TRANSPARENT; this.transform=Scale(rx,ry)
+                        this.viewport=Rectangle2D(bx*rx,by*ry,cw,ch)
+                    },null)
+                    val tgc=tileCanvas.graphicsContext2D
+                    tgc.scale(rx,ry)
+                    for(j in firstY.toInt()..lastY.toInt()) for(i in firstX.toInt()..lastX.toInt())
+                        tgc.drawImage(source,bx+i*w,by+j*h,cw/rx,ch/ry)
+                }
+                tileCanvas.snapshot(SnapshotParameters().apply { fill=Color.TRANSPARENT },null)
+            }
             val canvas=Canvas(pw,ph)
             val gc=canvas.graphicsContext2D
             gc.globalAlpha=opacity
@@ -133,9 +162,11 @@ internal class SvgPattern(
             gc.fillRect(cover.minX,cover.minY,cover.width,cover.height)
             val image=canvas.snapshot(SnapshotParameters().apply { fill=Color.TRANSPARENT },null)
             cached=ImagePattern(image,left,top,width,height,false)
+            retainedPixels=pw.toLong()*ph.toLong()
+            budget.reserve(this,retainedPixels)
             previous=key; dirty=false
             return cached
-        } finally { refreshing=false }
+        } finally { budget.reserve(this,retainedPixels); refreshing=false }
     }
     private fun units(value: String) = when(value) {
         "objectBoundingBox" -> true

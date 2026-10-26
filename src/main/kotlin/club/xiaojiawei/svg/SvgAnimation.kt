@@ -20,7 +20,8 @@ internal class SvgAnimation private constructor(
     private val by: Boolean,
     private val times: List<Double>,
     private val splines: List<DoubleArray>,
-    val order: Int
+    val order: Int,
+    private val filterValues: Boolean = false
 ) {
     val needsBase: Boolean get() = raw.size == 1
     val end: Double = (begin + duration * repeats).also {
@@ -43,7 +44,7 @@ internal class SvgAnimation private constructor(
     sealed interface Value {
         data class Number(val value: Double) : Value { init { require(value.isFinite()) { "Non-finite animated number" } } }
         data class Colour(val value: Color) : Value
-        data class Vector(val value: DoubleArray) : Value
+        data class Vector(val value: DoubleArray) : Value { init { require(value.all { it.isFinite() }) { "Non-finite animated vector" } } }
     }
 
     /** A per-instance curve; resolves only original lengths against the current viewport. */
@@ -52,7 +53,8 @@ internal class SvgAnimation private constructor(
         private val colours = if (attribute in COLOURS) raw.map {
             if (it == "currentColor") requireNotNull(baseColour) { "Animation currentColor has no colour" } else Color.web(it)
         } else emptyList()
-        private val vectors = if (transformType != null) raw.map { vector(it, transformType) } else emptyList()
+        private val vectors = if (transformType != null) raw.map { vector(it, transformType) }
+            else if (attribute in FILTER_VECTORS) raw.map { filterVector(it) } else emptyList()
         // Constant colour/vector endpoints and key positions do not depend on the current viewport.
         private val fixedValues: List<Value> = if (colours.isNotEmpty()) colours.map { Value.Colour(it) }
             else vectors.map { Value.Vector(it) }
@@ -63,14 +65,17 @@ internal class SvgAnimation private constructor(
 
 
         init {
-            if (attribute in setOf("opacity", "fill-opacity", "stroke-opacity")) {
+            if (attribute in setOf("opacity", "fill-opacity", "stroke-opacity") || (filterValues && attribute in NUMBERS)) {
                 require(raw.all { Regex("[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?").matches(it) }) {
-                    "Opacity animation requires unitless numbers"
+                    "Animation requires unitless numbers for $attribute"
                 }
             }
             if (attribute in NONNEGATIVE && !by) require(numbers.all { it.resolve(1.0) >= 0 }) { "Negative animated size: $attribute" }
             require(!by || attribute !in COLOURS) { "Colour by-animation is unsupported" }
         }
+
+        fun validationSamples(reference: Double, underlying: Value?): List<Value> =
+            (knots + listOf(0.0, 1.0)).distinct().map { sample(it, reference, underlying) }
 
         fun sample(progress: Double, reference: Double, underlying: Value?): Value {
             val values = if (numbers.isNotEmpty()) numbers.map { Value.Number(it.resolve(reference)) } else fixedValues
@@ -96,6 +101,7 @@ internal class SvgAnimation private constructor(
 
         private fun zero(): Value = when {
             attribute in NUMBERS -> Value.Number(0.0)
+            attribute in FILTER_VECTORS -> Value.Vector(doubleArrayOf(0.0, 0.0))
             transformType != null -> Value.Vector(when (transformType) {
                 "scale" -> doubleArrayOf(1.0, 1.0)
                 "rotate" -> doubleArrayOf(0.0, 0.0, 0.0)
@@ -125,15 +131,18 @@ internal class SvgAnimation private constructor(
         private val NONNEGATIVE = setOf("stroke-width", "r", "rx", "ry", "width", "height")
         val STYLE_NUMBERS = setOf("opacity", "fill-opacity", "stroke-opacity", "stroke-width", "stroke-dashoffset")
         val GEOMETRY = SvgAnimatedGeometry.attributes.values.flatten().toSet()
-        val NUMBERS = STYLE_NUMBERS + GEOMETRY
-        val COLOURS = setOf("fill", "stroke", "color")
+        val FILTER_NUMBERS = setOf("scale", "surfaceScale", "diffuseConstant", "specularConstant", "specularExponent", "flood-opacity")
+        val FILTER_VECTORS = setOf("stdDeviation", "radius")
+        val FILTER_COLOURS = setOf("flood-color", "lighting-color")
+        val NUMBERS = STYLE_NUMBERS + GEOMETRY + FILTER_NUMBERS
+        val COLOURS = setOf("fill", "stroke", "color") + FILTER_COLOURS
         val TARGETS = setOf("svg", "g", "a", "use", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "text", "tspan", "image")
         private val clock = Regex("([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))(h|min|s|ms)?")
 
-        fun parse(element: SvgElement, order: Int): SvgAnimation {
+        fun parse(element: SvgElement, order: Int, filterValues: Boolean = false): SvgAnimation {
             val attribute = element["attributeName"] ?: throw SvgException("Animation requires attributeName")
             val type = if (element.name == "animateTransform") element["type"] ?: throw SvgException("animateTransform requires type") else null
-            require(if (type == null) attribute in NUMBERS + COLOURS else attribute == "transform") { "Unsupported animated attribute: $attribute" }
+            require(if (type == null) attribute in NUMBERS + COLOURS + FILTER_VECTORS else attribute == "transform") { "Unsupported animated attribute: $attribute" }
             require(type == null || type in setOf("translate", "scale", "rotate", "skewX", "skewY")) { "Unsupported animation transform: $type" }
             require(element["attributeType"] in setOf(null, "auto", "XML", "CSS")) { "Invalid animation attributeType" }
             require(type == null || element["attributeType"] != "CSS") { "animateTransform requires an XML transform" }
@@ -175,7 +184,7 @@ internal class SvgAnimation private constructor(
             }
             require(mode == "spline" || splines.isEmpty()) { "keySplines requires calcMode=spline" }
             return SvgAnimation(element, attribute, type, begin, duration, repeats, fill == "freeze", additive == "sum",
-                mode, raw, by, times, splines, order)
+                mode, raw, by, times, splines, order, filterValues)
         }
 
         fun time(text: String): Double {
@@ -194,6 +203,12 @@ internal class SvgAnimation private constructor(
             return (match.groupValues[1].toDouble() * when (match.groupValues[2]) {
                 "h" -> 3_600.0; "min" -> 60.0; "ms" -> .001; else -> 1.0
             }).also { require(it.isFinite()) { "Non-finite animation time" } }
+        }
+
+        fun filterVector(text: String): DoubleArray {
+            val values = SvgNumbers.list(text)
+            require(values.size in 1..2) { "Filter animation needs one or two numbers" }
+            return doubleArrayOf(values[0], values.getOrElse(1) { values[0] })
         }
 
         private fun vector(text: String, type: String): DoubleArray {

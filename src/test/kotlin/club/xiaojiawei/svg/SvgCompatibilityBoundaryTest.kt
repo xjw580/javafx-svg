@@ -96,12 +96,12 @@ class SvgCompatibilityBoundaryTest {
     }
 
     @Test fun genuinelyUnsupportedPrimitivesStillDiagnoseAndFailStrictMode() = FxTest.run {
-        val source = """<svg width="640" height="360"><defs><filter id="f"><feConvolveMatrix/></filter></defs>
+        val source = """<svg width="640" height="360"><defs><filter id="f"><feUnsupported/></filter></defs>
             <rect width="640" height="360" fill="red" filter="url(#f)"/></svg>"""
         val view = SvgView.parse(source)
         try {
             assertEquals(Color.RED, snapshot(view).pixelReader.getColor(100, 100))
-            assertTrue(view.diagnostics.any { it.message == "Unsupported filter primitive: feConvolveMatrix" })
+            assertTrue(view.diagnostics.any { it.message == "Unsupported filter primitive: feUnsupported" })
             assertFailsWith<SvgException> { SvgView.parse(source, SvgOptions(strict = true)) }
         } finally { view.source = null }
     }

@@ -14,18 +14,20 @@ internal sealed interface SvgLightingLight {
 }
 
 /** Fixed work charge: eight alpha neighbours and normal/light arithmetic; explicit cones add four AA samples. */
-internal fun SvgFilterPixels.lightingWork(light: SvgLightingLight? = null): Long =
-    width.toLong() * height * if (light is SvgLightingLight.Spot && light.coneAngle != null) 320L else 160L
+internal fun SvgFilterPixels.lightingWork(light: SvgLightingLight? = null, grid: SvgFilterGridPlan? = null): Long =
+    (grid?.gridPixels ?: (width.toLong() * height)) *
+        (if (light is SvgLightingLight.Spot && light.coneAngle != null) 320L else 160L) + (grid?.resampleWork ?: 0L)
 
 /**
  * SVG Sobel/Phong lighting: https://www.w3.org/TR/filter-effects-1/#feDiffuseLightingElement
  * and https://www.w3.org/TR/filter-effects-1/#feSpecularLightingElement .
  * Only input alpha is read. [originX]/[originY] locate the first pixel center; steps and kernel
- * spacings are in resolved surface coordinates, not device pixels. Explicit kernel spacing is sampled
- * bilinearly without allocating an intermediate bitmap. The nine edge kernels are expressed as
+ * spacings are in resolved surface coordinates, not device pixels. Explicit kernel spacing first
+ * resamples the input onto its implicit grid, shades that grid, then resamples the light map back. The nine edge kernels are expressed as
  * separable differences and smoothing weights, with the specification's normalization factors.
  * [edgeMinX]/[edgeMinY]/[edgeMaxX]/[edgeMaxY] delimit coincident input/output edges
- * for missing-neighbour kernels only; they never crop or extend the sampled alpha bitmap.
+ * for missing-neighbour kernels and duplicate-edge interpolation on an explicit grid.
+ * Expanded output regions keep their transparent padding instead of clamping to a smaller input.
  * A one-pixel dimension has zero derivative on that axis (no invented transparent neighbours).
  * Returned RGB is already premultiplied: specular alpha is max(R,G,B), not another multiplier.
  */
@@ -63,6 +65,25 @@ internal fun SvgFilterPixels.lighting(
     val kx = kernelX / stepX
     val ky = kernelY / stepY
     require(kx.isFinite() && ky.isFinite() && kx > 0.0 && ky > 0.0) { "Invalid lighting kernel spacing" }
+    val grid = SvgFilterGridPlan(width, height, kx, ky)
+    require(lightingWork(light, grid) <= 200_000_000L) { "Lighting filter exceeds the 200000000 operation work limit" }
+    if (!grid.identity && width > 0 && height > 0) {
+        // Integer edge indices describe pixel footprints, hence floor(start)/ceil(end) mapping.
+        fun lo(edge: Int, scale: Double, size: Int) = floor(edge / scale).toInt().coerceIn(0, size)
+        fun hi(edge: Int, scale: Double, size: Int) = (ceil((edge + 1) / scale).toInt() - 1).coerceIn(-1, size - 1)
+        val nextOriginX = originX + (kernelX - stepX) * .5
+        val nextOriginY = originY + (kernelY - stepY) * .5
+        require(nextOriginX.isFinite() && nextOriginY.isFinite()) { "Non-finite lighting grid origin" }
+        // Coincident input/output edges delimit the actual height-map footprint. Duplicate
+        // those boundary pixels during resampling, otherwise fractional cells invent a bevel
+        // from transparent padding outside the input. Expanded output edges retain full bounds.
+        val resampled = grid.input(this, edgeMinX, edgeMinY, edgeMaxX, edgeMaxY)
+        val shaded = resampled.lighting(specular, surfaceScale, constant, exponent, color, outputLinear,
+            light, nextOriginX, nextOriginY, kernelX, kernelY, kernelX, kernelY,
+            lo(edgeMinX, kx, grid.gridWidth), lo(edgeMinY, ky, grid.gridHeight),
+            hi(edgeMaxX, kx, grid.gridWidth), hi(edgeMaxY, ky, grid.gridHeight))
+        return grid.output(shaded)
+    }
     val distant: LightingVector?
     val spotDirection: LightingVector?
     when (light) {

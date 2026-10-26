@@ -91,7 +91,7 @@ object SvgLoader {
                 }
                 // Detect resource work during the existing DOM walk. xml:base must be included even
                 // without an image or stylesheet: invalid bases still produce diagnostics.
-                if (element.localName == "style" || element.localName == "image" || attrs.containsKey("xml:base")) {
+                if (element.localName == "style" || element.localName == "image" || element.localName == "feImage" || attrs.containsKey("xml:base")) {
                     hasResourceFeatures = true
                 }
                 val children = mutableListOf<SvgElement>()

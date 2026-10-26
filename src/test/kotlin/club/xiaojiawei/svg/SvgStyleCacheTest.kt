@@ -77,7 +77,7 @@ class SvgStyleCacheTest {
 
     @Test fun sharedDocumentKeepsUseInstancesAndJavaFxCssIndependent() = FxTest.run {
         val doc = SvgLoader.parse("""<svg viewBox="0 0 40 20"><style>
-            .red .part { fill: red } .blue .part { fill: blue }
+            .red { fill: red } .blue { fill: blue }
             </style><defs><symbol id="symbol" viewBox="0 0 10 10" style="stroke: inherit">
             <path id="p" class="part" d="M0 0L10 10" style="stroke-width: 2"/></symbol></defs>
             <use id="a" class="red" href="#symbol" width="10" height="10" stroke="green"/>

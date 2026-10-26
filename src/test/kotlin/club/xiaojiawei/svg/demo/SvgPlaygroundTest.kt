@@ -175,9 +175,9 @@ class SvgPlaygroundTest {
             }
             await(ready)
             for ((xml, warning) in listOf(
-                """<svg viewBox="0 0 100 100"><defs><filter id="f"><feConvolveMatrix/></filter></defs>
+                """<svg viewBox="0 0 100 100"><defs><filter id="f"><feUnsupported/></filter></defs>
                     <circle id="p" cx="50" cy="50" r="30" fill="red" filter="url(#f)"/></svg>""" to
-                    "Unsupported filter primitive: feConvolveMatrix",
+                    "Unsupported filter primitive: feUnsupported",
                 """<svg viewBox="0 0 100 100"><circle id="p" cx="50" cy="50" r="30" fill="red"/>
                     <foreignObject width="100" height="100"><p xmlns="http://www.w3.org/1999/xhtml">Unsupported paragraph</p>
                     </foreignObject></svg>""" to "Unsupported foreignObject element: {http://www.w3.org/1999/xhtml}p"

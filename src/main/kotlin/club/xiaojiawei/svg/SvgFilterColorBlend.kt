@@ -8,7 +8,9 @@ import kotlin.math.sin
 
 /** SVG color-matrix parameters; calculations follow Filter Effects 1 section 9.6. */
 internal object SvgFilterColorBlend {
-    val BLEND_MODES = setOf("normal", "multiply", "screen", "darken", "lighten")
+    val BLEND_MODES = setOf("normal", "multiply", "screen", "darken", "lighten",
+        "overlay", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion",
+        "hue", "saturation", "color", "luminosity")
 
     fun blendMode(primitive: SvgElement): String = (primitive["mode"] ?: "normal").also {
         require(it in BLEND_MODES) { "Unsupported feBlend mode: $it" }
@@ -94,8 +96,17 @@ internal fun SvgFilterPixels.blend(other: SvgFilterPixels, mode: String): SvgFil
     require(mode in SvgFilterColorBlend.BLEND_MODES) { "Unsupported feBlend mode: $mode" }
     val backdrop = other.converted(linear).data
     val result = SvgFilterPixels(width, height, linear)
+    val sourceColor = DoubleArray(3); val backdropColor = DoubleArray(3); val mixed = DoubleArray(3)
+    val extended = mode !in setOf("normal", "multiply", "screen", "darken", "lighten")
     for (i in data.indices step 4) {
         val a = data[i+3].toDouble(); val b = backdrop[i+3].toDouble()
+        if (extended) {
+            for (c in 0..2) {
+                sourceColor[c] = if (a > 0) (data[i+c]/a).coerceIn(0.0,1.0) else 0.0
+                backdropColor[c] = if (b > 0) (backdrop[i+c]/b).coerceIn(0.0,1.0) else 0.0
+            }
+            svgBlendStraight(backdropColor, sourceColor, mode, mixed)
+        }
         val alpha = (a+b-a*b).coerceIn(0.0,1.0)
         result.data[i+3] = alpha.toFloat()
         for (c in 0..2) {
@@ -107,7 +118,8 @@ internal fun SvgFilterPixels.blend(other: SvgFilterPixels, mode: String): SvgFil
                 "multiply" -> (1-a)*cb+(1-b)*ca+ca*cb
                 "screen" -> ca+cb-ca*cb
                 "darken" -> min(sourceOver,backdropOver)
-                else -> max(sourceOver,backdropOver)
+                "lighten" -> max(sourceOver,backdropOver)
+                else -> (1-a)*cb+(1-b)*ca+a*b*mixed[c]
             }
             result.data[i+c] = color.coerceIn(0.0,alpha).toFloat()
         }

@@ -13,9 +13,14 @@ internal class SvgStyleSheet private constructor(
     data class Keyframe(val offset: Double, val declarations: List<Declaration>)
     data class Keyframes(val frames: List<Keyframe>)
     data class Declaration(val name: String, val value: String, val important: Boolean)
-    data class Compound(val type: String?, val ids: List<String>, val classes: List<String>)
+    data class Attribute(val name: String, val operator: String?, val value: String?)
+    data class Compound(val type: String?, val ids: List<String>, val classes: List<String>,
+        val attributes: List<Attribute> = emptyList(), val combinator: Char = ' ')
+    data class Specificity(val level: Int, val ids: Int = 0, val classes: Int = 0, val types: Int = 0) : Comparable<Specificity> {
+        override fun compareTo(other: Specificity): Int = compareValuesBy(this, other, { it.level }, { it.ids }, { it.classes }, { it.types })
+    }
     data class Rule(
-        val selector: List<Compound>, val declarations: List<Declaration>, val specificity: Int, val order: Int
+        val selector: List<Compound>, val declarations: List<Declaration>, val specificity: Specificity, val order: Int
     )
     private data class ParsedDeclarations(val values: List<Declaration>, val issues: List<String>)
 
@@ -86,21 +91,12 @@ internal class SvgStyleSheet private constructor(
                 parsed.issues.forEach { report(it, element) }
                 val declarations = parsed.values
                 for (selector in SvgCssSyntax.split(block.header)) {
-                    val parts = selector.trim().split(whitespace)
-                    if (parts.any { it.isEmpty() || !compound.matches(it) }) {
+                    val compiled = try { SvgCssSelectors.parse(selector) } catch (e: IllegalArgumentException) {
                         report("Unsupported CSS selector: ${selector.trim()}", element)
                         continue
                     }
-                    val specificity = parts.sumOf {
-                        it.count { c -> c == '#' } * 10000 + it.count { c -> c == '.' } * 100 +
-                            if (it.first() !in ".#*") 1 else 0
-                    }
-                    val compiled = parts.map { part ->
-                        val type = part.takeWhile { it != '.' && it != '#' }.takeUnless { it.isEmpty() || it == "*" }
-                        val tokens = selectorTokens.findAll(part).toList()
-                        Compound(type, tokens.filter { it.groupValues[1] == "#" }.map { it.groupValues[2] },
-                            tokens.filter { it.groupValues[1] == "." }.map { it.groupValues[2] })
-                    }
+                    val specificity = Specificity(1, compiled.sumOf { it.ids.size },
+                        compiled.sumOf { it.classes.size + it.attributes.size }, compiled.count { it.type != null })
                     val rule = Rule(compiled, declarations, specificity, ruleOrder++)
                     val last = compiled.last()
                     // Index each rule once; still check the entire compound and its ancestors when matching.

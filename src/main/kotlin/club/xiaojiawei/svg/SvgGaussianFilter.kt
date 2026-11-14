@@ -143,7 +143,7 @@ internal class SvgGaussianFilter(
             node.fillProperty().addListener { _ -> requestLayout() }
             node.strokeProperty().addListener { _ -> requestLayout() }
         }
-        if (node is Group) node.children.forEach(::observe)
+        if (node is javafx.scene.Parent) node.childrenUnmodifiable.forEach(::observe)
     }
 
     private fun isMonochrome(node: Node, required: Color? = null): Boolean {

@@ -120,8 +120,11 @@ internal class SvgPlayground(private val original: String) : BorderPane(), AutoC
             host.layout()
             candidate.resize(max(1.0, host.width), max(1.0, host.height))
             candidate.layout()
-            if (candidate.diagnostics.isNotEmpty())
-                throw SvgException(candidate.diagnostics.take(3).joinToString("; ") { it.message })
+            // Only known unsupported visual features may degrade to a partial preview.
+            // Malformed geometry, resource/security failures and exhausted budgets remain errors.
+            val blocking = candidate.diagnostics.filterNot { it.message in PARTIAL_PREVIEW_DIAGNOSTICS }
+            if (blocking.isNotEmpty())
+                throw SvgException(blocking.take(3).joinToString("; ") { it.message })
         } catch (failure: Exception) {
             host.children.setAll(old)
             candidate.source = null
@@ -132,8 +135,11 @@ internal class SvgPlayground(private val original: String) : BorderPane(), AutoC
         candidate.animationAutoPlay = true
         candidate.animationStatusProperty().addListener { _, _, _ -> transport() }
         transport()
+        val warnings = candidate.diagnostics
         return "已更新 · " + count(candidate) + " 个原生节点 · " + codeArea.length + " 字符" +
-            if (candidate.hasAnimations) " · 动画自动播放" else ""
+            (if (candidate.hasAnimations) " · 动画自动播放" else "") +
+            (if (warnings.isNotEmpty()) " · 部分渲染（不支持的效果已跳过）：" +
+                warnings.take(3).joinToString("; ") { it.message } else "")
     }
 
     private fun transport() {
@@ -145,6 +151,13 @@ internal class SvgPlayground(private val original: String) : BorderPane(), AutoC
     override fun close() {
         session.close()
         preview.source = null
+    }
+
+    private companion object {
+        val PARTIAL_PREVIEW_DIAGNOSTICS = setOf(
+            "Unsupported filter primitive: feUnsupported",
+            "Unsupported foreignObject element: {http://www.w3.org/1999/xhtml}p"
+        )
     }
 
     private fun count(node: Node): Int = 1 + if (node is Parent) node.childrenUnmodifiable.sumOf(::count) else 0

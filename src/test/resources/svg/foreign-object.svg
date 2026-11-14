@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="640" height="360" viewBox="0 0 640 360">
+  <title>ForeignObject 混合 HTML</title>
+  <desc>专门作为兼容性边界测试：浏览器支持度与轻量 SVG 库差异明显</desc>
+  <defs></defs>
+  <rect width="640" height="360" fill="#0b1327"/>
+  
+<rect x="49" y="62" width="542" height="237" rx="24" fill="#1b3355" stroke="#3c638e" stroke-width="3"/>
+<text x="320" y="110" font-family="sans-serif" text-anchor="middle" fill="#8ad4f9" font-size="24">SVG + foreignObject</text>
+<foreignObject x="120" y="141" width="400" height="110">
+ <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing:border-box;background:#193e54;border:2px solid #35d3ca;border-radius:17px;color:#f4fcff;font:bold 21px sans-serif;padding:22px;text-align:center;">HTML <span style="color:#66e7d8">inside</span> an SVG <span style="color:#ffc282">✓</span></div>
+</foreignObject>
+
+</svg>

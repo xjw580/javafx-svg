@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="640" height="360" viewBox="0 0 640 360">
+  <title>常规滤镜</title>
+  <desc>高斯模糊、投影、合成与滤镜区域，适合检测滤镜后端差异</desc>
+  <defs>
+<filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="13"/></filter>
+<filter id="shadow" x="-45%" y="-45%" width="200%" height="200%"><feGaussianBlur in="SourceAlpha" stdDeviation="11" result="blur"/><feOffset in="blur" dx="11" dy="14" result="offset"/><feFlood flood-color="#020411" flood-opacity="0.85" result="flood"/><feComposite in="flood" in2="offset" operator="in" result="shadow"/><feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+  <rect width="640" height="360" fill="#0b1327"/>
+  
+<rect x="31" y="42" width="278" height="276" rx="28" fill="#122943"/>
+<circle cx="170" cy="178" r="85" fill="#35e6db" filter="url(#glow)"/>
+<circle cx="170" cy="178" r="65" fill="#1d9cba" stroke="#bfffff" stroke-width="8"/>
+<circle cx="170" cy="178" r="16" fill="#d5ffff"/>
+<rect x="359" y="67" width="198" height="200" rx="32" fill="#ef7397" filter="url(#shadow)"/>
+<rect x="359" y="67" width="198" height="200" rx="32" fill="#7456d2"/>
+<path d="M406 174L453 221 522 129" fill="none" stroke="white" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+
+</svg>

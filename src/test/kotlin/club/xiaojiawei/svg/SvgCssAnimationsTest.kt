@@ -185,7 +185,7 @@ class SvgCssAnimationsTest {
 
     @Test fun cssUseInstancesAndSharedDocumentsKeepIndependentContextsAndClocks() = FxTest.run {
         val first = view("""<style>@keyframes k { from { fill: red } to { fill: blue } }
-            .a .part { animation: k 2s linear } .b .part { animation: k 4s linear }</style>
+            .a { animation: k 2s linear } .b { animation: k 4s linear }</style>
             <defs><circle id="dot" class="part" r="10"/></defs>
             <use class="a" href="#dot" x="25" y="50"/><use class="b" href="#dot" x="75" y="50"/>""")
         val second = SvgView(first.document).apply { animationAutoPlay = false; isManaged = false; Scene(Group(this)); resize(100.0, 100.0) }

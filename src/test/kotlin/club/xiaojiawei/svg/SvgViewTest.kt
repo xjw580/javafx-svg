@@ -88,9 +88,9 @@ class SvgViewTest {
     }
 
     @Test fun invalidAndUnsupportedContentIsDiagnosed() = FxTest.run {
-        val view = SvgView.parse("""<svg><path d="M0"/><foreignObject/></svg>""")
+        val view = SvgView.parse("""<svg><path d="M0"/><unknown/></svg>""")
         assertEquals(2, view.diagnostics.size)
-        assertFailsWith<SvgException> { SvgView.parse("<svg><foreignObject/></svg>", SvgOptions(strict = true)) }
+        assertFailsWith<SvgException> { SvgView.parse("<svg><unknown/></svg>", SvgOptions(strict = true)) }
         assertFails { SvgPathData.validate("M0 0 A10 10 0 2 0 20 20") }
         SvgPathData.validate("M0 0a10 10 0 0110 20z")
     }

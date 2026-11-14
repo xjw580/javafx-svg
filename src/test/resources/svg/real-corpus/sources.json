@@ -1,0 +1,27 @@
+[
+  {
+    "path": "icons/activity.svg",
+    "sha": "629b81c9fd020f3afec659daa5c9c7e5a1d07445",
+    "display_url": "https://github.com/lucide-icons/lucide/blob/main/icons/activity.svg"
+  },
+  {
+    "path": "icons/airplay.svg",
+    "sha": "03ad3669d3a2022e9cbfef2f1dbdcdb982a67e44",
+    "display_url": "https://github.com/lucide-icons/lucide/blob/main/icons/airplay.svg"
+  },
+  {
+    "path": "icons/atom.svg",
+    "sha": "9579a0eaafa396eb6b9702ee507726f7768bce4a",
+    "display_url": "https://github.com/lucide-icons/lucide/blob/main/icons/atom.svg"
+  },
+  {
+    "path": "icons/cpu.svg",
+    "sha": "0307c0e4ad2406f68158978dd183fd38d7b80dd4",
+    "display_url": "https://github.com/lucide-icons/lucide/blob/main/icons/cpu.svg"
+  },
+  {
+    "path": "LICENSE",
+    "sha": "718bb3f0e44153809972abed31839375804bf652",
+    "display_url": "https://github.com/lucide-icons/lucide/blob/main/LICENSE"
+  }
+]

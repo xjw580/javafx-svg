@@ -1,6 +1,0 @@
-r1-path-totalMounted-native: lastWarm=38.9021450181159; firstMeasured=46.542980952381; lastMeasured=39.0992041666667; inspect GC/compilation/noise; no samples removed.
-r2-gradient-totalMounted-native: lastWarm=64.7555; firstMeasured=63.103978125; lastMeasured=73.2319398351648; inspect GC/compilation/noise; no samples removed.
-r2-path-totalMounted-jsvg-fx: lastWarm=30.7701558238636; firstMeasured=32.2003213978495; lastMeasured=37.3038018518519; inspect GC/compilation/noise; no samples removed.
-r3-smil-transform-totalMounted-jsvg-fx: lastWarm=53.7753526315789; firstMeasured=51.4040222222222; lastMeasured=38.8381873846154; inspect GC/compilation/noise; no samples removed.
-r3-smil-transform-totalMounted-fxsvgimage: lastWarm=48.7682025; firstMeasured=51.7443581578947; lastMeasured=76.4752961538462; inspect GC/compilation/noise; no samples removed.
-r3-path-totalMounted-jsvg-awt: lastWarm=27.0723068693694; firstMeasured=29.0733704861111; lastMeasured=38.4486226153846; inspect GC/compilation/noise; no samples removed.

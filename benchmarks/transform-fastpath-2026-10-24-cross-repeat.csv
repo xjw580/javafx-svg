@@ -1,3 +1,0 @@
-provider,scenario,icons,samples,seconds,pulse_p50_ms,pulse_p95_ms,pulse_p99_ms,pulse_max_ms,over_33ms,process_cpu_core_pct,fx_cpu_ms_per_pulse,total_alloc_mib_s,fx_alloc_mib_s,fx_alloc_bytes_per_pulse,gc_count,gc_time_ms,unfocused_samples,iconified_samples
-native,smil-transform,100,814,5.006453,6.080100,10.530300,11.814400,44.631800,1,95.813845,1.036547,19.980252,7.938261,51195.410319,0,0,0,0
-native,smil-transform,500,239,5.014711,16.263500,32.535100,32.827900,33.417000,1,126.814397,5.295502,27.630725,10.848778,238686.962343,0,0,0,0

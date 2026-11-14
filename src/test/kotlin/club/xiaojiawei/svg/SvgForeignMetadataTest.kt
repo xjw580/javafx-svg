@@ -31,8 +31,14 @@ class SvgForeignMetadataTest {
     }
 
     @Test fun unknownSvgGraphicsAndForeignRootsStillFailAndParsingLimitsStillApply() = FxTest.run {
-        for (name in listOf("unknownDrawing", "foreignObject", "script"))
+        for (name in listOf("unknownDrawing", "script"))
             assertFailsWith<SvgException> { SvgView.parse("<svg><" + name + "/></svg>", SvgOptions(strict = true)) }
+        // Supporting bounded XHTML does not make arbitrary HTML elements renderable.
+        assertFailsWith<SvgException> {
+            SvgView.parse("""<svg><foreignObject width="20" height="20">
+                <p xmlns="http://www.w3.org/1999/xhtml">Not in the supported subset</p>
+                </foreignObject></svg>""", SvgOptions(strict = true))
+        }
         assertFailsWith<SvgException> { SvgLoader.parse("""<svg xmlns="urn:editor"/>""") }
         assertFailsWith<SvgException> {
             SvgLoader.parse("""<svg xmlns:e="urn:editor"><e:data><e:item/><e:item/></e:data></svg>""", SvgOptions(maxElements = 2))

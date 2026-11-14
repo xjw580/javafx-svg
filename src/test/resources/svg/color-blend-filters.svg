@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="550" viewBox="0 0 720 550">
+<title>SVG color matrix and blend filters</title><desc>Four color matrix types and five SVG 1.1 blend modes. All calculations use sRGB for visual comparison.</desc>
+<defs>
+<filter id="f-matrix" filterUnits="userSpaceOnUse" x="8" y="8" width="184" height="98" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 .08 0 .65 0 0 .05 0 0 .5 0 .2 0 0 0 1 0"/></filter>
+<filter id="f-saturate" filterUnits="userSpaceOnUse" x="8" y="8" width="184" height="98" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values="0"/></filter>
+<filter id="f-hueRotate" filterUnits="userSpaceOnUse" x="8" y="8" width="184" height="98" color-interpolation-filters="sRGB"><feColorMatrix type="hueRotate" values="110"/></filter>
+<filter id="f-luminanceToAlpha" filterUnits="userSpaceOnUse" x="8" y="8" width="184" height="98" color-interpolation-filters="sRGB"><feColorMatrix type="luminanceToAlpha"/></filter>
+<filter id="f-normal" filterUnits="userSpaceOnUse" x="8" y="8" width="184" height="98" color-interpolation-filters="sRGB"><feFlood flood-color="#f2ad6a" flood-opacity=".85" x="65" y="18" width="105" height="74" result="back"/><feBlend in="SourceGraphic" in2="back" mode="normal"/></filter>
+<filter id="f-multiply" filterUnits="userSpaceOnUse" x="8" y="8" width="184" height="98" color-interpolation-filters="sRGB"><feFlood flood-color="#f2ad6a" flood-opacity=".85" x="65" y="18" width="105" height="74" result="back"/><feBlend in="SourceGraphic" in2="back" mode="multiply"/></filter>
+<filter id="f-screen" filterUnits="userSpaceOnUse" x="8" y="8" width="184" height="98" color-interpolation-filters="sRGB"><feFlood flood-color="#f2ad6a" flood-opacity=".85" x="65" y="18" width="105" height="74" result="back"/><feBlend in="SourceGraphic" in2="back" mode="screen"/></filter>
+<filter id="f-darken" filterUnits="userSpaceOnUse" x="8" y="8" width="184" height="98" color-interpolation-filters="sRGB"><feFlood flood-color="#f2ad6a" flood-opacity=".85" x="65" y="18" width="105" height="74" result="back"/><feBlend in="SourceGraphic" in2="back" mode="darken"/></filter>
+<filter id="f-lighten" filterUnits="userSpaceOnUse" x="8" y="8" width="184" height="98" color-interpolation-filters="sRGB"><feFlood flood-color="#f2ad6a" flood-opacity=".85" x="65" y="18" width="105" height="74" result="back"/><feBlend in="SourceGraphic" in2="back" mode="lighten"/></filter>
+</defs><rect width="720" height="550" fill="#0a1529"/>
+<text x="26" y="35" font-family="sans-serif" font-size="24" font-weight="bold" fill="#f1f6ff">COLOR + BLEND</text>
+<text x="694" y="33" text-anchor="end" font-family="sans-serif" font-size="12" fill="#8ba4c4">4 matrix types · 5 blend modes</text>
+<g transform="translate(24 58)"><rect width="208" height="140" rx="13" fill="#162841" stroke="#2b4261"/>
+<text x="14" y="24" font-family="sans-serif" font-size="12" fill="#bdd3ef">Matrix / tint</text>
+<g transform="translate(4 30)" filter="url(#f-matrix)"><rect x="22" y="20" width="112" height="72" rx="18" fill="#38c9d6"/><circle cx="128" cy="56" r="28" fill="#ae6cfa" fill-opacity=".72"/><circle cx="55" cy="55" r="13" fill="#f4faff" fill-opacity=".7"/></g></g>
+<g transform="translate(256 58)"><rect width="208" height="140" rx="13" fill="#162841" stroke="#2b4261"/>
+<text x="14" y="24" font-family="sans-serif" font-size="12" fill="#bdd3ef">Saturate / grayscale</text>
+<g transform="translate(4 30)" filter="url(#f-saturate)"><rect x="22" y="20" width="112" height="72" rx="18" fill="#38c9d6"/><circle cx="128" cy="56" r="28" fill="#ae6cfa" fill-opacity=".72"/><circle cx="55" cy="55" r="13" fill="#f4faff" fill-opacity=".7"/></g></g>
+<g transform="translate(488 58)"><rect width="208" height="140" rx="13" fill="#162841" stroke="#2b4261"/>
+<text x="14" y="24" font-family="sans-serif" font-size="12" fill="#bdd3ef">Hue rotation / 110°</text>
+<g transform="translate(4 30)" filter="url(#f-hueRotate)"><rect x="22" y="20" width="112" height="72" rx="18" fill="#38c9d6"/><circle cx="128" cy="56" r="28" fill="#ae6cfa" fill-opacity=".72"/><circle cx="55" cy="55" r="13" fill="#f4faff" fill-opacity=".7"/></g></g>
+<g transform="translate(24 212)"><rect width="208" height="140" rx="13" fill="#162841" stroke="#2b4261"/>
+<text x="14" y="24" font-family="sans-serif" font-size="12" fill="#bdd3ef">Luminance → alpha</text>
+<g transform="translate(4 30)" filter="url(#f-luminanceToAlpha)"><rect x="22" y="20" width="112" height="72" rx="18" fill="#38c9d6"/><circle cx="128" cy="56" r="28" fill="#ae6cfa" fill-opacity=".72"/><circle cx="55" cy="55" r="13" fill="#f4faff" fill-opacity=".7"/></g></g>
+<g transform="translate(256 212)"><rect width="208" height="140" rx="13" fill="#162841" stroke="#2b4261"/>
+<text x="14" y="24" font-family="sans-serif" font-size="12" fill="#bdd3ef">Blend / normal</text>
+<g transform="translate(4 30)" filter="url(#f-normal)"><rect x="22" y="20" width="112" height="72" rx="18" fill="#38c9d6"/><circle cx="128" cy="56" r="28" fill="#ae6cfa" fill-opacity=".72"/><circle cx="55" cy="55" r="13" fill="#f4faff" fill-opacity=".7"/></g></g>
+<g transform="translate(488 212)"><rect width="208" height="140" rx="13" fill="#162841" stroke="#2b4261"/>
+<text x="14" y="24" font-family="sans-serif" font-size="12" fill="#bdd3ef">Blend / multiply</text>
+<g transform="translate(4 30)" filter="url(#f-multiply)"><rect x="22" y="20" width="112" height="72" rx="18" fill="#38c9d6"/><circle cx="128" cy="56" r="28" fill="#ae6cfa" fill-opacity=".72"/><circle cx="55" cy="55" r="13" fill="#f4faff" fill-opacity=".7"/></g></g>
+<g transform="translate(24 366)"><rect width="208" height="140" rx="13" fill="#162841" stroke="#2b4261"/>
+<text x="14" y="24" font-family="sans-serif" font-size="12" fill="#bdd3ef">Blend / screen</text>
+<g transform="translate(4 30)" filter="url(#f-screen)"><rect x="22" y="20" width="112" height="72" rx="18" fill="#38c9d6"/><circle cx="128" cy="56" r="28" fill="#ae6cfa" fill-opacity=".72"/><circle cx="55" cy="55" r="13" fill="#f4faff" fill-opacity=".7"/></g></g>
+<g transform="translate(256 366)"><rect width="208" height="140" rx="13" fill="#162841" stroke="#2b4261"/>
+<text x="14" y="24" font-family="sans-serif" font-size="12" fill="#bdd3ef">Blend / darken</text>
+<g transform="translate(4 30)" filter="url(#f-darken)"><rect x="22" y="20" width="112" height="72" rx="18" fill="#38c9d6"/><circle cx="128" cy="56" r="28" fill="#ae6cfa" fill-opacity=".72"/><circle cx="55" cy="55" r="13" fill="#f4faff" fill-opacity=".7"/></g></g>
+<g transform="translate(488 366)"><rect width="208" height="140" rx="13" fill="#162841" stroke="#2b4261"/>
+<text x="14" y="24" font-family="sans-serif" font-size="12" fill="#bdd3ef">Blend / lighten</text>
+<g transform="translate(4 30)" filter="url(#f-lighten)"><rect x="22" y="20" width="112" height="72" rx="18" fill="#38c9d6"/><circle cx="128" cy="56" r="28" fill="#ae6cfa" fill-opacity=".72"/><circle cx="55" cy="55" r="13" fill="#f4faff" fill-opacity=".7"/></g></g>
+<text x="26" y="539" font-family="sans-serif" font-size="11" fill="#8ba4c4">Native rendering · Straight-color matrix math · Premultiplied compositing · Bounded pixel pipeline</text></svg>

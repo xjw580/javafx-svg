@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="640" height="360" viewBox="0 0 640 360">
+  <title>高级滤镜效果</title>
+  <desc>高级像素滤镜测试，部分非浏览器渲染器可能忽略或降级</desc>
+  <defs>
+<filter id="rough" x="-35%" y="-35%" width="170%" height="170%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="7" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="19" xChannelSelector="R" yChannelSelector="G"/></filter>
+<filter id="morphGlow" x="-60%" y="-60%" width="220%" height="220%"><feMorphology in="SourceAlpha" operator="dilate" radius="7" result="big"/><feGaussianBlur in="big" stdDeviation="8" result="blur"/><feFlood flood-color="#dd7fff" flood-opacity="0.95" result="color"/><feComposite in="color" in2="blur" operator="in" result="out"/><feMerge><feMergeNode in="out"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+  <rect width="640" height="360" fill="#0b1327"/>
+  
+<circle cx="189" cy="180" r="115" fill="#24b9cf" filter="url(#rough)"/>
+<circle cx="189" cy="180" r="53" fill="#0b1327"/>
+<rect x="378" y="78" width="165" height="210" rx="26" fill="#a879e9" filter="url(#morphGlow)"/>
+<rect x="388" y="86" width="145" height="194" rx="20" fill="#614cab"/>
+<path d="M408 137L513 227 M513 137L408 227" stroke="#ddd0ff" stroke-width="18" stroke-linecap="round"/>
+
+</svg>

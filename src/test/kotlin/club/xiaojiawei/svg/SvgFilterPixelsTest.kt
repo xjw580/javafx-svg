@@ -4,7 +4,9 @@ import javafx.scene.image.PixelFormat
 import javafx.scene.image.WritableImage
 import javafx.scene.paint.Color
 import org.junit.jupiter.api.Test
+import kotlin.math.ceil
 import kotlin.math.exp
+import kotlin.random.Random
 import kotlin.test.*
 
 class SvgFilterPixelsTest {
@@ -140,10 +142,73 @@ class SvgFilterPixelsTest {
     @Test fun blurRejectsOversizedKernelOrWorkInsteadOfSilentlyClamping() {
         assertTrue(assertFailsWith<IllegalArgumentException> { pixel(0f, 0f, 0f, 0f).blur(86.0, 0.0) }
             .message!!.contains("kernel radius"))
-        assertTrue(assertFailsWith<IllegalArgumentException> { SvgFilterPixels(300, 300, false).blur(80.0, 80.0) }
+        assertTrue(assertFailsWith<IllegalArgumentException> {
+            SvgFilterPixels.flood(300, 300, Color.WHITE, false).blur(80.0, 80.0)
+        }
             .message!!.contains("work limit"))
         assertFailsWith<IllegalArgumentException> { pixel(0f, 0f, 0f, 0f).blur(Double.NaN, 0.0) }
         assertFailsWith<IllegalArgumentException> { pixel(0f, 0f, 0f, 0f).offset(Double.POSITIVE_INFINITY, 0.0) }
+    }
+
+    @Test fun optimizedGaussianMatchesFullRgbaReferenceForDenseSparseAndAlphaOnlyInputs() {
+        val random = Random(117)
+        for (alphaOnly in listOf(false, true)) for (sparse in listOf(false, true)) repeat(5) {
+            val width = random.nextInt(7, 24)
+            val height = random.nextInt(7, 24)
+            val input = SvgFilterPixels(width, height, random.nextBoolean())
+            for (y in 0 until height) for (x in 0 until width) {
+                if (sparse && (x !in 2 until width - 2 || y !in 2 until height - 2 || random.nextBoolean())) continue
+                val i = (y * width + x) * 4
+                val alpha = random.nextFloat()
+                input.data[i + 3] = alpha
+                if (!alphaOnly) for (channel in 0..2) input.data[i + channel] = random.nextFloat() * alpha
+            }
+            val before = input.data.copyOf()
+            for ((sigmaX, sigmaY) in listOf(0.0 to 0.0, 1.2 to 0.0, 0.0 to 2.1,
+                .2 to 1.7, 2.3 to .4, 5.0 to 1.5, 1e-300 to 2.0)) {
+                val result = input.blur(sigmaX, sigmaY)
+                assertPixels(referenceBlur(input, sigmaX, sigmaY), result,
+                    "alphaOnly=$alphaOnly sparse=$sparse sigma=$sigmaX,$sigmaY")
+                assertEquals(input.linear, result.linear)
+                assertContentEquals(before, input.data)
+            }
+        }
+    }
+
+    @Test fun sourceAlphaShadowBlurUsesOnlyItsSupportAndKeepsExistingWorkCap() {
+        // The user's 396x400 filter region and 198x200 source, rendered at 2x.
+        val input = SvgFilterPixels(792, 800, false)
+        for (y in 200 until 600) for (x in 198 until 594) input.data[(y * input.width + x) * 4 + 3] = 1f
+        val work = input.blurWork(22.0, 22.0)
+        assertEquals((528L * 400 + 528L * 532) * 133, work)
+        assertTrue(work < 150_000_000L)
+        assertTrue(input.data.size.toLong() * 266 > 150_000_000L)
+        val result = input.blur(22.0, 22.0)
+        assertEquals(1f, result.data[(400 * input.width + 396) * 4 + 3], 1e-6f)
+        assertTrue(result.data[(200 * input.width + 190) * 4 + 3] > 0f)
+        assertEquals(0f, result.data[(100 * input.width + 100) * 4 + 3])
+        assertTrue(result.data.indices.all { i -> i % 4 == 3 || result.data[i] == 0f })
+
+        val denseAlpha = SvgFilterPixels.flood(600, 600, Color.BLACK, false)
+        assertTrue(denseAlpha.blurWork(80.0, 80.0) > 150_000_000L)
+        assertTrue(assertFailsWith<IllegalArgumentException> { denseAlpha.blur(80.0, 80.0) }
+            .message!!.contains("work limit"))
+    }
+
+    @Test fun gaussianPlanningNeverCachesMutableSupportOrColourMetadata() {
+        val input = SvgFilterPixels(20, 20, false)
+        val i = (10 * input.width + 10) * 4
+        input.data[i + 3] = 1f
+        val alphaWork = input.blurWork(1.0, 1.0)
+        input.data[i] = .5f
+        assertEquals(alphaWork * 4, input.blurWork(1.0, 1.0))
+        assertPixels(referenceBlur(input, 1.0, 1.0), input.blur(1.0, 1.0))
+        input.clip(0, 0, 1, 1)
+        assertEquals(0L, input.blurWork(1.0, 1.0))
+        assertSame(input, input.blur(80.0, 80.0))
+        // An empty support does not excuse an invalid or excessive kernel.
+        assertFailsWith<IllegalArgumentException> { input.blurWork(86.0, 0.0) }
+        assertFailsWith<IllegalArgumentException> { input.blurWork(Double.NaN, 0.0) }
     }
 
     @Test fun clipUsesExclusiveEdgesAndClearsEmptyOrOffCanvasRegions() {
@@ -177,8 +242,66 @@ class SvgFilterPixelsTest {
         assertFailsWith<IllegalArgumentException> { input.composite(input, "arithmetic", k1 = Double.NaN) }
     }
 
+    @Test fun alphaColourConversionMayShareBackingButColouredConversionCannot() {
+        val alpha = pixel(0f, 0f, 0f, .4f)
+        assertFalse(alpha.conversionNeedsBuffer(true))
+        val linear = alpha.converted(true)
+        assertTrue(linear.linear)
+        assertSame(alpha.data, linear.data)
+        assertContentEquals(alpha.data, linear.data)
+        val colour = pixel(.1f, .2f, .3f, .4f)
+        assertTrue(colour.conversionNeedsBuffer(true))
+        assertNotSame(colour.data, colour.converted(true).data)
+    }
+
+    @Test fun privateMergeAccumulatorMatchesNonmutatingCompositeExactly() {
+        val random = Random(721)
+        repeat(100) {
+            fun sample(): SvgFilterPixels {
+                val alpha = random.nextFloat()
+                return pixel(random.nextFloat() * alpha, random.nextFloat() * alpha,
+                    random.nextFloat() * alpha, alpha)
+            }
+            val source = sample(); val destination = sample()
+            val input = source.data.copyOf()
+            val expected = source.composite(destination, "over")
+            assertSame(destination, destination.mergeOver(source))
+            assertContentEquals(expected.data, destination.data)
+            assertContentEquals(input, source.data)
+        }
+    }
+
     private fun pixel(red: Float, green: Float, blue: Float, alpha: Float): SvgFilterPixels =
         SvgFilterPixels(1, 1, false, floatArrayOf(red, green, blue, alpha))
+
+    /** Deliberately unoptimized pre-change convolution, independent of production planning. */
+    private fun referenceBlur(input: SvgFilterPixels, sigmaX: Double, sigmaY: Double): FloatArray {
+        var data = input.data.copyOf()
+        for ((sigma, horizontal) in listOf(sigmaX to true, sigmaY to false)) {
+            if (sigma == 0.0) continue
+            val radius = ceil(3 * sigma).toInt()
+            val weights = DoubleArray(radius * 2 + 1) {
+                val distance = (it - radius).toDouble() / sigma
+                exp(-.5 * distance * distance)
+            }
+            val sum = weights.sum()
+            for (i in weights.indices) weights[i] /= sum
+            val result = FloatArray(data.size)
+            for (y in 0 until input.height) for (x in 0 until input.width) for (channel in 0..3) {
+                var value = 0.0
+                for (tap in weights.indices) {
+                    val sx = if (horizontal) x + tap - radius else x
+                    val sy = if (horizontal) y else y + tap - radius
+                    if (sx in 0 until input.width && sy in 0 until input.height) {
+                        value += data[(sy * input.width + sx) * 4 + channel] * weights[tap]
+                    }
+                }
+                result[(y * input.width + x) * 4 + channel] = value.toFloat()
+            }
+            data = result
+        }
+        return data
+    }
 
     private fun assertPixels(expected: FloatArray, actual: SvgFilterPixels, message: String = "") {
         assertEquals(expected.size, actual.data.size, message)

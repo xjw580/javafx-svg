@@ -183,7 +183,7 @@ class SvgFilterChainTest {
     }
 
     @Test fun unsupportedFeaturesAndBudgetsNeverProduceStaleSuccess() = FxTest.run {
-        for (p in listOf("<feBlend/>", "<feComposite in='BackgroundImage'/>", "<feComposite operator='multiply'/>",
+        for (p in listOf("<feUnsupported/>", "<feComposite in='BackgroundImage'/>", "<feComposite operator='multiply'/>",
             "<feMerge><feFlood/></feMerge>", "<feFlood><animate attributeName='flood-color'/></feFlood>")) {
             assertFailsWith<SvgException>(p) { view(p) }
         }
@@ -220,6 +220,77 @@ class SvgFilterChainTest {
             <rect x="20" y="20" width="20" height="20" transform="translate(10 10)" filter="url(#f)" clip-path="url(#c)"/></svg>""", SvgOptions(strict = true))
         val p = pixels(v).pixelReader
         assertEquals(Color.BLUE, p.getColor(35, 35)); assertEquals(0.0, p.getColor(45, 35).opacity)
+    }
+
+    @Test fun deadResultsDoNotAccumulateButLiveNamedDagInputsAreStillBudgeted() = FxTest.run {
+        val linear = "color-interpolation-filters='sRGB'"
+        val repeated = (0 until 60).joinToString("") { "<feOffset result='unused$it'/>" }
+        val compact = view(repeated, linear, options = SvgOptions(strict = true, maxFilterPixels = 70_000))
+        assertEquals(Color.RED, pixels(compact).pixelReader.getColor(25, 25))
+        val retained = (0 until 12).joinToString("") { "<feFlood result='layer$it'/>" } +
+            "<feMerge>" + (0 until 12).joinToString("") { "<feMergeNode in='layer$it'/>" } + "</feMerge>"
+        assertFailsWith<SvgException> {
+            view(retained, linear, options = SvgOptions(strict = true, maxFilterPixels = 70_000))
+        }
+    }
+
+    @Test fun completedChainsReleaseScratchButKeepTheirVisibleOutputsBudgeted() = FxTest.run {
+        val content = "<rect x='20' y='20' width='20' height='20' fill='red' filter='url(#f)'/>"
+        val v = view("<feFlood flood-color='blue'/>", content = content.repeat(5),
+            options = SvgOptions(strict = true, maxFilterPixels = 100_000))
+        assertEquals(Color.BLUE, pixels(v).pixelReader.getColor(25, 25))
+        assertFailsWith<SvgException> {
+            view("<feFlood/>", content = content.repeat(15),
+                options = SvgOptions(strict = true, maxFilterPixels = 100_000))
+        }
+    }
+
+    @Test fun budgetValidationRejectsNegativeOverflowAndNonfiniteReservations() = FxTest.run {
+        val owner = findChain(view("<feFlood/>"))
+        val budget = SvgFilterBudget(100)
+        assertFailsWith<IllegalArgumentException> { budget.reserve(owner, -1) }
+        assertFailsWith<IllegalArgumentException> { budget.reserve(owner, Long.MAX_VALUE) }
+        assertFailsWith<IllegalArgumentException> { budget.reserveWork(owner, -1.0) }
+        assertFailsWith<IllegalArgumentException> { budget.reserveWork(owner, Double.NaN) }
+        assertFailsWith<IllegalArgumentException> { budget.reserveWork(owner, Double.POSITIVE_INFINITY) }
+        budget.reserve(owner, 100)
+        budget.reserveWork(owner, 200_000_000.0)
+    }
+
+    @Test fun identityPrimitiveCroppingNeverMutatesSharedNamedInput() = FxTest.run {
+        for (identity in listOf("feOffset", "feGaussianBlur")) {
+            val v = view("""<feFlood flood-color="blue" result="saved"/>
+                <$identity in="saved" x="30" y="30" width="10" height="10" result="tiny"/>
+                <feMerge><feMergeNode in="saved"/><feMergeNode in="tiny"/></feMerge>""",
+                "color-interpolation-filters='sRGB'")
+            assertEquals(Color.BLUE, pixels(v).pixelReader.getColor(80, 80), identity)
+            assertTrue(v.diagnostics.isEmpty())
+        }
+    }
+
+    @Test fun releasingPixelScratchDoesNotReleaseAggregateWorkProtection() = FxTest.run {
+        val content = "<rect width='20' height='20' filter='url(#f)'/>"
+        val failure = assertFailsWith<SvgException> {
+            view("<feFlood flood-color='white'/><feGaussianBlur stdDeviation='10'/>",
+                content = content.repeat(40), options = SvgOptions(strict = true))
+        }
+        assertTrue(failure.message!!.contains("per-view 200000000"), failure.message)
+    }
+
+    @Test fun alphaConversionAliasDoesNotLetSubregionCroppingMutateSavedInput() = FxTest.run {
+        val v = view("""<feGaussianBlur in="SourceAlpha" stdDeviation="0" color-interpolation-filters="sRGB" result="saved"/>
+            <feGaussianBlur in="saved" stdDeviation="0" x="30" y="30" width="5" height="5"/>
+            <feFlood flood-color="blue" result="ink"/>
+            <feComposite in="ink" in2="saved" operator="in"/>""")
+        assertEquals(Color.BLUE, pixels(v).pixelReader.getColor(25, 25))
+        assertEquals(Color.BLUE, pixels(v).pixelReader.getColor(35, 35))
+    }
+
+    @Test fun mergeFanInWorkIsRejectedBeforeScanningRepeatedAlphaConversions() = FxTest.run {
+        val failure = assertFailsWith<SvgException> {
+            view("<feMerge>" + "<feMergeNode in='SourceAlpha'/>".repeat(5000) + "</feMerge>")
+        }
+        assertTrue(failure.message!!.contains("work limit"), failure.message)
     }
 
     private fun findChain(node: Node): SvgFilterChain = if (node is SvgFilterChain) node else

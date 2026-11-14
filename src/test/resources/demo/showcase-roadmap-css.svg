@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300" viewBox="0 0 640 300">
+<!-- Supported static child/sibling/attribute selectors only. Functional/dynamic pseudo-classes, namespaces, CSS escapes and attribute case flags remain diagnosed; this is not full browser CSS. -->
+<title>Static selector combinations</title>
+<style>
+.card > rect { fill: #43d6d2 }
+circle + rect { stroke: #ffca70; stroke-width: 7 }
+circle ~ rect[data-role~=highlight] { fill: #a796ff }
+[data-code^=safe][data-code$=end][data-code*='middle'] { fill: #f58ead }
+[lang|=en] { stroke: white; stroke-width: 3 }
+</style>
+<rect width="640" height="300" fill="#101c30"/>
+<g class="card"><rect x="30" y="70" width="120" height="130" rx="16"/></g>
+<g><circle cx="190" cy="135" r="12" fill="white"/><rect x="215" y="70" width="120" height="130" rx="16" data-role="large highlight"/></g>
+<rect x="390" y="70" width="180" height="130" rx="16" data-code="safe-middle-end" lang="en-US"/>
+<g fill="white" font-family="sans-serif" font-size="18" text-anchor="middle"><text x="90" y="240">child</text><text x="275" y="240">siblings + attr</text><text x="480" y="240">attribute chain</text></g>
+</svg>

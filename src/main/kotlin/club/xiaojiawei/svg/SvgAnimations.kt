@@ -35,14 +35,20 @@ internal class SvgAnimations(
                         require(href.startsWith('#') && href.length > 1) { "Only local animation targets are supported" }
                         document.elementsById[href.drop(1)] ?: throw SvgException("Missing animation target: $href")
                     }
-                    require(target != null && target.name in SvgAnimation.TARGETS) { "Unsupported animation target: " + target?.name }
+                    require(target != null && target.name in SvgAnimation.TARGETS + SvgFilterAnimation.ATTRIBUTES.keys) { "Unsupported animation target: " + target?.name }
+                    val filterTarget = target.name in SvgFilterAnimation.ATTRIBUTES
+                    require(!filterTarget || element.name == "animate") { "Only animate is supported on filter primitives" }
                     if (element.name == "animateMotion") {
                         require(target.name != "tspan") { "tspan motion animation is unsupported" }
                         motions.getOrPut(target) { mutableListOf() } += SvgMotion.create(element, document, order++)
                         return
                     }
-                    val spec = SvgAnimation.parse(element, order++)
-                    if (spec.attribute in SvgAnimation.GEOMETRY) {
+                    val spec = SvgAnimation.parse(element, order++, filterTarget)
+                    if (filterTarget) {
+                        require(spec.attribute in SvgFilterAnimation.ATTRIBUTES.getValue(target.name)) { "Unsupported animated filter attribute: " + spec.attribute }
+                        require(element["attributeType"] != "CSS" || spec.attribute in SvgFilterAnimation.STYLE) { "Filter numeric animation requires XML/auto attributes" }
+                    } else require(spec.attribute !in SvgAnimation.FILTER_NUMBERS + SvgAnimation.FILTER_VECTORS + SvgAnimation.FILTER_COLOURS) { "Unsupported animated attribute on " + target.name }
+                    if (!filterTarget && spec.attribute in SvgAnimation.GEOMETRY) {
                         require(spec.attribute in (SvgAnimatedGeometry.attributes[target.name] ?: emptySet())) {
                             "Unsupported geometry animation on " + target.name + ": " + spec.attribute
                         }
@@ -100,6 +106,12 @@ internal class SvgAnimations(
         }
         if (accepted.isNotEmpty()) bindings += Binding(accepted.maxOf { it.first.end }) {}
         return SvgAnimatedGeometry(element, accepted, this, viewport, document.lengths)
+    }
+
+    fun filter(primitives: List<SvgElement>, styleOf: (SvgElement) -> Map<String, String>, viewport: SvgViewport, proportional: Boolean): SvgFilterAnimation {
+        val animation = SvgFilterAnimation(primitives, primitives.associateWith(::specs), styleOf, { time }, viewport, document.lengths, proportional, report)
+        if (animation.isAnimated) bindings += Binding(animation.duration, cacheBlocked = true) {}
+        return animation
     }
 
     fun transform(element: SvgElement, source: Affine, style: Map<String, String>, viewport: SvgViewport, node: Node, isRoot: Boolean) {

@@ -1,4 +1,0 @@
-"round","provider","run","kinds","native_jar","native_sha256"
-"1","native-before","r1-native-before","path,gradient","S:\IdeaProjects\javafx-svg\target\hierarchy-gradient-20261025\before.jar","1E09B83F0C62D0D87BFD363098CBE9620D91937A3AC8874CAEDADE9F645007CD"
-"1","native","r1-native","path,gradient","S:\IdeaProjects\javafx-svg\target\hierarchy-gradient-20261025\after.jar","2396CD9B0C12FDA388A698E7A16A1CC0F874BC4D4A8365D0BDC6E5A036019156"
-"1","fxsvgimage","r1-fxsvgimage","path,gradient","S:\IdeaProjects\javafx-svg\target\hierarchy-gradient-20261025\after.jar","2396CD9B0C12FDA388A698E7A16A1CC0F874BC4D4A8365D0BDC6E5A036019156"

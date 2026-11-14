@@ -1,0 +1,17 @@
+javafx-svg
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at https://www.mozilla.org/MPL/2.0/.
+
+The project-owned source is provided under MPL-2.0. This notice does not
+replace third-party notices or grant rights to third-party material under
+new terms. In particular, the unchanged Lucide/Feather test fixtures in
+src/test/resources/svg/real-corpus retain the ISC/MIT notices in that
+directory's LICENSE and their provenance in sources.json. External
+runtime/build dependencies remain governed by their own licenses.
+
+Project source: https://github.com/xjw580/javafx-svg
+For a prepared release candidate, the matching source is supplied in the
+source distribution and source JAR alongside the binary. A public release
+or artifact repository location must be verified at publication time.

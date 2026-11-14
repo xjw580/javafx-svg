@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="440" viewBox="0 0 720 440">
+<title>Native SVG lighting filters</title>
+<desc>Diffuse and specular lighting with distant, point and spot lights, rendered without WebView.</desc>
+<defs>
+<filter id="light-0-0" filterUnits="userSpaceOnUse" x="11" y="9" width="178" height="98">
+<feGaussianBlur in="SourceAlpha" stdDeviation="3" result="bump"/>
+<feDiffuseLighting in="bump" surfaceScale="10" diffuseConstant="1.35" lighting-color="#e8f5ff" result="light"><feDistantLight azimuth="225" elevation="48"/></feDiffuseLighting>
+<feComposite in="SourceGraphic" in2="light" operator="arithmetic" k1="1"/>
+</filter>
+<filter id="light-0-1" filterUnits="userSpaceOnUse" x="11" y="9" width="178" height="98">
+<feGaussianBlur in="SourceAlpha" stdDeviation="3" result="bump"/>
+<feDiffuseLighting in="bump" surfaceScale="10" diffuseConstant="1.35" lighting-color="#e8f5ff" result="light"><fePointLight x="50" y="10" z="75"/></feDiffuseLighting>
+<feComposite in="SourceGraphic" in2="light" operator="arithmetic" k1="1"/>
+</filter>
+<filter id="light-0-2" filterUnits="userSpaceOnUse" x="11" y="9" width="178" height="98">
+<feGaussianBlur in="SourceAlpha" stdDeviation="3" result="bump"/>
+<feDiffuseLighting in="bump" surfaceScale="10" diffuseConstant="1.35" lighting-color="#e8f5ff" result="light"><feSpotLight x="55" y="-15" z="100" pointsAtX="100" pointsAtY="60" pointsAtZ="0" specularExponent="4" limitingConeAngle="42"/></feDiffuseLighting>
+<feComposite in="SourceGraphic" in2="light" operator="arithmetic" k1="1"/>
+</filter>
+<filter id="light-1-0" filterUnits="userSpaceOnUse" x="11" y="9" width="178" height="98">
+<feGaussianBlur in="SourceAlpha" stdDeviation="3" result="bump"/>
+<feSpecularLighting in="bump" surfaceScale="10" specularConstant="1.25" specularExponent="16" lighting-color="#e8f5ff" result="light"><feDistantLight azimuth="225" elevation="48"/></feSpecularLighting>
+<feComposite in="light" in2="SourceAlpha" operator="in" result="highlight"/>
+<feComposite in="SourceGraphic" in2="highlight" operator="arithmetic" k2="1" k3="1"/>
+</filter>
+<filter id="light-1-1" filterUnits="userSpaceOnUse" x="11" y="9" width="178" height="98">
+<feGaussianBlur in="SourceAlpha" stdDeviation="3" result="bump"/>
+<feSpecularLighting in="bump" surfaceScale="10" specularConstant="1.25" specularExponent="16" lighting-color="#e8f5ff" result="light"><fePointLight x="50" y="10" z="75"/></feSpecularLighting>
+<feComposite in="light" in2="SourceAlpha" operator="in" result="highlight"/>
+<feComposite in="SourceGraphic" in2="highlight" operator="arithmetic" k2="1" k3="1"/>
+</filter>
+<filter id="light-1-2" filterUnits="userSpaceOnUse" x="11" y="9" width="178" height="98">
+<feGaussianBlur in="SourceAlpha" stdDeviation="3" result="bump"/>
+<feSpecularLighting in="bump" surfaceScale="10" specularConstant="1.25" specularExponent="16" lighting-color="#e8f5ff" result="light"><feSpotLight x="55" y="-15" z="100" pointsAtX="100" pointsAtY="60" pointsAtZ="0" specularExponent="4" limitingConeAngle="42"/></feSpecularLighting>
+<feComposite in="light" in2="SourceAlpha" operator="in" result="highlight"/>
+<feComposite in="SourceGraphic" in2="highlight" operator="arithmetic" k2="1" k3="1"/>
+</filter>
+</defs>
+<rect width="720" height="440" fill="#091427"/>
+<text x="28" y="36" font-family="sans-serif" font-size="23" font-weight="bold" fill="#f1f6ff">SVG LIGHTING</text>
+<text x="692" y="34" text-anchor="end" font-family="sans-serif" font-size="12" fill="#8297b4">Native pixels · 3 light sources × 2 models</text>
+<g transform="translate(24 58)">
+<rect width="208" height="164" rx="14" fill="#12223b" stroke="#263b59"/>
+<text x="14" y="23" font-family="sans-serif" font-size="11" letter-spacing="1" fill="#93aaca">DIFFUSE</text>
+<text x="194" y="23" text-anchor="end" font-family="sans-serif" font-size="12" fill="#4ddfc9">Distant</text>
+<g transform="translate(4 31)" filter="url(#light-0-0)">
+<rect x="20" y="18" width="160" height="80" rx="26" fill="#4ddfc9"/>
+<circle cx="70" cy="58" r="15" fill="#ffffff" fill-opacity=".25"/>
+<path d="M104 45 L133 45 M104 58 L145 58 M104 71 L126 71" stroke="#ffffff" stroke-opacity=".25" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g transform="translate(256 58)">
+<rect width="208" height="164" rx="14" fill="#12223b" stroke="#263b59"/>
+<text x="14" y="23" font-family="sans-serif" font-size="11" letter-spacing="1" fill="#93aaca">DIFFUSE</text>
+<text x="194" y="23" text-anchor="end" font-family="sans-serif" font-size="12" fill="#68aafa">Point</text>
+<g transform="translate(4 31)" filter="url(#light-0-1)">
+<rect x="20" y="18" width="160" height="80" rx="26" fill="#68aafa"/>
+<circle cx="70" cy="58" r="15" fill="#ffffff" fill-opacity=".25"/>
+<path d="M104 45 L133 45 M104 58 L145 58 M104 71 L126 71" stroke="#ffffff" stroke-opacity=".25" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g transform="translate(488 58)">
+<rect width="208" height="164" rx="14" fill="#12223b" stroke="#263b59"/>
+<text x="14" y="23" font-family="sans-serif" font-size="11" letter-spacing="1" fill="#93aaca">DIFFUSE</text>
+<text x="194" y="23" text-anchor="end" font-family="sans-serif" font-size="12" fill="#bc8af4">Spot</text>
+<g transform="translate(4 31)" filter="url(#light-0-2)">
+<rect x="20" y="18" width="160" height="80" rx="26" fill="#bc8af4"/>
+<circle cx="70" cy="58" r="15" fill="#ffffff" fill-opacity=".25"/>
+<path d="M104 45 L133 45 M104 58 L145 58 M104 71 L126 71" stroke="#ffffff" stroke-opacity=".25" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g transform="translate(24 240)">
+<rect width="208" height="164" rx="14" fill="#12223b" stroke="#263b59"/>
+<text x="14" y="23" font-family="sans-serif" font-size="11" letter-spacing="1" fill="#93aaca">SPECULAR</text>
+<text x="194" y="23" text-anchor="end" font-family="sans-serif" font-size="12" fill="#4ddfc9">Distant</text>
+<g transform="translate(4 31)" filter="url(#light-1-0)">
+<rect x="20" y="18" width="160" height="80" rx="26" fill="#4ddfc9"/>
+<circle cx="70" cy="58" r="15" fill="#ffffff" fill-opacity=".25"/>
+<path d="M104 45 L133 45 M104 58 L145 58 M104 71 L126 71" stroke="#ffffff" stroke-opacity=".25" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g transform="translate(256 240)">
+<rect width="208" height="164" rx="14" fill="#12223b" stroke="#263b59"/>
+<text x="14" y="23" font-family="sans-serif" font-size="11" letter-spacing="1" fill="#93aaca">SPECULAR</text>
+<text x="194" y="23" text-anchor="end" font-family="sans-serif" font-size="12" fill="#68aafa">Point</text>
+<g transform="translate(4 31)" filter="url(#light-1-1)">
+<rect x="20" y="18" width="160" height="80" rx="26" fill="#68aafa"/>
+<circle cx="70" cy="58" r="15" fill="#ffffff" fill-opacity=".25"/>
+<path d="M104 45 L133 45 M104 58 L145 58 M104 71 L126 71" stroke="#ffffff" stroke-opacity=".25" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<g transform="translate(488 240)">
+<rect width="208" height="164" rx="14" fill="#12223b" stroke="#263b59"/>
+<text x="14" y="23" font-family="sans-serif" font-size="11" letter-spacing="1" fill="#93aaca">SPECULAR</text>
+<text x="194" y="23" text-anchor="end" font-family="sans-serif" font-size="12" fill="#bc8af4">Spot</text>
+<g transform="translate(4 31)" filter="url(#light-1-2)">
+<rect x="20" y="18" width="160" height="80" rx="26" fill="#bc8af4"/>
+<circle cx="70" cy="58" r="15" fill="#ffffff" fill-opacity=".25"/>
+<path d="M104 45 L133 45 M104 58 L145 58 M104 71 L126 71" stroke="#ffffff" stroke-opacity=".25" stroke-width="5" stroke-linecap="round"/>
+</g>
+</g>
+<text x="28" y="425" font-family="sans-serif" font-size="11" fill="#8297b4">Alpha bump map · Linear RGB · Blinn–Phong highlights · Bounded software pipeline</text>
+</svg>

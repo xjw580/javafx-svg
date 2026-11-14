@@ -172,9 +172,6 @@ class SvgTspanTest {
 
     @Test fun unsupportedFeaturesReportAndStrictModeRejectsWithoutBreakingPlainTextLength() = FxTest.run {
         val examples = listOf(
-            """<text x="1 2">A<tspan>B</tspan>C</text>""" to "single length",
-            """<text textLength="100">A<tspan>B</tspan>C</text>""" to "textLength",
-            """<text>A<tspan rotate="20">B</tspan>C</text>""" to "rotate",
             """<text>A<tspan transform="translate(5)">B</tspan>C</text>""" to "transform",
             """<text>A<tspan style="filter: url(#f)">B</tspan>C</text>""" to "filter",
             """<text>A<tspan>مرحبا</tspan>C</text>""" to "Bidirectional",

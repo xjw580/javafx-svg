@@ -1,0 +1,683 @@
+Compiled from "SvgDocument.kt"
+public final class club.xiaojiawei.svg.SvgOptions {
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int, int, int, club.xiaojiawei.svg.SvgResourceResolver, int, int, int, long, long, int, int);
+    descriptor: (ZIIIIIILclub/xiaojiawei/svg/SvgResourceResolver;IIIJJII)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int, int, int, club.xiaojiawei.svg.SvgResourceResolver, int, int, int, long, long, int, int, int, kotlin.jvm.internal.DefaultConstructorMarker);
+    descriptor: (ZIIIIIILclub/xiaojiawei/svg/SvgResourceResolver;IIIJJIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+
+  public final boolean getStrict();
+    descriptor: ()Z
+
+  public final int getMaxBytes();
+    descriptor: ()I
+
+  public final int getMaxDepth();
+    descriptor: ()I
+
+  public final int getMaxElements();
+    descriptor: ()I
+
+  public final int getMaxMaskPixels();
+    descriptor: ()I
+
+  public final int getMaxPatternPixels();
+    descriptor: ()I
+
+  public final int getMaxCachePixels();
+    descriptor: ()I
+
+  public final club.xiaojiawei.svg.SvgResourceResolver getResourceResolver();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgResourceResolver;
+
+  public final int getMaxResourceRequests();
+    descriptor: ()I
+
+  public final int getMaxResourceDepth();
+    descriptor: ()I
+
+  public final int getMaxResourceBytes();
+    descriptor: ()I
+
+  public final long getMaxTotalResourceBytes();
+    descriptor: ()J
+
+  public final long getMaxImagePixels();
+    descriptor: ()J
+
+  public final int getMaxFilterPixels();
+    descriptor: ()I
+
+  public final int getMaxFilterPrimitives();
+    descriptor: ()I
+
+  public final boolean component1();
+    descriptor: ()Z
+
+  public final int component2();
+    descriptor: ()I
+
+  public final int component3();
+    descriptor: ()I
+
+  public final int component4();
+    descriptor: ()I
+
+  public final int component5();
+    descriptor: ()I
+
+  public final int component6();
+    descriptor: ()I
+
+  public final int component7();
+    descriptor: ()I
+
+  public final club.xiaojiawei.svg.SvgResourceResolver component8();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgResourceResolver;
+
+  public final int component9();
+    descriptor: ()I
+
+  public final int component10();
+    descriptor: ()I
+
+  public final int component11();
+    descriptor: ()I
+
+  public final long component12();
+    descriptor: ()J
+
+  public final long component13();
+    descriptor: ()J
+
+  public final int component14();
+    descriptor: ()I
+
+  public final int component15();
+    descriptor: ()I
+
+  public final club.xiaojiawei.svg.SvgOptions copy(boolean, int, int, int, int, int, int, club.xiaojiawei.svg.SvgResourceResolver, int, int, int, long, long, int, int);
+    descriptor: (ZIIIIIILclub/xiaojiawei/svg/SvgResourceResolver;IIIJJII)Lclub/xiaojiawei/svg/SvgOptions;
+
+  public static club.xiaojiawei.svg.SvgOptions copy$default(club.xiaojiawei.svg.SvgOptions, boolean, int, int, int, int, int, int, club.xiaojiawei.svg.SvgResourceResolver, int, int, int, long, long, int, int, int, java.lang.Object);
+    descriptor: (Lclub/xiaojiawei/svg/SvgOptions;ZIIIIIILclub/xiaojiawei/svg/SvgResourceResolver;IIIJJIIILjava/lang/Object;)Lclub/xiaojiawei/svg/SvgOptions;
+
+  public java.lang.String toString();
+    descriptor: ()Ljava/lang/String;
+
+  public int hashCode();
+    descriptor: ()I
+
+  public boolean equals(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)Z
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int, int, int, club.xiaojiawei.svg.SvgResourceResolver, int, int, int, long, long, int);
+    descriptor: (ZIIIIIILclub/xiaojiawei/svg/SvgResourceResolver;IIIJJI)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int, int, int, club.xiaojiawei.svg.SvgResourceResolver, int, int, int, long, long);
+    descriptor: (ZIIIIIILclub/xiaojiawei/svg/SvgResourceResolver;IIIJJ)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int, int, int, club.xiaojiawei.svg.SvgResourceResolver, int, int, int, long);
+    descriptor: (ZIIIIIILclub/xiaojiawei/svg/SvgResourceResolver;IIIJ)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int, int, int, club.xiaojiawei.svg.SvgResourceResolver, int, int, int);
+    descriptor: (ZIIIIIILclub/xiaojiawei/svg/SvgResourceResolver;III)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int, int, int, club.xiaojiawei.svg.SvgResourceResolver, int, int);
+    descriptor: (ZIIIIIILclub/xiaojiawei/svg/SvgResourceResolver;II)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int, int, int, club.xiaojiawei.svg.SvgResourceResolver, int);
+    descriptor: (ZIIIIIILclub/xiaojiawei/svg/SvgResourceResolver;I)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int, int, int, club.xiaojiawei.svg.SvgResourceResolver);
+    descriptor: (ZIIIIIILclub/xiaojiawei/svg/SvgResourceResolver;)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int, int, int);
+    descriptor: (ZIIIIII)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int, int);
+    descriptor: (ZIIIII)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int, int);
+    descriptor: (ZIIII)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int, int);
+    descriptor: (ZIII)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int, int);
+    descriptor: (ZII)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean, int);
+    descriptor: (ZI)V
+
+  public club.xiaojiawei.svg.SvgOptions(boolean);
+    descriptor: (Z)V
+
+  public club.xiaojiawei.svg.SvgOptions();
+    descriptor: ()V
+}
+Compiled from "SvgDocument.kt"
+public final class club.xiaojiawei.svg.SvgException extends java.lang.IllegalArgumentException {
+  public club.xiaojiawei.svg.SvgException(java.lang.String, java.lang.Throwable);
+    descriptor: (Ljava/lang/String;Ljava/lang/Throwable;)V
+
+  public club.xiaojiawei.svg.SvgException(java.lang.String, java.lang.Throwable, int, kotlin.jvm.internal.DefaultConstructorMarker);
+    descriptor: (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+
+  public club.xiaojiawei.svg.SvgException(java.lang.String);
+    descriptor: (Ljava/lang/String;)V
+}
+Compiled from "SvgDocument.kt"
+public final class club.xiaojiawei.svg.SvgDiagnostic {
+  public club.xiaojiawei.svg.SvgDiagnostic(java.lang.String, java.lang.String);
+    descriptor: (Ljava/lang/String;Ljava/lang/String;)V
+
+  public club.xiaojiawei.svg.SvgDiagnostic(java.lang.String, java.lang.String, int, kotlin.jvm.internal.DefaultConstructorMarker);
+    descriptor: (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+
+  public final java.lang.String getMessage();
+    descriptor: ()Ljava/lang/String;
+
+  public final java.lang.String getElementId();
+    descriptor: ()Ljava/lang/String;
+
+  public final java.lang.String component1();
+    descriptor: ()Ljava/lang/String;
+
+  public final java.lang.String component2();
+    descriptor: ()Ljava/lang/String;
+
+  public final club.xiaojiawei.svg.SvgDiagnostic copy(java.lang.String, java.lang.String);
+    descriptor: (Ljava/lang/String;Ljava/lang/String;)Lclub/xiaojiawei/svg/SvgDiagnostic;
+
+  public static club.xiaojiawei.svg.SvgDiagnostic copy$default(club.xiaojiawei.svg.SvgDiagnostic, java.lang.String, java.lang.String, int, java.lang.Object);
+    descriptor: (Lclub/xiaojiawei/svg/SvgDiagnostic;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lclub/xiaojiawei/svg/SvgDiagnostic;
+
+  public java.lang.String toString();
+    descriptor: ()Ljava/lang/String;
+
+  public int hashCode();
+    descriptor: ()I
+
+  public boolean equals(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)Z
+
+  public club.xiaojiawei.svg.SvgDiagnostic(java.lang.String);
+    descriptor: (Ljava/lang/String;)V
+}
+Compiled from "SvgDocument.kt"
+public final class club.xiaojiawei.svg.SvgElement {
+  public club.xiaojiawei.svg.SvgElement(java.lang.String, java.util.Map<java.lang.String, java.lang.String>, java.util.List<club.xiaojiawei.svg.SvgElement>, java.lang.String, java.util.List<? extends club.xiaojiawei.svg.SvgContent>);
+    descriptor: (Ljava/lang/String;Ljava/util/Map;Ljava/util/List;Ljava/lang/String;Ljava/util/List;)V
+
+  public final java.lang.String getName();
+    descriptor: ()Ljava/lang/String;
+
+  public final java.util.Map<java.lang.String, java.lang.String> getAttributes();
+    descriptor: ()Ljava/util/Map;
+
+  public final java.util.List<club.xiaojiawei.svg.SvgElement> getChildren();
+    descriptor: ()Ljava/util/List;
+
+  public final java.lang.String getText();
+    descriptor: ()Ljava/lang/String;
+
+  public final java.util.List<club.xiaojiawei.svg.SvgContent> getContent$javafx_svg();
+    descriptor: ()Ljava/util/List;
+
+  public final java.lang.String getId();
+    descriptor: ()Ljava/lang/String;
+
+  public final java.lang.String get(java.lang.String);
+    descriptor: (Ljava/lang/String;)Ljava/lang/String;
+}
+Compiled from "SvgDocument.kt"
+public final class club.xiaojiawei.svg.SvgDocument {
+  public club.xiaojiawei.svg.SvgDocument(club.xiaojiawei.svg.SvgElement, java.util.Map<java.lang.String, club.xiaojiawei.svg.SvgElement>, java.util.List<club.xiaojiawei.svg.SvgDiagnostic>, club.xiaojiawei.svg.SvgOptions, int, java.net.URI, club.xiaojiawei.svg.SvgPreparedResources);
+    descriptor: (Lclub/xiaojiawei/svg/SvgElement;Ljava/util/Map;Ljava/util/List;Lclub/xiaojiawei/svg/SvgOptions;ILjava/net/URI;Lclub/xiaojiawei/svg/SvgPreparedResources;)V
+
+  public final club.xiaojiawei.svg.SvgElement getRoot();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgElement;
+
+  public final java.util.Map<java.lang.String, club.xiaojiawei.svg.SvgElement> getElementsById();
+    descriptor: ()Ljava/util/Map;
+
+  public final java.util.List<club.xiaojiawei.svg.SvgDiagnostic> getDiagnostics();
+    descriptor: ()Ljava/util/List;
+
+  public final club.xiaojiawei.svg.SvgOptions getOptions();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgOptions;
+
+  public final int getSourceBytes$javafx_svg();
+    descriptor: ()I
+
+  public final java.net.URI getBaseUri();
+    descriptor: ()Ljava/net/URI;
+
+  public final club.xiaojiawei.svg.SvgPreparedResources getResources$javafx_svg();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgPreparedResources;
+
+  public final club.xiaojiawei.svg.SvgStyleSheet getStyleSheet$javafx_svg();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgStyleSheet;
+
+  public final club.xiaojiawei.svg.SvgGeometryCache getGeometry$javafx_svg();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgGeometryCache;
+
+  public final club.xiaojiawei.svg.SvgLengthCache getLengths$javafx_svg();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgLengthCache;
+}
+Compiled from "SvgLoader.kt"
+public final class club.xiaojiawei.svg.SvgLoader {
+  public static final club.xiaojiawei.svg.SvgLoader INSTANCE;
+    descriptor: Lclub/xiaojiawei/svg/SvgLoader;
+  public static final club.xiaojiawei.svg.SvgDocument parse(java.lang.String, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/lang/String;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static club.xiaojiawei.svg.SvgDocument parse$default(java.lang.String, club.xiaojiawei.svg.SvgOptions, int, java.lang.Object);
+    descriptor: (Ljava/lang/String;Lclub/xiaojiawei/svg/SvgOptions;ILjava/lang/Object;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final club.xiaojiawei.svg.SvgDocument parse(java.lang.String, java.net.URI, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/lang/String;Ljava/net/URI;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static club.xiaojiawei.svg.SvgDocument parse$default(java.lang.String, java.net.URI, club.xiaojiawei.svg.SvgOptions, int, java.lang.Object);
+    descriptor: (Ljava/lang/String;Ljava/net/URI;Lclub/xiaojiawei/svg/SvgOptions;ILjava/lang/Object;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final club.xiaojiawei.svg.SvgDocument load(java.nio.file.Path, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/nio/file/Path;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static club.xiaojiawei.svg.SvgDocument load$default(java.nio.file.Path, club.xiaojiawei.svg.SvgOptions, int, java.lang.Object);
+    descriptor: (Ljava/nio/file/Path;Lclub/xiaojiawei/svg/SvgOptions;ILjava/lang/Object;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final club.xiaojiawei.svg.SvgDocument load(java.net.URL, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/net/URL;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static club.xiaojiawei.svg.SvgDocument load$default(java.net.URL, club.xiaojiawei.svg.SvgOptions, int, java.lang.Object);
+    descriptor: (Ljava/net/URL;Lclub/xiaojiawei/svg/SvgOptions;ILjava/lang/Object;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final club.xiaojiawei.svg.SvgDocument load(java.io.InputStream, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/io/InputStream;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static club.xiaojiawei.svg.SvgDocument load$default(java.io.InputStream, club.xiaojiawei.svg.SvgOptions, int, java.lang.Object);
+    descriptor: (Ljava/io/InputStream;Lclub/xiaojiawei/svg/SvgOptions;ILjava/lang/Object;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final club.xiaojiawei.svg.SvgDocument load(java.io.InputStream, java.net.URI, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/io/InputStream;Ljava/net/URI;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static club.xiaojiawei.svg.SvgDocument load$default(java.io.InputStream, java.net.URI, club.xiaojiawei.svg.SvgOptions, int, java.lang.Object);
+    descriptor: (Ljava/io/InputStream;Ljava/net/URI;Lclub/xiaojiawei/svg/SvgOptions;ILjava/lang/Object;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final club.xiaojiawei.svg.SvgDocument parse(java.lang.String);
+    descriptor: (Ljava/lang/String;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final club.xiaojiawei.svg.SvgDocument parse(java.lang.String, java.net.URI);
+    descriptor: (Ljava/lang/String;Ljava/net/URI;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final club.xiaojiawei.svg.SvgDocument load(java.nio.file.Path);
+    descriptor: (Ljava/nio/file/Path;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final club.xiaojiawei.svg.SvgDocument load(java.net.URL);
+    descriptor: (Ljava/net/URL;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final club.xiaojiawei.svg.SvgDocument load(java.io.InputStream);
+    descriptor: (Ljava/io/InputStream;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final club.xiaojiawei.svg.SvgDocument load(java.io.InputStream, java.net.URI);
+    descriptor: (Ljava/io/InputStream;Ljava/net/URI;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static final void access$loadBytes$report(club.xiaojiawei.svg.SvgOptions, java.util.List, java.lang.String, club.xiaojiawei.svg.SvgElement);
+    descriptor: (Lclub/xiaojiawei/svg/SvgOptions;Ljava/util/List;Ljava/lang/String;Lclub/xiaojiawei/svg/SvgElement;)V
+}
+Compiled from "SvgView.kt"
+public final class club.xiaojiawei.svg.SvgView extends javafx.scene.layout.Region {
+  public static final club.xiaojiawei.svg.SvgView$Companion Companion;
+    descriptor: Lclub/xiaojiawei/svg/SvgView$Companion;
+  public club.xiaojiawei.svg.SvgView(club.xiaojiawei.svg.SvgDocument);
+    descriptor: (Lclub/xiaojiawei/svg/SvgDocument;)V
+
+  public club.xiaojiawei.svg.SvgView(club.xiaojiawei.svg.SvgDocument, int, kotlin.jvm.internal.DefaultConstructorMarker);
+    descriptor: (Lclub/xiaojiawei/svg/SvgDocument;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+
+  public final javafx.scene.paint.Paint getSvgFill();
+    descriptor: ()Ljavafx/scene/paint/Paint;
+
+  public final void setSvgFill(javafx.scene.paint.Paint);
+    descriptor: (Ljavafx/scene/paint/Paint;)V
+
+  public final javafx.beans.property.ObjectProperty<javafx.scene.paint.Paint> svgFillProperty();
+    descriptor: ()Ljavafx/beans/property/ObjectProperty;
+
+  public final javafx.scene.paint.Paint getSvgStroke();
+    descriptor: ()Ljavafx/scene/paint/Paint;
+
+  public final void setSvgStroke(javafx.scene.paint.Paint);
+    descriptor: (Ljavafx/scene/paint/Paint;)V
+
+  public final javafx.beans.property.ObjectProperty<javafx.scene.paint.Paint> svgStrokeProperty();
+    descriptor: ()Ljavafx/beans/property/ObjectProperty;
+
+  public final double getSvgStrokeWidth();
+    descriptor: ()D
+
+  public final void setSvgStrokeWidth(double);
+    descriptor: (D)V
+
+  public final javafx.beans.property.DoubleProperty svgStrokeWidthProperty();
+    descriptor: ()Ljavafx/beans/property/DoubleProperty;
+
+  public java.util.List<javafx.css.CssMetaData<? extends javafx.css.Styleable, ?>> getCssMetaData();
+    descriptor: ()Ljava/util/List;
+
+  public final club.xiaojiawei.svg.SvgDocument getDocument();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgDocument;
+
+  public final void setDocument(club.xiaojiawei.svg.SvgDocument);
+    descriptor: (Lclub/xiaojiawei/svg/SvgDocument;)V
+
+  public final javafx.beans.property.ReadOnlyObjectProperty<club.xiaojiawei.svg.SvgDocument> documentProperty();
+    descriptor: ()Ljavafx/beans/property/ReadOnlyObjectProperty;
+
+  public final club.xiaojiawei.svg.SvgResourceCache getResourceCache();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgResourceCache;
+
+  public final void setResourceCache(club.xiaojiawei.svg.SvgResourceCache);
+    descriptor: (Lclub/xiaojiawei/svg/SvgResourceCache;)V
+
+  public final club.xiaojiawei.svg.SvgOptions getSourceOptions();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgOptions;
+
+  public final void setSourceOptions(club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Lclub/xiaojiawei/svg/SvgOptions;)V
+
+  public final java.lang.String getSource();
+    descriptor: ()Ljava/lang/String;
+
+  public final void setSource(java.lang.String);
+    descriptor: (Ljava/lang/String;)V
+
+  public final javafx.beans.property.ReadOnlyStringProperty sourceProperty();
+    descriptor: ()Ljavafx/beans/property/ReadOnlyStringProperty;
+
+  public final boolean isLoading();
+    descriptor: ()Z
+
+  public final javafx.beans.property.ReadOnlyBooleanProperty loadingProperty();
+    descriptor: ()Ljavafx/beans/property/ReadOnlyBooleanProperty;
+
+  public final club.xiaojiawei.svg.SvgException getLoadException();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgException;
+
+  public final javafx.beans.property.ReadOnlyObjectProperty<club.xiaojiawei.svg.SvgException> loadExceptionProperty();
+    descriptor: ()Ljavafx/beans/property/ReadOnlyObjectProperty;
+
+  public final boolean getRenderCacheEnabled();
+    descriptor: ()Z
+
+  public final void setRenderCacheEnabled(boolean);
+    descriptor: (Z)V
+
+  public final javafx.beans.property.BooleanProperty renderCacheEnabledProperty();
+    descriptor: ()Ljavafx/beans/property/BooleanProperty;
+
+  public final double getFitWidth();
+    descriptor: ()D
+
+  public final void setFitWidth(double);
+    descriptor: (D)V
+
+  public final javafx.beans.property.DoubleProperty fitWidthProperty();
+    descriptor: ()Ljavafx/beans/property/DoubleProperty;
+
+  public final double getFitHeight();
+    descriptor: ()D
+
+  public final void setFitHeight(double);
+    descriptor: (D)V
+
+  public final javafx.beans.property.DoubleProperty fitHeightProperty();
+    descriptor: ()Ljavafx/beans/property/DoubleProperty;
+
+  public final boolean getPreserveRatio();
+    descriptor: ()Z
+
+  public final void setPreserveRatio(boolean);
+    descriptor: (Z)V
+
+  public final javafx.beans.property.BooleanProperty preserveRatioProperty();
+    descriptor: ()Ljavafx/beans/property/BooleanProperty;
+
+  public final boolean getAnimationAutoPlay();
+    descriptor: ()Z
+
+  public final void setAnimationAutoPlay(boolean);
+    descriptor: (Z)V
+
+  public final javafx.beans.property.BooleanProperty animationAutoPlayProperty();
+    descriptor: ()Ljavafx/beans/property/BooleanProperty;
+
+  public final boolean getHasAnimations();
+    descriptor: ()Z
+
+  public final javafx.animation.Animation$Status getAnimationStatus();
+    descriptor: ()Ljavafx/animation/Animation$Status;
+
+  public final javafx.beans.property.ReadOnlyObjectProperty<javafx.animation.Animation$Status> animationStatusProperty();
+    descriptor: ()Ljavafx/beans/property/ReadOnlyObjectProperty;
+
+  public final javafx.util.Duration getAnimationTime();
+    descriptor: ()Ljavafx/util/Duration;
+
+  public final javafx.beans.property.ReadOnlyObjectProperty<javafx.util.Duration> animationTimeProperty();
+    descriptor: ()Ljavafx/beans/property/ReadOnlyObjectProperty;
+
+  public final javafx.util.Duration getAnimationDuration();
+    descriptor: ()Ljavafx/util/Duration;
+
+  public final javafx.beans.property.ReadOnlyObjectProperty<javafx.util.Duration> animationDurationProperty();
+    descriptor: ()Ljavafx/beans/property/ReadOnlyObjectProperty;
+
+  public final void playAnimations();
+    descriptor: ()V
+
+  public final void pauseAnimations();
+    descriptor: ()V
+
+  public final void stopAnimations();
+    descriptor: ()V
+
+  public final void seekAnimations(javafx.util.Duration);
+    descriptor: (Ljavafx/util/Duration;)V
+
+  public final java.util.List<club.xiaojiawei.svg.SvgDiagnostic> getDiagnostics();
+    descriptor: ()Ljava/util/List;
+
+  public club.xiaojiawei.svg.SvgView();
+    descriptor: ()V
+
+  public static final java.util.List<javafx.css.CssMetaData<? extends javafx.css.Styleable, ?>> getClassCssMetaData();
+    descriptor: ()Ljava/util/List;
+
+  public static final club.xiaojiawei.svg.SvgView parse(java.lang.String, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/lang/String;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final club.xiaojiawei.svg.SvgView parse(java.lang.String, java.net.URI, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/lang/String;Ljava/net/URI;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final club.xiaojiawei.svg.SvgView load(java.nio.file.Path, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/nio/file/Path;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final club.xiaojiawei.svg.SvgView load(java.net.URL, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/net/URL;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final club.xiaojiawei.svg.SvgView load(java.io.InputStream, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/io/InputStream;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final club.xiaojiawei.svg.SvgView load(java.io.InputStream, java.net.URI, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/io/InputStream;Ljava/net/URI;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final club.xiaojiawei.svg.SvgView parse(java.lang.String);
+    descriptor: (Ljava/lang/String;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final club.xiaojiawei.svg.SvgView parse(java.lang.String, java.net.URI);
+    descriptor: (Ljava/lang/String;Ljava/net/URI;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final club.xiaojiawei.svg.SvgView load(java.nio.file.Path);
+    descriptor: (Ljava/nio/file/Path;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final club.xiaojiawei.svg.SvgView load(java.net.URL);
+    descriptor: (Ljava/net/URL;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final club.xiaojiawei.svg.SvgView load(java.io.InputStream);
+    descriptor: (Ljava/io/InputStream;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final club.xiaojiawei.svg.SvgView load(java.io.InputStream, java.net.URI);
+    descriptor: (Ljava/io/InputStream;Ljava/net/URI;)Lclub/xiaojiawei/svg/SvgView;
+
+  public static final java.util.List access$getCSS_META_DATA$cp();
+    descriptor: ()Ljava/util/List;
+
+  public static final javafx.css.CssMetaData access$getFILL_CSS$cp();
+    descriptor: ()Ljavafx/css/CssMetaData;
+
+  public static final void access$updateTheme(club.xiaojiawei.svg.SvgView);
+    descriptor: (Lclub/xiaojiawei/svg/SvgView;)V
+
+  public static final javafx.css.CssMetaData access$getSTROKE_CSS$cp();
+    descriptor: ()Ljavafx/css/CssMetaData;
+
+  public static final javafx.css.CssMetaData access$getSTROKE_WIDTH_CSS$cp();
+    descriptor: ()Ljavafx/css/CssMetaData;
+
+  public static final javafx.css.StyleableObjectProperty access$getSvgFillValue$p(club.xiaojiawei.svg.SvgView);
+    descriptor: (Lclub/xiaojiawei/svg/SvgView;)Ljavafx/css/StyleableObjectProperty;
+
+  public static final javafx.css.StyleableObjectProperty access$getSvgStrokeValue$p(club.xiaojiawei.svg.SvgView);
+    descriptor: (Lclub/xiaojiawei/svg/SvgView;)Ljavafx/css/StyleableObjectProperty;
+
+  public static final javafx.css.StyleableDoubleProperty access$getSvgStrokeWidthValue$p(club.xiaojiawei.svg.SvgView);
+    descriptor: (Lclub/xiaojiawei/svg/SvgView;)Ljavafx/css/StyleableDoubleProperty;
+}
+Compiled from "SvgResourceCache.kt"
+public final class club.xiaojiawei.svg.SvgResourceCache {
+  public static final club.xiaojiawei.svg.SvgResourceCache$Companion Companion;
+    descriptor: Lclub/xiaojiawei/svg/SvgResourceCache$Companion;
+  public static final club.xiaojiawei.svg.SvgResourceCache shared;
+    descriptor: Lclub/xiaojiawei/svg/SvgResourceCache;
+  public club.xiaojiawei.svg.SvgResourceCache(int, long, java.time.Duration, kotlin.jvm.functions.Function0<java.lang.Long>);
+    descriptor: (IJLjava/time/Duration;Lkotlin/jvm/functions/Function0;)V
+
+  public final int getMaxEntries();
+    descriptor: ()I
+
+  public final long getMaxSourceBytes();
+    descriptor: ()J
+
+  public final java.time.Duration getExpireAfter();
+    descriptor: ()Ljava/time/Duration;
+
+  public club.xiaojiawei.svg.SvgResourceCache(int, long, java.time.Duration);
+    descriptor: (IJLjava/time/Duration;)V
+
+  public club.xiaojiawei.svg.SvgResourceCache(int, long, java.time.Duration, int, kotlin.jvm.internal.DefaultConstructorMarker);
+    descriptor: (IJLjava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+
+  public final int getSize();
+    descriptor: ()I
+
+  public final long getSourceBytes();
+    descriptor: ()J
+
+  public final club.xiaojiawei.svg.SvgDocument load(java.nio.file.Path, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/nio/file/Path;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static club.xiaojiawei.svg.SvgDocument load$default(club.xiaojiawei.svg.SvgResourceCache, java.nio.file.Path, club.xiaojiawei.svg.SvgOptions, int, java.lang.Object);
+    descriptor: (Lclub/xiaojiawei/svg/SvgResourceCache;Ljava/nio/file/Path;Lclub/xiaojiawei/svg/SvgOptions;ILjava/lang/Object;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public final club.xiaojiawei.svg.SvgDocument load(java.net.URL, club.xiaojiawei.svg.SvgOptions);
+    descriptor: (Ljava/net/URL;Lclub/xiaojiawei/svg/SvgOptions;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public static club.xiaojiawei.svg.SvgDocument load$default(club.xiaojiawei.svg.SvgResourceCache, java.net.URL, club.xiaojiawei.svg.SvgOptions, int, java.lang.Object);
+    descriptor: (Lclub/xiaojiawei/svg/SvgResourceCache;Ljava/net/URL;Lclub/xiaojiawei/svg/SvgOptions;ILjava/lang/Object;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public final void clear();
+    descriptor: ()V
+
+  public final void invalidate(java.nio.file.Path);
+    descriptor: (Ljava/nio/file/Path;)V
+
+  public final void invalidate(java.net.URL);
+    descriptor: (Ljava/net/URL;)V
+
+  public club.xiaojiawei.svg.SvgResourceCache(int, long);
+    descriptor: (IJ)V
+
+  public club.xiaojiawei.svg.SvgResourceCache(int);
+    descriptor: (I)V
+
+  public club.xiaojiawei.svg.SvgResourceCache();
+    descriptor: ()V
+
+  public final club.xiaojiawei.svg.SvgDocument load(java.nio.file.Path);
+    descriptor: (Ljava/nio/file/Path;)Lclub/xiaojiawei/svg/SvgDocument;
+
+  public final club.xiaojiawei.svg.SvgDocument load(java.net.URL);
+    descriptor: (Ljava/net/URL;)Lclub/xiaojiawei/svg/SvgDocument;
+}
+Compiled from "SvgResources.kt"
+public final class club.xiaojiawei.svg.SvgResourceKind extends java.lang.Enum<club.xiaojiawei.svg.SvgResourceKind> {
+  public static final club.xiaojiawei.svg.SvgResourceKind STYLESHEET;
+    descriptor: Lclub/xiaojiawei/svg/SvgResourceKind;
+  public static final club.xiaojiawei.svg.SvgResourceKind IMAGE;
+    descriptor: Lclub/xiaojiawei/svg/SvgResourceKind;
+  public static club.xiaojiawei.svg.SvgResourceKind[] values();
+    descriptor: ()[Lclub/xiaojiawei/svg/SvgResourceKind;
+
+  public static club.xiaojiawei.svg.SvgResourceKind valueOf(java.lang.String);
+    descriptor: (Ljava/lang/String;)Lclub/xiaojiawei/svg/SvgResourceKind;
+
+  public static kotlin.enums.EnumEntries<club.xiaojiawei.svg.SvgResourceKind> getEntries();
+    descriptor: ()Lkotlin/enums/EnumEntries;
+}
+Compiled from "SvgResources.kt"
+public final class club.xiaojiawei.svg.SvgResourceRequest {
+  public club.xiaojiawei.svg.SvgResourceRequest(java.net.URI, club.xiaojiawei.svg.SvgResourceKind);
+    descriptor: (Ljava/net/URI;Lclub/xiaojiawei/svg/SvgResourceKind;)V
+
+  public final java.net.URI getUri();
+    descriptor: ()Ljava/net/URI;
+
+  public final club.xiaojiawei.svg.SvgResourceKind getKind();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgResourceKind;
+
+  public final java.net.URI component1();
+    descriptor: ()Ljava/net/URI;
+
+  public final club.xiaojiawei.svg.SvgResourceKind component2();
+    descriptor: ()Lclub/xiaojiawei/svg/SvgResourceKind;
+
+  public final club.xiaojiawei.svg.SvgResourceRequest copy(java.net.URI, club.xiaojiawei.svg.SvgResourceKind);
+    descriptor: (Ljava/net/URI;Lclub/xiaojiawei/svg/SvgResourceKind;)Lclub/xiaojiawei/svg/SvgResourceRequest;
+
+  public static club.xiaojiawei.svg.SvgResourceRequest copy$default(club.xiaojiawei.svg.SvgResourceRequest, java.net.URI, club.xiaojiawei.svg.SvgResourceKind, int, java.lang.Object);
+    descriptor: (Lclub/xiaojiawei/svg/SvgResourceRequest;Ljava/net/URI;Lclub/xiaojiawei/svg/SvgResourceKind;ILjava/lang/Object;)Lclub/xiaojiawei/svg/SvgResourceRequest;
+
+  public java.lang.String toString();
+    descriptor: ()Ljava/lang/String;
+
+  public int hashCode();
+    descriptor: ()I
+
+  public boolean equals(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)Z
+}
+Compiled from "SvgResources.kt"
+public interface club.xiaojiawei.svg.SvgResourceResolver {
+  public abstract java.io.InputStream open(club.xiaojiawei.svg.SvgResourceRequest);
+    descriptor: (Lclub/xiaojiawei/svg/SvgResourceRequest;)Ljava/io/InputStream;
+}
+Compiled from "SvgResources.kt"
+public final class club.xiaojiawei.svg.SvgResourceResolvers {
+  public static final club.xiaojiawei.svg.SvgResourceResolvers INSTANCE;
+    descriptor: Lclub/xiaojiawei/svg/SvgResourceResolvers;
+  public static final club.xiaojiawei.svg.SvgResourceResolver directory(java.nio.file.Path);
+    descriptor: (Ljava/nio/file/Path;)Lclub/xiaojiawei/svg/SvgResourceResolver;
+}

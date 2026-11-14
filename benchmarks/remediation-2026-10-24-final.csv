@@ -1,4 +1,0 @@
-"provider","scenario","icons","samples","seconds","pulse_p50_ms","pulse_p95_ms","pulse_p99_ms","pulse_max_ms","over_33ms","process_cpu_core_pct","fx_cpu_ms_per_pulse","total_alloc_mib_s","fx_alloc_mib_s","fx_alloc_bytes_per_pulse","gc_count","gc_time_ms","unfocused_samples","iconified_samples","run"
-"native","path","500","768","5.002230","6.120800","8.549600","15.700200","58.135100","6","113.386941","3.153483","49.379578","44.105756","301229.552083","1","9","0","0","path-final"
-"native","gradient","500","719","5.006409","6.139500","8.527100","18.411500","97.121800","6","117.973791","3.455319","46.262773","41.259894","301248.867872","1","11","0","0","render-final"
-"native","smil-transform","500","694","5.001362","6.937500","9.664700","16.297000","43.368200","1","114.343857","4.592939","63.904174","52.082394","393567.884726","1","10","0","0","render-final"

@@ -1,0 +1,2 @@
+# Preserve the upstream corpus byte-for-byte for checksum verification.
+src/test/resources/svg/real-corpus/** -text

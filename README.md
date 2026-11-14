@@ -19,7 +19,7 @@
 <dependency>
     <groupId>club.xiaojiawei</groupId>
     <artifactId>javafx-svg</artifactId>
-    <version>1.0.0-rc</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
@@ -36,7 +36,7 @@
 <dependency>
     <groupId>com.github.xjw580</groupId>
     <artifactId>javafx-svg</artifactId>
-    <version>1.0.0-rc</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 

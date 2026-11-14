@@ -1,5 +1,11 @@
-# Pin an available Java 21 SDK; fail instead of silently building with JDK 17.
-before_install:
-  - sdk install java 21.0.13.0+9-tem
 install:
-  - sdk use java 21.0.13.0+9-tem && mvn -B -V -Pheadless clean install
+  - |
+    set -e
+    jdk_dir=$(mktemp -d)
+    trap 'rm -rf "$jdk_dir"' EXIT
+    curl -fsSL --retry 3 -o "$jdk_dir/jdk.tar.gz" https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse
+    tar -xzf "$jdk_dir/jdk.tar.gz" -C "$jdk_dir" --strip-components=1
+    export JAVA_HOME="$jdk_dir"
+    export PATH="$JAVA_HOME/bin:$PATH"
+    java -version
+    mvn -B -V -Pheadless clean install

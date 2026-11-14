@@ -6,9 +6,9 @@
 
     <groupId>club.xiaojiawei</groupId>
     <artifactId>javafx-svg</artifactId>
-    <version>1.0.0-rc</version>
+    <version>1.0.0</version>
     <name>JavaFX SVG</name>
-    <description>Native JavaFX scene-graph SVG rendering with CSS styling</description>
+    <description>原生JavaFX场景图SVG渲染</description>
 
     <url>https://github.com/xjw580/javafx-svg</url>
     <scm>
@@ -35,8 +35,6 @@
         <kotlin.version>2.2.0</kotlin.version>
         <javafx.version>21.0.8</javafx.version>
     </properties>
-
-
 
     <build>
         <sourceDirectory>src/main/kotlin</sourceDirectory>
